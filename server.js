@@ -134,7 +134,7 @@ function roomText(room) {
     text += '\n\n📱 Жеке хабарламаларыңызды тексеріңіздер!';
     text += '\n⏳ Бірінші кірген ойыншыға 1 минут 30 секунд беріледі.';
   } else {
-    text += '\n\n♟️ Ойын басталды! Сәттілік!';
+    text += '\n\n🎮 <b>Ойын басталды!</b>\nСәттілік!';
   }
 
   return text;
@@ -152,7 +152,6 @@ function roomKeyboard(room) {
     };
   }
 
-  // Екі ойыншы қосылған соң батырмалар жеке хабарламаға жіберіледі.
   return { inline_keyboard: [] };
 }
 
@@ -168,6 +167,10 @@ async function updateGroupRoom(room) {
   });
 }
 
+/*
+ * Ескі хабарламаны өшіріп,
+ * топқа жаңадан ойын басталғаны туралы хабарлама жібереді.
+ */
 async function replaceGroupRoomMessage(room) {
   if (!room) return;
 
@@ -182,11 +185,18 @@ async function replaceGroupRoomMessage(room) {
     }
   }
 
+  const text =
+    '♟️ <b>ШАШКА ОЙЫНЫ</b>\n\n' +
+    room.players.map((player, index) =>
+      `${index + 1}. ${playerLink(player)} ✅`
+    ).join('\n') +
+    '\n\n🎮 <b>Ойын басталды!</b>\n' +
+    'Сәттілік!';
+
   const sent = await telegramApi('sendMessage', {
     chat_id: room.chatId,
-    text: roomText(room),
-    parse_mode: 'HTML',
-    reply_markup: roomKeyboard(room)
+    text,
+    parse_mode: 'HTML'
   });
 
   room.messageId = sent.result.message_id;
@@ -280,7 +290,6 @@ function sendGroupWaiting(room) {
 
   const message = groupWaitingMessage(room);
 
-  // Екі ойыншыға да бірдей уақыт көрсетіледі.
   for (const player of room.players) {
     send(users.get(String(player.id)), message);
   }
@@ -291,12 +300,10 @@ function startGroupWaitingTimer(room, g, firstPlayerId) {
     return;
   }
 
-  // Бірінші кірген ойыншыны тек бір рет белгілейміз.
   if (!room.firstConnectedId) {
     room.firstConnectedId = String(firstPlayerId);
   }
 
-  // Қайта қосылғанда таймер қайта басталмайды.
   if (!room.waitingDeadline) {
     room.waitingDeadline = Date.now() + GROUP_WAIT_MS;
   }
@@ -336,13 +343,15 @@ function startGroupWaitingTimer(room, g, firstPlayerId) {
       return;
     }
 
-    // Бірінші кірген ойыншының өзі жеңімпаз болады.
     const winnerSide = sideOfUser(g, room.firstConnectedId);
 
     finish(g, winnerSide, 'opponent_timeout');
   };
 
-  room.waitingTimer = setTimeout(check, Math.max(0, deadline - Date.now()));
+  room.waitingTimer = setTimeout(
+    check,
+    Math.max(0, deadline - Date.now())
+  );
 
   if (room.waitingTimer.unref) {
     room.waitingTimer.unref();
@@ -516,7 +525,6 @@ async function sendLinksToBothPlayers(room) {
     console.error('Топ хабарламасын жаңарту қатесі:', error.message);
   }
 
-  // Жеке хабарламаға жібере алмаған жағдайда топқа ескерту.
   if (room.privateSent < 2) {
     try {
       await telegramApi('sendMessage', {
@@ -1102,6 +1110,7 @@ function startGroupMatch(room, g) {
   send(first, { t: 'group_started' });
   send(second, { t: 'group_started' });
 
+  // Ескі хабарлама өшіріліп, жаңа хабарлама жіберіледі.
   replaceGroupRoomMessage(room).catch(error => {
     console.error('Ойын басталғандағы хабарлама қатесі:', error.message);
   });
@@ -1169,7 +1178,6 @@ function joinGroupGame(u, token) {
     g = createPendingGroupGame(room);
   }
 
-  // Бірінші нақты кірген ойыншыны белгілейміз.
   if (!room.firstConnectedId) {
     room.firstConnectedId = String(u.id);
   }
@@ -1194,7 +1202,6 @@ function joinGroupGame(u, token) {
   send(u, gameState(g, u.id));
   send(u, groupWaitingMessage(room));
 
-  // Екінші ойыншы кіргенде бірінші ойыншыға да жаңартылған күй жіберіледі.
   sendGroupWaiting(room);
 }
 
