@@ -59,7 +59,7 @@ async function telegramApi(method, data) {
   return result;
 }
 
-/* ---------- Guruh o‘йындары ---------- */
+/* ---------- Guruh o‘yinlari ---------- */
 
 const groupRooms = new Map();
 const groupTokens = new Map();
@@ -86,7 +86,7 @@ function roomText(room) {
   } else if (room.entered.size < 2) {
     text += '\nЕкі ойыншы да «ОЙЫНҒА КІРУ» батырмасын бассын.';
   } else {
-    text += '\nЕкі ойыншы да кірді! Ойынға қосылу күтілуде...';
+    text += '\nЕкі ойыншы да кірді! Mini App ашылуын күтеміз...';
   }
 
   return text;
@@ -131,6 +131,27 @@ async function answerCallback(id, text, alert = false) {
   }
 }
 
+function cleanupGroupRoom(code) {
+  const room = groupRooms.get(code);
+  if (!room) return;
+
+  clearTimeout(room.timer);
+
+  for (const player of room.players) {
+    const id = String(player.id);
+
+    if (groupPlayerRooms.get(id) === code) {
+      groupPlayerRooms.delete(id);
+    }
+  }
+
+  for (const token of room.tokens.values()) {
+    groupTokens.delete(token);
+  }
+
+  groupRooms.delete(code);
+}
+
 async function handleGroupCallback(query) {
   const data = String(query.data || '');
   const from = query.from;
@@ -145,11 +166,7 @@ async function handleGroupCallback(query) {
   const room = groupRooms.get(code);
 
   if (!room || room.started) {
-    await answerCallback(
-      query.id,
-      'Бұл ойынның уақыты аяқталған.',
-      true
-    );
+    await answerCallback(query.id, 'Бұл ойынның уақыты аяқталған.', true);
     return true;
   }
 
@@ -197,7 +214,6 @@ async function handleGroupCallback(query) {
     return true;
   }
 
-  // ОЙЫНҒА КІРУ
   if (room.players.length !== 2) {
     await answerCallback(
       query.id,
@@ -296,7 +312,6 @@ async function handleTelegramWebhook(req, res) {
 
     const update = JSON.parse(body);
 
-    // Батырма басылған кезде
     if (update.callback_query) {
       await handleGroupCallback(update.callback_query);
 
@@ -311,7 +326,6 @@ async function handleTelegramWebhook(req, res) {
       return res.end('ok');
     }
 
-    // Топта /game
     if (
       /^\/game(?:@\w+)?(?:\s|$)/.test(message.text) &&
       ['group', 'supergroup'].includes(message.chat.type)
@@ -331,15 +345,7 @@ async function handleTelegramWebhook(req, res) {
       };
 
       room.timer = setTimeout(() => {
-        groupRooms.delete(code);
-
-        for (const player of room.players) {
-          groupPlayerRooms.delete(String(player.id));
-        }
-
-        for (const token of room.tokens.values()) {
-          groupTokens.delete(token);
-        }
+        cleanupGroupRoom(code);
       }, GROUP_TTL);
 
       if (room.timer.unref) room.timer.unref();
@@ -355,7 +361,6 @@ async function handleTelegramWebhook(req, res) {
       room.messageId = sent.result.message_id;
     }
 
-    // Жеке чатта /start
     if (
       /^\/start(?:@\w+)?(?:\s|$)/.test(message.text) &&
       message.chat.type === 'private'
@@ -514,7 +519,7 @@ function gameState(g, uid) {
 }
 
 function dequeue(id) {
-  queue = queue.filter((x) => x !== id);
+  queue = queue.filter(x => x !== id);
 }
 
 function removeInvite(code) {
@@ -610,25 +615,11 @@ function finish(g, winner, reason) {
       text:
         '♟️ ШАШКА ОЙЫНЫ АЯҚТАЛДЫ!\n\n' +
         resultText
-    }).catch((err) => {
+    }).catch(err => {
       console.error('Group result error:', err.message);
     });
 
-    const room = groupRooms.get(g.groupInfo.code);
-
-    if (room) {
-      clearTimeout(room.timer);
-
-      for (const player of room.players) {
-        groupPlayerRooms.delete(String(player.id));
-      }
-
-      for (const token of room.tokens.values()) {
-        groupTokens.delete(token);
-      }
-
-      groupRooms.delete(g.groupInfo.code);
-    }
+    cleanupGroupRoom(g.groupInfo.code);
   }
 }
 
@@ -663,6 +654,24 @@ function joinGroupGame(u, token) {
     });
   }
 
+  if (room.started) {
+    const existingGame = [...games.values()].find(
+      g =>
+        g.groupInfo &&
+        g.groupInfo.code === room.code &&
+        (g.p.w === u.id || g.p.b === u.id)
+    );
+
+    if (existingGame) {
+      return send(u, gameState(existingGame, u.id));
+    }
+
+    return send(u, {
+      t: 'group_error',
+      code: 'expired'
+    });
+  }
+
   if (room.players.length !== 2) {
     return send(u, {
       t: 'group_error',
@@ -677,52 +686,24 @@ function joinGroupGame(u, token) {
     });
   }
 
-  if (room.started) {
-    const existingGame = [...games.values()].find(
-      g => g.groupInfo && g.groupInfo.code === room.code &&
-        (g.p.w === u.id || g.p.b === u.id)
-    );
-
-    if (existingGame) {
-      return send(u, gameState(existingGame, u.id));
-    }
-
-    return send(u, {
-      t: 'group_error',
-      code: 'expired'
-    });
-  }
-
   room.connected.add(String(u.id));
 
   dequeue(u.id);
   removeUserInvite(u.id);
 
-  if (room.connected.size < 2) {
-    send(u, {
-      t: 'group_waiting',
-      count: 1,
-      message: 'Екінші ойыншының кіруін күтіңіз...'
-    });
-
-    return;
-  }
-
-  const first = users.get(room.players[0].id);
-  const second = users.get(room.players[1].id);
+  const first = users.get(String(room.players[0].id));
+  const second = users.get(String(room.players[1].id));
 
   if (
     !first || !second ||
     !first.ws || first.ws.readyState !== 1 ||
     !second.ws || second.ws.readyState !== 1
   ) {
-    send(u, {
+    return send(u, {
       t: 'group_waiting',
       count: room.connected.size,
-      message: 'Екінші ойыншының қосылуын күтіңіз...'
+      message: 'Екінші ойыншының кіруін күтіңіз...'
     });
-
-    return;
   }
 
   room.started = true;
@@ -854,7 +835,7 @@ function joinInvite(u, code) {
 function handle(u, m) {
   switch (m.t) {
     case 'group_join':
-      return joinGroupGame(u, m.code);
+      return joinGroupGame(u, m.token || m.code);
 
     case 'find': {
       if (u.game && games.has(u.game)) {
@@ -865,7 +846,7 @@ function handle(u, m) {
         return send(u, { t: 'searching' });
       }
 
-      queue = queue.filter((id) => {
+      queue = queue.filter(id => {
         const user = users.get(id);
         return user && user.ws && !user.game;
       });
@@ -1077,7 +1058,7 @@ function onAuth(ws, m) {
 
 /* ---------- WebSocket ulanishi ---------- */
 
-wss.on('connection', (ws) => {
+wss.on('connection', ws => {
   ws.isAlive = true;
 
   ws.on('pong', () => {
@@ -1088,7 +1069,7 @@ wss.on('connection', (ws) => {
     if (!ws.user) ws.close();
   }, 10000);
 
-  ws.on('message', (raw) => {
+  ws.on('message', raw => {
     let m;
 
     try {
@@ -1121,8 +1102,6 @@ wss.on('connection', (ws) => {
     dequeue(u.id);
     removeUserInvite(u.id);
 
-    // Ойын басталмаған кезде Mini App-тан шықса,
-    // қайта кіргенде сол токенмен қосыла алады.
     const roomCode = groupPlayerRooms.get(String(u.id));
     const room = roomCode && groupRooms.get(roomCode);
 
@@ -1152,7 +1131,7 @@ wss.on('connection', (ws) => {
 });
 
 setInterval(() => {
-  wss.clients.forEach((ws) => {
+  wss.clients.forEach(ws => {
     if (!ws.isAlive) {
       return ws.terminate();
     }
