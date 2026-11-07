@@ -8,12 +8,14 @@ if (tg) {
   tg.ready();
   tg.expand();
   try { tg.disableVerticalSwipes && tg.disableVerticalSwipes(); } catch (e) {}
-  try { tg.setHeaderColor('#efe3cf'); tg.setBackgroundColor('#efe3cf'); } catch (e) {}
+  try {
+    tg.setHeaderColor('#121212');
+    tg.setBackgroundColor('#121212');
+  } catch (e) {}
 }
 
 const $ = (id) => document.getElementById(id);
 
-// Бұрынғы мәтін шақыруларын өзгертпей сақтау үшін
 const tr = (text) => text;
 
 /* ---------- HAPTIC ---------- */
