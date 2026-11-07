@@ -17,7 +17,6 @@ const PUBLIC = path.join(__dirname, 'public');
 const INVITE_TTL = 10 * 60 * 1000;
 const GROUP_TTL = 10 * 60 * 1000;
 
-// Әр ойыншыға бір жүріс үшін берілетін уақыт
 const TURN_SECONDS = 60;
 const TURN_MS = TURN_SECONDS * 1000;
 
@@ -63,7 +62,7 @@ async function telegramApi(method, data) {
   return result;
 }
 
-/* ---------- Umumiy yordamchi funksiyalar ---------- */
+/* ---------- Yordamchilar ---------- */
 
 function escapeHtml(value) {
   return String(value || '')
@@ -77,9 +76,7 @@ function escapeHtml(value) {
 function playerName(player) {
   if (!player) return 'Ойыншы';
 
-  if (player.username) {
-    return '@' + player.username;
-  }
+  if (player.username) return '@' + player.username;
 
   return [
     player.first_name,
@@ -88,22 +85,22 @@ function playerName(player) {
 }
 
 function playerLink(player) {
-  if (!player || !player.id) {
-    return 'Ойыншы';
-  }
+  if (!player || !player.id) return 'Ойыншы';
 
   return `<a href="tg://user?id=${encodeURIComponent(String(player.id))}">${escapeHtml(playerName(player))}</a>`;
 }
 
+const groupRooms = new Map();
+const groupTokens = new Map();
+const groupPlayerRooms = new Map();
+
 function createGroupToken(room, player) {
   const userId = String(player.id);
-
   let token = room.tokens.get(userId);
 
   if (token) return token;
 
   token = crypto.randomBytes(16).toString('hex');
-
   room.tokens.set(userId, token);
 
   groupTokens.set(token, {
@@ -114,11 +111,7 @@ function createGroupToken(room, player) {
   return token;
 }
 
-/* ---------- Guruh o‘yinlari ---------- */
-
-const groupRooms = new Map();
-const groupTokens = new Map();
-const groupPlayerRooms = new Map();
+/* ---------- Guruh xonasi ---------- */
 
 function roomText(room) {
   let text = '♟️ <b>ШАШКА ОЙЫНЫ</b>\n\n';
@@ -133,8 +126,8 @@ function roomText(room) {
   if (room.players.length < 2) {
     text += '\nЕкінші ойыншыны күтеміз...';
   } else if (!room.started) {
-    text += '\n\n🎮 Екі ойыншы да өз батырмасын басып, ойынға кірсін.';
-    text += '\nБірінші кірген ойыншы тақтаны бірден көреді.';
+    text += '\n\n🎮 Екі ойыншы да ойынға кірсін.';
+    text += '\nБірінші ойыншы тақтаны бірден көреді.';
   } else {
     text += '\n\n♟️ Ойын басталды! Сәттілік!';
   }
@@ -163,9 +156,7 @@ function roomKeyboard(room) {
     }];
   });
 
-  return {
-    inline_keyboard: rows
-  };
+  return { inline_keyboard: rows };
 }
 
 async function updateGroupRoom(room) {
@@ -180,6 +171,31 @@ async function updateGroupRoom(room) {
   });
 }
 
+// Ескі топ хабарламасын өшіріп, жаңа ойын хабарламасын қалдырады.
+async function replaceGroupRoomMessage(room) {
+  if (!room) return;
+
+  if (room.messageId) {
+    try {
+      await telegramApi('deleteMessage', {
+        chat_id: room.chatId,
+        message_id: room.messageId
+      });
+    } catch (error) {
+      console.error('Old group message delete:', error.message);
+    }
+  }
+
+  const sent = await telegramApi('sendMessage', {
+    chat_id: room.chatId,
+    text: roomText(room),
+    parse_mode: 'HTML',
+    reply_markup: roomKeyboard(room)
+  });
+
+  room.messageId = sent.result.message_id;
+}
+
 async function answerCallback(id, text, alert = false) {
   try {
     await telegramApi('answerCallbackQuery', {
@@ -191,6 +207,39 @@ async function answerCallback(id, text, alert = false) {
     console.error('Callback answer:', error.message);
   }
 }
+
+const users = new Map();
+const games = new Map();
+const invites = new Map();
+const userInvites = new Map();
+
+let queue = [];
+let gameSeq = 0;
+
+const send = (u, msg) => {
+  if (u && u.ws && u.ws.readyState === 1) {
+    u.ws.send(JSON.stringify(msg));
+  }
+};
+
+const pub = (u) => ({
+  name: u ? u.name : 'Ойыншы',
+  avatar: u ? u.avatar : null
+});
+
+const sideOfUser = (g, id) =>
+  g.p.w === id ? 'w' : 'b';
+
+const legalList = (g, side) =>
+  g.st.turn === side && !g.st.over && !g.waitingForOpponent
+    ? G.legalMoves(g.st).map(({ from, to, cap }) => ({
+        from,
+        to,
+        cap
+      }))
+    : [];
+
+/* ---------- Guruhni tozalash ---------- */
 
 function cleanupGroupRoom(code) {
   const room = groupRooms.get(code);
@@ -204,10 +253,7 @@ function cleanupGroupRoom(code) {
     clearTurnTimer(pending);
     games.delete(pending.id);
 
-    for (const id of [
-      pending.p.w,
-      pending.p.b
-    ]) {
+    for (const id of [pending.p.w, pending.p.b]) {
       const user = users.get(id);
 
       if (user && user.game === pending.id) {
@@ -260,11 +306,7 @@ async function sendPlayerGroupLink(room, player) {
     room.entered.add(userId);
     return true;
   } catch (error) {
-    console.error(
-      'Private link error for ' + userId + ':',
-      error.message
-    );
-
+    console.error('Private link error:', error.message);
     return false;
   }
 }
@@ -273,9 +315,7 @@ async function sendLinksToBothPlayers(room) {
   if (room.players.length !== 2) return;
 
   await Promise.all(
-    room.players.map(player =>
-      sendPlayerGroupLink(room, player)
-    )
+    room.players.map(player => sendPlayerGroupLink(room, player))
   );
 
   try {
@@ -290,19 +330,14 @@ async function handleGroupCallback(query) {
   const from = query.from;
   const userId = String(from.id);
 
-  const joinMatch = data.match(/^gj:([a-f0-9]{12})$/);
+  const match = data.match(/^gj:([a-f0-9]{12})$/);
+  if (!match) return false;
 
-  if (!joinMatch) return false;
-
-  const code = joinMatch[1];
+  const code = match[1];
   const room = groupRooms.get(code);
 
   if (!room || room.started) {
-    await answerCallback(
-      query.id,
-      'Бұл ойынның уақыты аяқталған.',
-      true
-    );
+    await answerCallback(query.id, 'Бұл ойынның уақыты аяқталған.', true);
     return true;
   }
 
@@ -311,28 +346,17 @@ async function handleGroupCallback(query) {
   );
 
   if (already) {
-    await answerCallback(
-      query.id,
-      'Сіз ойынға қосылдыңыз.'
-    );
+    await answerCallback(query.id, 'Сіз ойынға қосылдыңыз.');
     return true;
   }
 
   if (room.players.length >= 2) {
-    await answerCallback(
-      query.id,
-      'Ойыншылар толып кетті.',
-      true
-    );
+    await answerCallback(query.id, 'Ойыншылар толып кетті.', true);
     return true;
   }
 
   if (groupPlayerRooms.has(userId)) {
-    await answerCallback(
-      query.id,
-      'Сіз басқа топтық ойынға қосылғансыз.',
-      true
-    );
+    await answerCallback(query.id, 'Сіз басқа топтық ойынға қосылғансыз.', true);
     return true;
   }
 
@@ -346,10 +370,7 @@ async function handleGroupCallback(query) {
   room.players.push(player);
   groupPlayerRooms.set(userId, code);
 
-  await answerCallback(
-    query.id,
-    'Сіз ойынға қосылдыңыз!'
-  );
+  await answerCallback(query.id, 'Сіз ойынға қосылдыңыз!');
 
   if (room.players.length === 2) {
     await sendLinksToBothPlayers(room);
@@ -390,7 +411,6 @@ async function handleTelegramWebhook(req, res) {
 
     if (update.callback_query) {
       await handleGroupCallback(update.callback_query);
-
       res.writeHead(200);
       return res.end('ok');
     }
@@ -475,15 +495,11 @@ async function setupTelegramWebhook() {
 
   try {
     await telegramApi('setMyCommands', {
-      commands: [
-        {
-          command: 'game',
-          description: 'Shashka o‘yinini yaratish'
-        }
-      ],
-      scope: {
-        type: 'all_group_chats'
-      }
+      commands: [{
+        command: 'game',
+        description: 'Shashka o‘yinini yaratish'
+      }],
+      scope: { type: 'all_group_chats' }
     });
 
     console.log('Telegram /game komandasi sozlandi');
@@ -500,7 +516,7 @@ async function setupTelegramWebhook() {
   }
 }
 
-/* ---------- HTTP server ---------- */
+/* ---------- HTTP ---------- */
 
 const server = http.createServer((req, res) => {
   const url = decodeURIComponent((req.url || '/').split('?')[0]);
@@ -545,45 +561,12 @@ const wss = new WebSocketServer({
   maxPayload: 4096
 });
 
-const users = new Map();
-const games = new Map();
-const invites = new Map();
-const userInvites = new Map();
-
-let queue = [];
-let gameSeq = 0;
-
-const send = (u, msg) => {
-  if (u && u.ws && u.ws.readyState === 1) {
-    u.ws.send(JSON.stringify(msg));
-  }
-};
-
-const pub = (u) => ({
-  name: u ? u.name : 'Ойыншы',
-  avatar: u ? u.avatar : null
-});
-
-const legalList = (g, side) =>
-  g.st.turn === side && !g.st.over && !g.waitingForOpponent
-    ? G.legalMoves(g.st).map(({ from, to, cap }) => ({
-        from,
-        to,
-        cap
-      }))
-    : [];
-
-const sideOfUser = (g, id) =>
-  g.p.w === id ? 'w' : 'b';
-
 /* ---------- 60 sekund timer ---------- */
 
 function clearTurnTimer(g) {
   if (!g) return;
 
-  if (g.turnTimer) {
-    clearTimeout(g.turnTimer);
-  }
+  if (g.turnTimer) clearTimeout(g.turnTimer);
 
   g.turnTimer = null;
   g.turnDeadline = null;
@@ -597,9 +580,7 @@ function sendTurnTimer(g) {
     g.waitingForOpponent ||
     g.st.over ||
     !g.turnDeadline
-  ) {
-    return;
-  }
+  ) return;
 
   const remaining = Math.max(
     0,
@@ -608,7 +589,7 @@ function sendTurnTimer(g) {
 
   const message = {
     t: 'turn_timer',
-    side: g.st.turn,
+    side: g.turnTimerSide,
     seconds: remaining,
     deadline: g.turnDeadline
   };
@@ -632,45 +613,33 @@ function startTurnTimer(g) {
 
   sendTurnTimer(g);
 
-  g.turnTimer = setTimeout(() => {
+  const checkTimeout = () => {
     if (!games.has(g.id)) return;
     if (g.waitingForOpponent || g.st.over) return;
 
-    // Егер кезек ауысып кеткен болса, ескі таймер әсер етпейді.
     if (
       g.st.turn !== side ||
       g.turnTimerSide !== side ||
       g.turnDeadline !== deadline
-    ) {
-      return;
-    }
+    ) return;
 
-    // Сервер кешігіп орындаса, қалған уақытты қайта тексереді.
     const remaining = deadline - Date.now();
 
     if (remaining > 0) {
-      g.turnTimer = setTimeout(() => {
-        if (
-          games.has(g.id) &&
-          !g.waitingForOpponent &&
-          !g.st.over &&
-          g.st.turn === side &&
-          g.turnTimerSide === side &&
-          g.turnDeadline === deadline
-        ) {
-          finish(g, G.other(side), 'timeout');
-        }
-      }, remaining);
-
+      g.turnTimer = setTimeout(checkTimeout, remaining);
       if (g.turnTimer.unref) g.turnTimer.unref();
       return;
     }
 
     finish(g, G.other(side), 'timeout');
-  }, TURN_MS);
+  };
+
+  g.turnTimer = setTimeout(checkTimeout, TURN_MS);
 
   if (g.turnTimer.unref) g.turnTimer.unref();
 }
+
+/* ---------- Game state ---------- */
 
 function gameState(g, uid) {
   const you = sideOfUser(g, uid);
@@ -738,10 +707,7 @@ function startGame(a, b, groupInfo = null) {
 
   const g = {
     id: 'g' + ++gameSeq,
-    p: {
-      w: w.id,
-      b: bl.id
-    },
+    p: { w: w.id, b: bl.id },
     st: G.newGame(),
     chat: [],
     timers: {},
@@ -759,7 +725,6 @@ function startGame(a, b, groupInfo = null) {
   send(a, gameState(g, a.id));
   send(b, gameState(g, b.id));
 
-  // Кездейсоқ және дос ойынында таймер бірден басталады.
   startTurnTimer(g);
 
   return g;
@@ -767,7 +732,6 @@ function startGame(a, b, groupInfo = null) {
 
 function ensureRoomUser(player) {
   const id = String(player.id);
-
   let u = users.get(id);
 
   if (!u) {
@@ -809,10 +773,7 @@ function createPendingGroupGame(room) {
 
   const g = {
     id: 'g' + ++gameSeq,
-    p: {
-      w: w.id,
-      b: bl.id
-    },
+    p: { w: w.id, b: bl.id },
     st: G.newGame(),
     chat: [],
     timers: {},
@@ -911,28 +872,19 @@ function joinGroupGame(u, token) {
     typeof token !== 'string' ||
     !/^[a-f0-9]{32}$/.test(token)
   ) {
-    return send(u, {
-      t: 'group_error',
-      code: 'invalid'
-    });
+    return send(u, { t: 'group_error', code: 'invalid' });
   }
 
   const tokenInfo = groupTokens.get(token);
 
   if (!tokenInfo || tokenInfo.userId !== String(u.id)) {
-    return send(u, {
-      t: 'group_error',
-      code: 'invalid'
-    });
+    return send(u, { t: 'group_error', code: 'invalid' });
   }
 
   const room = groupRooms.get(tokenInfo.code);
 
   if (!room) {
-    return send(u, {
-      t: 'group_error',
-      code: 'expired'
-    });
+    return send(u, { t: 'group_error', code: 'expired' });
   }
 
   if (room.started) {
@@ -948,17 +900,11 @@ function joinGroupGame(u, token) {
       return;
     }
 
-    return send(u, {
-      t: 'group_error',
-      code: 'expired'
-    });
+    return send(u, { t: 'group_error', code: 'expired' });
   }
 
   if (room.players.length !== 2) {
-    return send(u, {
-      t: 'group_error',
-      code: 'waiting'
-    });
+    return send(u, { t: 'group_error', code: 'waiting' });
   }
 
   if (u.game && games.has(u.game)) {
@@ -968,10 +914,7 @@ function joinGroupGame(u, token) {
       !existing.groupInfo ||
       existing.groupInfo.code !== room.code
     ) {
-      return send(u, {
-        t: 'group_error',
-        code: 'busy'
-      });
+      return send(u, { t: 'group_error', code: 'busy' });
     }
   }
 
@@ -1013,22 +956,17 @@ function joinGroupGame(u, token) {
 
   clearTimeout(room.timer);
 
-  // Топтық ойында таймер екі ойыншы кірген кезде ғана басталады.
+  // Таймер екі ойыншы да қосылғаннан кейін ғана басталады.
   startTurnTimer(g);
 
   send(first, gameState(g, first.id));
   send(second, gameState(g, second.id));
 
-  send(first, {
-    t: 'group_started'
-  });
+  send(first, { t: 'group_started' });
+  send(second, { t: 'group_started' });
 
-  send(second, {
-    t: 'group_started'
-  });
-
-  updateGroupRoom(room).catch(error => {
-    console.error('Started lobby update:', error.message);
+  replaceGroupRoomMessage(room).catch(error => {
+    console.error('Started group message:', error.message);
   });
 }
 
@@ -1036,10 +974,7 @@ function joinGroupGame(u, token) {
 
 function createInvite(u) {
   if (u.game && games.has(u.game)) {
-    return send(u, {
-      t: 'error',
-      code: 'busy'
-    });
+    return send(u, { t: 'error', code: 'busy' });
   }
 
   const existing = userInvites.get(u.id);
@@ -1088,61 +1023,39 @@ function joinInvite(u, code) {
     typeof code !== 'string' ||
     !/^[a-f0-9]{12}$/.test(code)
   ) {
-    return send(u, {
-      t: 'error',
-      code: 'invite_invalid'
-    });
+    return send(u, { t: 'error', code: 'invite_invalid' });
   }
 
   if (u.game && games.has(u.game)) {
-    return send(u, {
-      t: 'error',
-      code: 'busy'
-    });
+    return send(u, { t: 'error', code: 'busy' });
   }
 
   const invite = invites.get(code);
 
   if (!invite) {
-    return send(u, {
-      t: 'error',
-      code: 'invite_expired'
-    });
+    return send(u, { t: 'error', code: 'invite_expired' });
   }
 
   if (invite.ownerId === u.id) {
-    return send(u, {
-      t: 'error',
-      code: 'invite_self'
-    });
+    return send(u, { t: 'error', code: 'invite_self' });
   }
 
   const owner = users.get(invite.ownerId);
 
   if (!owner || !owner.ws || owner.ws.readyState !== 1) {
     removeInvite(code);
-
-    return send(u, {
-      t: 'error',
-      code: 'invite_expired'
-    });
+    return send(u, { t: 'error', code: 'invite_expired' });
   }
 
   if (owner.game && games.has(owner.game)) {
     removeInvite(code);
-
-    return send(u, {
-      t: 'error',
-      code: 'busy'
-    });
+    return send(u, { t: 'error', code: 'busy' });
   }
 
   removeInvite(code);
   dequeue(u.id);
 
-  send(owner, {
-    t: 'invite_joined'
-  });
+  send(owner, { t: 'invite_joined' });
 
   startGame(owner, u);
 }
@@ -1156,9 +1069,7 @@ function handle(u, m) {
 
     case 'find': {
       if (u.game && games.has(u.game)) {
-        const current = games.get(u.game);
-
-        return send(u, gameState(current, u.id));
+        return send(u, gameState(games.get(u.game), u.id));
       }
 
       if (queue.includes(u.id)) {
@@ -1181,7 +1092,6 @@ function handle(u, m) {
       }
 
       queue.push(u.id);
-
       return send(u, { t: 'searching' });
     }
 
@@ -1207,9 +1117,7 @@ function handle(u, m) {
         g.waitingForOpponent ||
         !Number.isInteger(m.from) ||
         !Number.isInteger(m.to)
-      ) {
-        return;
-      }
+      ) return;
 
       const side = sideOfUser(g, u.id);
 
@@ -1217,7 +1125,6 @@ function handle(u, m) {
         return send(u, gameState(g, u.id));
       }
 
-      // Таймер бітіп қойған болса, жүрісті қабылдамаймыз.
       if (
         g.turnTimerSide === side &&
         g.turnDeadline &&
@@ -1253,9 +1160,6 @@ function handle(u, m) {
         return;
       }
 
-      // Кезек ауысқан кезде жаңа 60 секунд беріледі.
-      // Бірнеше рет ұру кезінде кезек ауыспаса,
-      // бұрынғы таймер жалғаса береді.
       if (g.st.turn !== g.turnTimerSide) {
         startTurnTimer(g);
       } else {
@@ -1269,11 +1173,7 @@ function handle(u, m) {
       const g = games.get(u.game);
 
       if (g && !g.waitingForOpponent) {
-        finish(
-          g,
-          G.other(sideOfUser(g, u.id)),
-          'resign'
-        );
+        finish(g, G.other(sideOfUser(g, u.id)), 'resign');
       }
 
       return;
@@ -1289,9 +1189,7 @@ function handle(u, m) {
       const text = m.text.trim().slice(0, 300);
       const now = Date.now();
 
-      if (!text || now - (g.lastChat[u.id] || 0) < 400) {
-        return;
-      }
+      if (!text || now - (g.lastChat[u.id] || 0) < 400) return;
 
       g.lastChat[u.id] = now;
 
@@ -1304,10 +1202,7 @@ function handle(u, m) {
       };
 
       g.chat.push(msg);
-
-      if (g.chat.length > 100) {
-        g.chat.shift();
-      }
+      if (g.chat.length > 100) g.chat.shift();
 
       for (const id of [g.p.w, g.p.b]) {
         send(users.get(id), msg);
@@ -1318,7 +1213,7 @@ function handle(u, m) {
   }
 }
 
-/* ---------- Telegram foydalanuvchisini tekshirish ---------- */
+/* ---------- Auth ---------- */
 
 function onAuth(ws, m) {
   let info = null;
@@ -1334,11 +1229,7 @@ function onAuth(ws, m) {
   }
 
   if (!info) {
-    ws.send(JSON.stringify({
-      t: 'error',
-      code: 'auth'
-    }));
-
+    ws.send(JSON.stringify({ t: 'error', code: 'auth' }));
     return ws.close();
   }
 
@@ -1352,11 +1243,7 @@ function onAuth(ws, m) {
   }
 
   if (!u) {
-    u = {
-      id: info.id,
-      game: null
-    };
-
+    u = { id: info.id, game: null };
     users.set(info.id, u);
   }
 
@@ -1377,20 +1264,51 @@ function onAuth(ws, m) {
     send(u, gameState(g, u.id));
 
     if (g.waitingForOpponent) {
+      const roomCode = groupPlayerRooms.get(String(u.id));
+      const room = roomCode && groupRooms.get(roomCode);
+
+      if (room) room.connected.add(String(u.id));
+
       send(u, {
         t: 'group_waiting',
-        count: 1,
+        count: room ? room.connected.size : 1,
         message: 'Екінші ойыншының кіруін күтіңіз...'
       });
+
+      if (room && room.players.length === 2) {
+        const first = users.get(String(room.players[0].id));
+        const second = users.get(String(room.players[1].id));
+
+        const bothConnected =
+          first && second &&
+          first.ws && first.ws.readyState === 1 &&
+          second.ws && second.ws.readyState === 1 &&
+          room.connected.has(String(first.id)) &&
+          room.connected.has(String(second.id));
+
+        if (bothConnected && !room.started) {
+          room.started = true;
+          g.waitingForOpponent = false;
+          clearTimeout(room.timer);
+
+          startTurnTimer(g);
+
+          send(first, gameState(g, first.id));
+          send(second, gameState(g, second.id));
+          send(first, { t: 'group_started' });
+          send(second, { t: 'group_started' });
+
+          replaceGroupRoomMessage(room).catch(err => {
+            console.error('Started group message:', err.message);
+          });
+        }
+      }
     } else {
       const opp = users.get(
         g.p[G.other(sideOfUser(g, u.id))]
       );
 
-      send(opp, {
-        t: 'away',
-        left: false
-      });
+      send(opp, { t: 'away', left: false });
 
       if (g.timers[opp.id]) {
         send(u, {
@@ -1400,7 +1318,7 @@ function onAuth(ws, m) {
         });
       }
 
-      // Қайта кіргенде таймер жаңадан басталмайды.
+      // Қайта қосылғанда таймер жаңадан басталмайды.
       sendTurnTimer(g);
     }
   } else {
@@ -1447,7 +1365,6 @@ wss.on('connection', ws => {
     clearTimeout(authTimer);
 
     const u = ws.user;
-
     if (!u || u.ws !== ws) return;
 
     u.ws = null;
@@ -1462,7 +1379,6 @@ wss.on('connection', ws => {
     }
 
     const g = u.game && games.get(u.game);
-
     if (!g) return;
 
     if (g.waitingForOpponent) {
@@ -1497,16 +1413,14 @@ wss.on('connection', ws => {
 
 setInterval(() => {
   wss.clients.forEach(ws => {
-    if (!ws.isAlive) {
-      return ws.terminate();
-    }
+    if (!ws.isAlive) return ws.terminate();
 
     ws.isAlive = false;
     ws.ping();
   });
 }, 15000).unref();
 
-/* ---------- Serverni ishga tushirish ---------- */
+/* ---------- Server ---------- */
 
 if (require.main === module) {
   server.listen(PORT, () => {
