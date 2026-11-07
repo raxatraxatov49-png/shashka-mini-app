@@ -59,34 +59,80 @@ async function telegramApi(method, data) {
   return result;
 }
 
+/* ---------- Umumiy yordamchi funksiyalar ---------- */
+
+function escapeHtml(value) {
+  return String(value || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function playerName(player) {
+  if (!player) return 'Ойыншы';
+
+  if (player.username) {
+    return '@' + player.username;
+  }
+
+  return [
+    player.first_name,
+    player.last_name
+  ].filter(Boolean).join(' ') || player.name || 'Ойыншы';
+}
+
+function playerLink(player) {
+  if (!player || !player.id) {
+    return 'Ойыншы';
+  }
+
+  return `<a href="tg://user?id=${encodeURIComponent(String(player.id))}">${escapeHtml(playerName(player))}</a>`;
+}
+
+function createGroupToken(room, player) {
+  const userId = String(player.id);
+
+  let token = room.tokens.get(userId);
+
+  if (token) return token;
+
+  token = crypto.randomBytes(16).toString('hex');
+
+  room.tokens.set(userId, token);
+
+  groupTokens.set(token, {
+    code: room.code,
+    userId
+  });
+
+  return token;
+}
+
 /* ---------- Guruh o‘yinlari ---------- */
 
 const groupRooms = new Map();
 const groupTokens = new Map();
 const groupPlayerRooms = new Map();
 
-function playerName(player) {
-  if (player.username) return '@' + player.username;
-
-  return [player.first_name, player.last_name]
-    .filter(Boolean)
-    .join(' ') || 'Ойыншы';
-}
-
 function roomText(room) {
-  let text = '♟️ ШАШКА ОЙЫНЫ\n\n';
+  let text = '♟️ <b>ШАШКА ОЙЫНЫ</b>\n\n';
 
   room.players.forEach((player, index) => {
-    const entered = room.entered.has(String(player.id));
-    text += `${index + 1}. ${playerName(player)}${entered ? ' ✅' : ''}\n`;
+    const id = String(player.id);
+    const entered = room.entered.has(id);
+
+    text += `${index + 1}. ${playerLink(player)}${entered ? ' ✅' : ''}\n`;
   });
 
   if (room.players.length < 2) {
     text += '\nЕкінші ойыншыны күтеміз...';
-  } else if (room.entered.size < 2) {
-    text += '\nЕкі ойыншы да «ОЙЫНҒА КІРУ» батырмасын бассын.';
+  } else if (!room.started) {
+    text += '\n\n🎮 Екі ойыншы да өз батырмасын басып, ойынға кірсін.';
+    text += '\nБірінші кірген ойыншы тақтаны бірден көреді.';
   } else {
-    text += '\nЕкі ойыншы да кірді! Mini App ашылуын күтеміз...';
+    text += '\n\n♟️ Ойын басталды! Сәттілік!';
   }
 
   return text;
@@ -96,15 +142,25 @@ function roomKeyboard(room) {
   if (room.players.length < 2) {
     return {
       inline_keyboard: [[
-        { text: '♟️ ҚОСЫЛУ', callback_data: 'gj:' + room.code }
+        {
+          text: '♟️ ҚОСЫЛУ',
+          callback_data: 'gj:' + room.code
+        }
       ]]
     };
   }
 
+  const rows = room.players.map((player, index) => {
+    const token = createGroupToken(room, player);
+
+    return [{
+      text: `🎮 ${index + 1}-ОЙЫНШЫ — ОЙЫНҒА КІРУ`,
+      url: MINI_APP_LINK + 'group_' + token
+    }];
+  });
+
   return {
-    inline_keyboard: [[
-      { text: '🎮 ОЙЫНҒА КІРУ', callback_data: 'ge:' + room.code }
-    ]]
+    inline_keyboard: rows
   };
 }
 
@@ -115,6 +171,7 @@ async function updateGroupRoom(room) {
     chat_id: room.chatId,
     message_id: room.messageId,
     text: roomText(room),
+    parse_mode: 'HTML',
     reply_markup: roomKeyboard(room)
   });
 }
@@ -137,6 +194,26 @@ function cleanupGroupRoom(code) {
 
   clearTimeout(room.timer);
 
+  if (room.pendingGame && games.has(room.pendingGame.id)) {
+    games.delete(room.pendingGame.id);
+
+    for (const id of [
+      room.pendingGame.p.w,
+      room.pendingGame.p.b
+    ]) {
+      const user = users.get(id);
+
+      if (user && user.game === room.pendingGame.id) {
+        user.game = null;
+      }
+
+      send(user, {
+        t: 'group_error',
+        code: 'expired'
+      });
+    }
+  }
+
   for (const player of room.players) {
     const id = String(player.id);
 
@@ -152,101 +229,9 @@ function cleanupGroupRoom(code) {
   groupRooms.delete(code);
 }
 
-async function handleGroupCallback(query) {
-  const data = String(query.data || '');
-  const from = query.from;
-  const userId = String(from.id);
-
-  const joinMatch = data.match(/^gj:([a-f0-9]{12})$/);
-  const enterMatch = data.match(/^ge:([a-f0-9]{12})$/);
-
-  if (!joinMatch && !enterMatch) return false;
-
-  const code = (joinMatch || enterMatch)[1];
-  const room = groupRooms.get(code);
-
-  if (!room || room.started) {
-    await answerCallback(query.id, 'Бұл ойынның уақыты аяқталған.', true);
-    return true;
-  }
-
-  if (joinMatch) {
-    const already = room.players.some(
-      player => String(player.id) === userId
-    );
-
-    if (already) {
-      await answerCallback(query.id, 'Сіз ойынға қосылдыңыз.');
-      return true;
-    }
-
-    if (room.players.length >= 2) {
-      await answerCallback(query.id, 'Ойыншылар толып кетті.', true);
-      return true;
-    }
-
-    if (groupPlayerRooms.has(userId)) {
-      await answerCallback(
-        query.id,
-        'Сіз басқа топтық ойынға қосылғансыз.',
-        true
-      );
-      return true;
-    }
-
-    room.players.push({
-      id: userId,
-      username: from.username || '',
-      first_name: from.first_name || '',
-      last_name: from.last_name || ''
-    });
-
-    groupPlayerRooms.set(userId, code);
-
-    await answerCallback(query.id, 'Сіз ойынға қосылдыңыз!');
-
-    try {
-      await updateGroupRoom(room);
-    } catch (error) {
-      console.error('Lobby update:', error.message);
-    }
-
-    return true;
-  }
-
-  if (room.players.length !== 2) {
-    await answerCallback(
-      query.id,
-      'Алдымен екі ойыншы қосылуы керек.',
-      true
-    );
-    return true;
-  }
-
-  const player = room.players.find(
-    item => String(item.id) === userId
-  );
-
-  if (!player) {
-    await answerCallback(
-      query.id,
-      'Сіз бұл ойынға қосылмағансыз.',
-      true
-    );
-    return true;
-  }
-
-  let token = room.tokens.get(userId);
-
-  if (!token) {
-    token = crypto.randomBytes(16).toString('hex');
-    room.tokens.set(userId, token);
-
-    groupTokens.set(token, {
-      code,
-      userId
-    });
-  }
+async function sendPlayerGroupLink(room, player) {
+  const userId = String(player.id);
+  const token = createGroupToken(room, player);
 
   try {
     await telegramApi('sendMessage', {
@@ -266,23 +251,107 @@ async function handleGroupCallback(query) {
     });
 
     room.entered.add(userId);
-
-    await answerCallback(
-      query.id,
-      'Сілтеме жеке чатыңызға жіберілді!'
+    return true;
+  } catch (error) {
+    console.error(
+      'Private link error for ' + userId + ':',
+      error.message
     );
 
+    return false;
+  }
+}
+
+async function sendLinksToBothPlayers(room) {
+  if (room.players.length !== 2) return;
+
+  await Promise.all(
+    room.players.map(player =>
+      sendPlayerGroupLink(room, player)
+    )
+  );
+
+  try {
+    await updateGroupRoom(room);
+  } catch (error) {
+    console.error('Lobby update:', error.message);
+  }
+}
+
+async function handleGroupCallback(query) {
+  const data = String(query.data || '');
+  const from = query.from;
+  const userId = String(from.id);
+
+  const joinMatch = data.match(/^gj:([a-f0-9]{12})$/);
+
+  if (!joinMatch) return false;
+
+  const code = joinMatch[1];
+  const room = groupRooms.get(code);
+
+  if (!room || room.started) {
+    await answerCallback(
+      query.id,
+      'Бұл ойынның уақыты аяқталған.',
+      true
+    );
+    return true;
+  }
+
+  const already = room.players.some(
+    player => String(player.id) === userId
+  );
+
+  if (already) {
+    await answerCallback(
+      query.id,
+      'Сіз ойынға қосылдыңыз.'
+    );
+    return true;
+  }
+
+  if (room.players.length >= 2) {
+    await answerCallback(
+      query.id,
+      'Ойыншылар толып кетті.',
+      true
+    );
+    return true;
+  }
+
+  if (groupPlayerRooms.has(userId)) {
+    await answerCallback(
+      query.id,
+      'Сіз басқа топтық ойынға қосылғансыз.',
+      true
+    );
+    return true;
+  }
+
+  const player = {
+    id: userId,
+    username: from.username || '',
+    first_name: from.first_name || '',
+    last_name: from.last_name || ''
+  };
+
+  room.players.push(player);
+  groupPlayerRooms.set(userId, code);
+
+  await answerCallback(
+    query.id,
+    'Сіз ойынға қосылдыңыз!'
+  );
+
+  if (room.players.length === 2) {
+    await sendLinksToBothPlayers(room);
+  } else {
     try {
       await updateGroupRoom(room);
     } catch (error) {
       console.error('Lobby update:', error.message);
     }
-  } catch (error) {
-    await answerCallback(
-      query.id,
-      'Алдымен ботқа жеке чатта /start жіберіңіз. Содан кейін қайта басыңыз.',
-      true
-    );
   }
 
   return true;
@@ -340,6 +409,7 @@ async function handleTelegramWebhook(req, res) {
         entered: new Set(),
         connected: new Set(),
         tokens: new Map(),
+        pendingGame: null,
         started: false,
         timer: null
       };
@@ -355,6 +425,7 @@ async function handleTelegramWebhook(req, res) {
       const sent = await telegramApi('sendMessage', {
         chat_id: message.chat.id,
         text: roomText(room),
+        parse_mode: 'HTML',
         reply_markup: roomKeyboard(room)
       });
 
@@ -482,12 +553,12 @@ const send = (u, msg) => {
 };
 
 const pub = (u) => ({
-  name: u.name,
-  avatar: u.avatar
+  name: u ? u.name : 'Ойыншы',
+  avatar: u ? u.avatar : null
 });
 
 const legalList = (g, side) =>
-  g.st.turn === side && !g.st.over
+  g.st.turn === side && !g.st.over && !g.waitingForOpponent
     ? G.legalMoves(g.st).map(({ from, to, cap }) => ({
         from,
         to,
@@ -514,7 +585,8 @@ function gameState(g, uid) {
     legal: legalList(g, you),
     score: g.st.score,
     chainPos: g.st.chain ? g.st.chain.pos : null,
-    chat: g.chat
+    chat: g.chat,
+    waitingForOpponent: Boolean(g.waitingForOpponent)
   };
 }
 
@@ -562,7 +634,8 @@ function startGame(a, b, groupInfo = null) {
     chat: [],
     timers: {},
     lastChat: {},
-    groupInfo
+    groupInfo,
+    waitingForOpponent: false
   };
 
   games.set(g.id, g);
@@ -570,6 +643,76 @@ function startGame(a, b, groupInfo = null) {
 
   send(a, gameState(g, a.id));
   send(b, gameState(g, b.id));
+
+  return g;
+}
+
+function ensureRoomUser(player) {
+  const id = String(player.id);
+
+  let u = users.get(id);
+
+  if (!u) {
+    const name = player.username
+      ? '@' + player.username
+      : [
+          player.first_name,
+          player.last_name
+        ].filter(Boolean).join(' ') || 'Ойыншы';
+
+    u = {
+      id,
+      name,
+      avatar: null,
+      game: null,
+      ws: null
+    };
+
+    users.set(id, u);
+  }
+
+  return u;
+}
+
+function createPendingGroupGame(room) {
+  const first = ensureRoomUser(room.players[0]);
+  const second = ensureRoomUser(room.players[1]);
+
+  dequeue(first.id);
+  dequeue(second.id);
+
+  removeUserInvite(first.id);
+  removeUserInvite(second.id);
+
+  const [w, bl] = Math.random() < 0.5
+    ? [first, second]
+    : [second, first];
+
+  const g = {
+    id: 'g' + ++gameSeq,
+    p: {
+      w: w.id,
+      b: bl.id
+    },
+    st: G.newGame(),
+    chat: [],
+    timers: {},
+    lastChat: {},
+    groupInfo: {
+      chatId: room.chatId,
+      code: room.code
+    },
+    waitingForOpponent: true
+  };
+
+  games.set(g.id, g);
+
+  first.game = g.id;
+  second.game = g.id;
+
+  room.pendingGame = g;
+
+  return g;
 }
 
 /* ---------- O‘yinni tugatish ---------- */
@@ -607,14 +750,19 @@ function finish(g, winner, reason) {
       : null;
 
     const resultText = winnerUser
-      ? `🏆 ЖЕҢІМПАЗ: ${winnerUser.name}`
+      ? `🏆 ЖЕҢІМПАЗ: ${playerLink({
+          id: winnerId,
+          name: winnerUser.name,
+          username: winnerUser.username || ''
+        })}`
       : '🤝 Ойын тең аяқталды!';
 
     telegramApi('sendMessage', {
       chat_id: g.groupInfo.chatId,
       text:
-        '♟️ ШАШКА ОЙЫНЫ АЯҚТАЛДЫ!\n\n' +
-        resultText
+        '♟️ <b>ШАШКА ОЙЫНЫ АЯҚТАЛДЫ!</b>\n\n' +
+        resultText,
+      parse_mode: 'HTML'
     }).catch(err => {
       console.error('Group result error:', err.message);
     });
@@ -655,14 +803,13 @@ function joinGroupGame(u, token) {
   }
 
   if (room.started) {
-    const existingGame = [...games.values()].find(
-      g =>
-        g.groupInfo &&
-        g.groupInfo.code === room.code &&
-        (g.p.w === u.id || g.p.b === u.id)
-    );
+    const existingGame = room.pendingGame;
 
-    if (existingGame) {
+    if (
+      existingGame &&
+      games.has(existingGame.id) &&
+      (existingGame.p.w === u.id || existingGame.p.b === u.id)
+    ) {
       return send(u, gameState(existingGame, u.id));
     }
 
@@ -680,10 +827,17 @@ function joinGroupGame(u, token) {
   }
 
   if (u.game && games.has(u.game)) {
-    return send(u, {
-      t: 'group_error',
-      code: 'busy'
-    });
+    const existing = games.get(u.game);
+
+    if (
+      !existing.groupInfo ||
+      existing.groupInfo.code !== room.code
+    ) {
+      return send(u, {
+        t: 'group_error',
+        code: 'busy'
+      });
+    }
   }
 
   room.connected.add(String(u.id));
@@ -691,27 +845,52 @@ function joinGroupGame(u, token) {
   dequeue(u.id);
   removeUserInvite(u.id);
 
+  let g = room.pendingGame;
+
+  if (!g || !games.has(g.id)) {
+    g = createPendingGroupGame(room);
+  }
+
   const first = users.get(String(room.players[0].id));
   const second = users.get(String(room.players[1].id));
 
-  if (
-    !first || !second ||
-    !first.ws || first.ws.readyState !== 1 ||
-    !second.ws || second.ws.readyState !== 1
-  ) {
-    return send(u, {
+  const bothConnected =
+    first && second &&
+    first.ws && first.ws.readyState === 1 &&
+    second.ws && second.ws.readyState === 1 &&
+    room.connected.has(String(first.id)) &&
+    room.connected.has(String(second.id));
+
+  if (!bothConnected) {
+    send(u, gameState(g, u.id));
+
+    send(u, {
       t: 'group_waiting',
       count: room.connected.size,
       message: 'Екінші ойыншының кіруін күтіңіз...'
     });
+
+    return;
   }
 
   room.started = true;
+  g.waitingForOpponent = false;
+
   clearTimeout(room.timer);
 
-  startGame(first, second, {
-    chatId: room.chatId,
-    code: room.code
+  send(first, gameState(g, first.id));
+  send(second, gameState(g, second.id));
+
+  send(first, {
+    t: 'group_started'
+  });
+
+  send(second, {
+    t: 'group_started'
+  });
+
+  updateGroupRoom(room).catch(error => {
+    console.error('Started lobby update:', error.message);
   });
 }
 
@@ -839,7 +1018,9 @@ function handle(u, m) {
 
     case 'find': {
       if (u.game && games.has(u.game)) {
-        return send(u, gameState(games.get(u.game), u.id));
+        const current = games.get(u.game);
+
+        return send(u, gameState(current, u.id));
       }
 
       if (queue.includes(u.id)) {
@@ -885,6 +1066,7 @@ function handle(u, m) {
 
       if (
         !g ||
+        g.waitingForOpponent ||
         !Number.isInteger(m.from) ||
         !Number.isInteger(m.to)
       ) {
@@ -929,7 +1111,7 @@ function handle(u, m) {
     case 'resign': {
       const g = games.get(u.game);
 
-      if (g) {
+      if (g && !g.waitingForOpponent) {
         finish(
           g,
           G.other(sideOfUser(g, u.id)),
@@ -943,7 +1125,9 @@ function handle(u, m) {
     case 'chat': {
       const g = games.get(u.game);
 
-      if (!g || typeof m.text !== 'string') return;
+      if (!g || g.waitingForOpponent || typeof m.text !== 'string') {
+        return;
+      }
 
       const text = m.text.trim().slice(0, 300);
       const now = Date.now();
@@ -1035,21 +1219,29 @@ function onAuth(ws, m) {
 
     send(u, gameState(g, u.id));
 
-    const opp = users.get(
-      g.p[G.other(sideOfUser(g, u.id))]
-    );
-
-    send(opp, {
-      t: 'away',
-      left: false
-    });
-
-    if (g.timers[opp.id]) {
+    if (g.waitingForOpponent) {
       send(u, {
-        t: 'away',
-        left: true,
-        seconds: GRACE
+        t: 'group_waiting',
+        count: 1,
+        message: 'Екінші ойыншының кіруін күтіңіз...'
       });
+    } else {
+      const opp = users.get(
+        g.p[G.other(sideOfUser(g, u.id))]
+      );
+
+      send(opp, {
+        t: 'away',
+        left: false
+      });
+
+      if (g.timers[opp.id]) {
+        send(u, {
+          t: 'away',
+          left: true,
+          seconds: GRACE
+        });
+      }
     }
   } else {
     u.game = null;
@@ -1112,6 +1304,19 @@ wss.on('connection', ws => {
     const g = u.game && games.get(u.game);
 
     if (!g) return;
+
+    if (g.waitingForOpponent) {
+      const otherId = g.p[G.other(sideOfUser(g, u.id))];
+      const other = users.get(otherId);
+
+      send(other, {
+        t: 'group_waiting',
+        count: room ? room.connected.size : 0,
+        message: 'Екінші ойыншының кіруін күтіңіз...'
+      });
+
+      return;
+    }
 
     const side = sideOfUser(g, u.id);
 
