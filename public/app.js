@@ -1,3 +1,4 @@
+
 (() => {
 'use strict';
 
@@ -69,9 +70,16 @@ function getStartCode() {
 
 /* ---------- Guruh o‘yini ---------- */
 
+// Bu yerda endi oddiy xona kodi emas,
+// har bir o‘yinшы uchun alohida 32 belgili token keladi.
 function getGroupCode() {
   const value = getStartValue();
-  return value.startsWith('group_') ? value.slice(6) : '';
+
+  if (!value.startsWith('group_')) return '';
+
+  const token = value.slice(6);
+
+  return /^[a-f0-9]{32}$/.test(token) ? token : '';
 }
 
 function showInviteStatus(message) {
@@ -156,6 +164,14 @@ function cancelInvite() {
 /* ---------- Ulanish ---------- */
 
 function connect() {
+  if (
+    S.ws &&
+    (S.ws.readyState === WebSocket.CONNECTING ||
+     S.ws.readyState === WebSocket.OPEN)
+  ) {
+    return;
+  }
+
   const ws = new WebSocket(
     `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`
   );
@@ -199,6 +215,8 @@ function connect() {
 
   ws.onclose = () => {
     if (S.ws !== ws || S.fatal) return;
+
+    S.ws = null;
 
     $('conn').classList.remove('hidden');
     setSearching(false);
@@ -321,14 +339,14 @@ function onMsg(m) {
       setAva($('meAva'), m.me);
       $('meName').textContent = m.me.name;
 
-      // Guruh o‘yiniga kirish
+      // Guruh o‘yiniga shaxsiy token orqali kirish
       S.groupCode = getGroupCode();
 
       if (S.groupCode) {
         $('sheetInvite').classList.remove('hidden');
 
         showInviteStatus(
-          'Guruhdagi shashka xonasiga ulanmoqda...'
+          '♟️ O‘yin xonasiga ulanmoqda...'
         );
 
         send({
@@ -336,7 +354,6 @@ function onMsg(m) {
           code: S.groupCode
         });
       } else {
-        // Do‘st taklif havolasi
         if (!S.joinCode) {
           S.joinCode = getStartCode();
         }
@@ -362,9 +379,8 @@ function onMsg(m) {
       $('sheetInvite').classList.remove('hidden');
 
       showInviteStatus(
-        m.count === 2
-          ? 'Ikki o‘yinchi qo‘shildi! O‘yin boshlanmoqda...'
-          : 'Siz qo‘shildingiz! Ikkinchi o‘yinchi kutilmoqda...'
+        m.message ||
+        'Sіз ойынға кірдіңіз. Екінші ойыншының кіруін күтіңіз...'
       );
 
       break;
@@ -374,12 +390,14 @@ function onMsg(m) {
 
       showInviteStatus(
         m.code === 'expired'
-          ? 'Bu guruh o‘yinining muddati tugagan. Guruhda /game yozing.'
+          ? 'Бұл ойынның уақыты аяқталған. Топта /game деп жазыңыз.'
           : m.code === 'full'
-            ? 'Bu o‘yin xonasi to‘ldi.'
+            ? 'Бұл ойын бөлмесі толып кетті.'
             : m.code === 'busy'
-              ? 'Siz hozir boshqa o‘yindasiz.'
-              : 'O‘yin xonasiga ulanib bo‘lmadi.'
+              ? 'Сіз қазір басқа ойындасыз.'
+              : m.code === 'waiting'
+                ? 'Екінші ойыншы әлі ойынға кірген жоқ.'
+                : 'Ойын бөлмесіне қосылу мүмкін болмады.'
       );
 
       break;
@@ -456,7 +474,7 @@ function onMsg(m) {
       S.fatal = true;
 
       fatal(
-        'Boshqa qurilmada ochildi',
+        'Boshқа qurilmada ochildi',
         'Bu hisob boshqa joyda ochilgan. Shu yerda davom etish uchun o‘yinni qayta oching.'
       );
 
