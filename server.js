@@ -1,4 +1,3 @@
-
 'use strict';
 
 const http = require('http');
@@ -17,6 +16,10 @@ const PUBLIC = path.join(__dirname, 'public');
 
 const INVITE_TTL = 10 * 60 * 1000;
 const GROUP_TTL = 10 * 60 * 1000;
+
+// Қарсылас іздеу уақыты — 2 минут
+const GROUP_SEARCH_SECONDS = 120;
+const GROUP_SEARCH_MS = GROUP_SEARCH_SECONDS * 1000;
 
 const TURN_SECONDS = 60;
 const TURN_MS = TURN_SECONDS * 1000;
@@ -128,7 +131,10 @@ function roomText(room) {
   });
 
   if (room.players.length < 2) {
-    text += '\nЕкінші ойыншының қосылуын күтеміз...';
+    text +=
+      '\n🔎 Қарсылас ізделуде...\n' +
+      '♟️ Ойынға қосылу үшін төмендегі батырманы басыңыз.\n' +
+      '⏳ Қарсылас табуға 2 минут беріледі.';
   } else if (!room.started) {
     text += '\n\n📩 Екі ойыншыға да ойынға кіру батырмасы жеке хабарлама арқылы жіберілді.';
     text += '\n\n📱 Жеке хабарламаларыңызды тексеріңіздер!';
@@ -433,6 +439,7 @@ function cleanupGroupRoom(code) {
   if (!room) return;
 
   clearTimeout(room.timer);
+  clearTimeout(room.searchTimer);
   clearGroupWaitingTimer(room);
 
   if (room.pendingGame && games.has(room.pendingGame.id)) {
@@ -468,6 +475,40 @@ function cleanupGroupRoom(code) {
   }
 
   groupRooms.delete(code);
+}
+
+// Қарсылас 2 минут ішінде табылмаса, іздеу хабарламасын өшіру
+async function expireGroupSearch(code) {
+  const room = groupRooms.get(code);
+
+  if (!room || room.started || room.players.length >= 2) {
+    return;
+  }
+
+  const chatId = room.chatId;
+
+  const messageIds = [
+    room.commandMessageId,
+    room.messageId
+  ].filter(Boolean);
+
+  cleanupGroupRoom(code);
+
+  for (const messageId of messageIds) {
+    try {
+      await telegramApi('deleteMessage', {
+        chat_id: chatId,
+        message_id: messageId
+      });
+    } catch (error) {
+      console.error(
+        'Іздеу хабарламасын өшіру қатесі:',
+        error.message
+      );
+    }
+  }
+
+  console.log(`Топтық іздеу аяқталды: ${code}`);
 }
 
 /* ---------- Жеке хабарлама ---------- */
@@ -594,6 +635,10 @@ async function handleGroupCallback(query) {
   await answerCallback(query.id, 'Сіз ойынға қосылдыңыз!');
 
   if (room.players.length === 2) {
+    // Екінші ойыншы табылды — 2 минуттық іздеу таймерін тоқтату
+    clearTimeout(room.searchTimer);
+    room.searchTimer = null;
+
     await sendLinksToBothPlayers(room);
   } else {
     try {
@@ -712,24 +757,37 @@ async function handleTelegramWebhook(req, res) {
 
       const code = crypto.randomBytes(6).toString('hex');
 
+      // /game жазған адам автоматты түрде бірінші ойыншы болады
+      const creator = {
+        id: creatorId,
+        username: message.from.username || '',
+        first_name: message.from.first_name || '',
+        last_name: message.from.last_name || ''
+      };
+
       const room = {
         code,
         chatId: message.chat.id,
         commandMessageId: message.message_id,
         messageId: null,
-        players: [],
+        players: [creator],
         entered: new Set(),
         connected: new Set(),
         tokens: new Map(),
         pendingGame: null,
         started: false,
         timer: null,
+        searchTimer: null,
         waitingTimer: null,
         waitingDeadline: null,
         firstConnectedId: null,
         privateSent: 0
       };
 
+      // Бірінші ойыншыны осы бөлмеге бекіту
+      groupPlayerRooms.set(creatorId, code);
+
+      // Бөлменің жалпы қауіпсіздік мерзімі
       room.timer = setTimeout(() => {
         cleanupGroupRoom(code);
       }, GROUP_TTL);
@@ -746,6 +804,17 @@ async function handleTelegramWebhook(req, res) {
       });
 
       room.messageId = sent.result.message_id;
+
+      // Қарсылас 2 минутта табылмаса, бөлмені жабу
+      room.searchTimer = setTimeout(() => {
+        expireGroupSearch(code).catch(error => {
+          console.error('Іздеуді жабу қатесі:', error.message);
+        });
+      }, GROUP_SEARCH_MS);
+
+      if (room.searchTimer.unref) {
+        room.searchTimer.unref();
+      }
     }
 
     if (
@@ -1137,6 +1206,7 @@ function startGroupMatch(room, g) {
 
   clearGroupWaitingTimer(room);
   clearTimeout(room.timer);
+  clearTimeout(room.searchTimer);
 
   startTurnTimer(g);
 
