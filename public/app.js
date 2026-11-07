@@ -62,14 +62,10 @@ function getStartValue() {
   return value;
 }
 
-/* ---------- Do‘st bilan o‘ynash ---------- */
-
 function getStartCode() {
   const value = getStartValue();
   return value.startsWith('invite_') ? value.slice(7) : '';
 }
-
-/* ---------- Guruh o‘yini ---------- */
 
 function getGroupCode() {
   const value = getStartValue();
@@ -77,7 +73,6 @@ function getGroupCode() {
   if (!value.startsWith('group_')) return '';
 
   const token = value.slice(6);
-
   return /^[a-f0-9]{32}$/.test(token) ? token : '';
 }
 
@@ -85,6 +80,8 @@ function showInviteStatus(message) {
   const el = $('inviteStatus');
   if (el) el.textContent = message;
 }
+
+/* ---------- Do‘st bilan o‘ynash ---------- */
 
 function openInviteSheet() {
   S.inviteCode = null;
@@ -167,9 +164,7 @@ function connect() {
     S.ws &&
     (S.ws.readyState === WebSocket.CONNECTING ||
      S.ws.readyState === WebSocket.OPEN)
-  ) {
-    return;
-  }
+  ) return;
 
   const ws = new WebSocket(
     `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`
@@ -342,7 +337,6 @@ function onMsg(m) {
 
       if (S.groupCode) {
         S.groupWaiting = true;
-
         $('sheetInvite').classList.add('hidden');
 
         send({
@@ -350,9 +344,7 @@ function onMsg(m) {
           token: S.groupCode
         });
       } else {
-        if (!S.joinCode) {
-          S.joinCode = getStartCode();
-        }
+        if (!S.joinCode) S.joinCode = getStartCode();
 
         if (S.joinCode) {
           $('sheetInvite').classList.remove('hidden');
@@ -383,8 +375,7 @@ function onMsg(m) {
         refresh();
         show('game');
       } else {
-        $('sheetInvite').classList.remove('hidden');
-
+        $('sheetInvite').classList.add('hidden');
         showInviteStatus(
           m.message ||
           'Ikkinchi o‘yinchining kirishini kuting...'
@@ -403,7 +394,6 @@ function onMsg(m) {
       }
 
       $('sheetInvite').classList.add('hidden');
-
       haptic('heavy');
       break;
 
@@ -440,17 +430,12 @@ function onMsg(m) {
       $('btnCopyInvite').disabled = false;
       $('btnShareInvite').disabled = false;
 
-      showInviteStatus(
-        'Havola tayyor! Uni do‘stingizga yuboring.'
-      );
-
+      showInviteStatus('Havola tayyor! Uni do‘stingizga yuboring.');
       break;
     }
 
     case 'invite_joined':
-      showInviteStatus(
-        'Do‘stingiz qo‘shildi! O‘yin boshlanmoqda...'
-      );
+      showInviteStatus('Do‘stingiz qo‘shildi! O‘yin boshlanmoqda...');
       break;
 
     case 'invite_expired':
@@ -461,21 +446,25 @@ function onMsg(m) {
       $('btnCopyInvite').disabled = true;
       $('btnShareInvite').disabled = true;
 
-      showInviteStatus(
-        'Taklif havolasi muddati tugadi. Yangi taklif yarating.'
-      );
-
+      showInviteStatus('Taklif havolasi muddati tugadi. Yangi taklif yarating.');
       break;
 
     case 'invite_cancelled':
       S.inviteCode = null;
       S.inviteLink = '';
-
       $('sheetInvite').classList.add('hidden');
       break;
 
     case 'game':
       startGame(m);
+      break;
+
+    case 'turn_timer':
+      if (S.g) {
+        S.g.turnDeadline = m.deadline || null;
+        S.g.turnTimerSide = m.side || null;
+        refresh();
+      }
       break;
 
     case 'move':
@@ -499,7 +488,6 @@ function onMsg(m) {
         'Boshqa qurilmada ochildi',
         'Bu hisob boshqa joyda ochilgan. Shu yerda davom etish uchun o‘yinni qayta oching.'
       );
-
       break;
 
     case 'error':
@@ -509,23 +497,14 @@ function onMsg(m) {
           'Telegram orqali tasdiqlab bo‘lmadi. O‘yinni bot orqali qayta oching.'
         );
       } else if (m.code === 'invite_invalid') {
-        showInviteStatus(
-          'Taklif havolasi noto‘g‘ri yoki mavjud emas.'
-        );
+        showInviteStatus('Taklif havolasi noto‘g‘ri yoki mavjud emas.');
       } else if (m.code === 'invite_expired') {
-        showInviteStatus(
-          'Taklif havolasining muddati tugagan.'
-        );
+        showInviteStatus('Taklif havolasining muddati tugagan.');
       } else if (m.code === 'invite_self') {
-        showInviteStatus(
-          'O‘zingizning taklif havolangiz orqali qo‘shila olmaysiz.'
-        );
+        showInviteStatus('O‘zingizning taklif havolangiz orqali qo‘shila olmaysiz.');
       } else if (m.code === 'busy') {
-        showInviteStatus(
-          'O‘yinchi hozir boshqa o‘yinda.'
-        );
+        showInviteStatus('O‘yinchi hozir boshqa o‘yinda.');
       }
-
       break;
   }
 }
@@ -548,9 +527,7 @@ const rc = (i) => {
 
 const place = (el, i) => {
   const [r, c] = rc(i);
-
-  el.style.transform =
-    `translate(${c * 100}%,${r * 100}%)`;
+  el.style.transform = `translate(${c * 100}%,${r * 100}%)`;
 };
 
 function startGame(m) {
@@ -572,6 +549,8 @@ function startGame(m) {
     waitingForOpponent: Boolean(
       m.waitingForOpponent || S.groupWaiting
     ),
+    turnDeadline: m.turnDeadline || null,
+    turnTimerSide: m.turnDeadline ? m.turn : null,
     over: null,
     last: null
   };
@@ -599,16 +578,13 @@ function startGame(m) {
   $('oppName').textContent = opp.name;
   $('myName').textContent = me.name;
 
-  $('oppDot').className =
-    'pdot ' + (m.you === 'w' ? 'b' : 'w');
-
+  $('oppDot').className = 'pdot ' + (m.you === 'w' ? 'b' : 'w');
   $('myDot').className = 'pdot ' + m.you;
 
   buildSquares();
   renderPieces();
 
   $('msgs').textContent = '';
-
   m.chat.forEach((c) => addChat(c, true));
 
   updateBadge();
@@ -636,8 +612,7 @@ function buildSquares() {
     const i = r * 8 + c;
     const el = document.createElement('div');
 
-    el.className =
-      'sq' + ((r + c) % 2 ? ' d' : '');
+    el.className = 'sq' + ((r + c) % 2 ? ' d' : '');
 
     wrap.append(el);
     sqEls[i] = el;
@@ -671,7 +646,6 @@ function renderPieces() {
   S.g.board.forEach((p, i) => {
     if (p) {
       const el = pieceEl(p, i);
-
       wrap.append(el);
       pcEls.set(i, el);
     }
@@ -744,7 +718,6 @@ async function doMove(m) {
   });
 
   S.sel = null;
-
   refresh();
 
   await sleep(cap != null ? 340 : 260);
@@ -765,6 +738,7 @@ async function doOver(m) {
 
   g.over = m;
   g.legal = [];
+  g.turnDeadline = null;
 
   refresh();
 
@@ -799,6 +773,10 @@ async function doOver(m) {
     left: win
       ? 'Raqib o‘yindan chiqib ketdi'
       : 'Aloqa uzilgani uchun o‘yin tugadi',
+
+    timeout: win
+      ? 'Raqibning vaqti tugadi'
+      : 'Sizning vaqtingiz tugadi',
 
     draw: '15 ta yurish davomida urish va oddiy shashka yurishi bo‘lmadi'
   };
@@ -864,6 +842,30 @@ function refresh() {
           ? ''
           : 'O‘ylanmoqda…';
 
+  // Serverdagi taymerning qolgan vaqtini ko‘rsatish.
+  if (
+    !waiting &&
+    !g.over &&
+    g.turnDeadline &&
+    g.turnTimerSide
+  ) {
+    const seconds = Math.max(
+      0,
+      Math.ceil((g.turnDeadline - Date.now()) / 1000)
+    );
+
+    const mm = String(Math.floor(seconds / 60)).padStart(2, '0');
+    const ss = String(seconds % 60).padStart(2, '0');
+
+    const clock = ` ⏱ ${mm}:${ss}`;
+
+    if (g.turnTimerSide === g.you) {
+      ms.textContent += clock;
+    } else {
+      $('oppSub').textContent += clock;
+    }
+  }
+
   $('myCap').textContent = g.score[g.you];
 
   $('oppCap').textContent =
@@ -874,18 +876,12 @@ function refresh() {
   } else if (g.chainPos != null && mine) {
     S.sel = g.chainPos;
   } else if (mine && S.sel == null) {
-    const f = [
-      ...new Set(g.legal.map((m) => m.from))
-    ];
+    const f = [...new Set(g.legal.map((m) => m.from))];
 
-    if (f.length === 1) {
-      S.sel = f[0];
-    }
+    if (f.length === 1) S.sel = f[0];
   }
 
-  if (!mine) {
-    S.sel = null;
-  }
+  if (!mine) S.sel = null;
 
   const movable = new Set(
     mine ? g.legal.map((m) => m.from) : []
@@ -904,11 +900,7 @@ function refresh() {
       : null;
 
     el.classList.toggle('tgt', !!t);
-    el.classList.toggle(
-      'cap',
-      !!(t && t.cap != null)
-    );
-
+    el.classList.toggle('cap', !!(t && t.cap != null));
     el.classList.toggle('sel', i === S.sel);
 
     el.classList.toggle(
@@ -917,6 +909,18 @@ function refresh() {
     );
   });
 }
+
+// Таймерді әр секунд сайын экранда жаңарту.
+setInterval(() => {
+  if (
+    S.g &&
+    !S.g.over &&
+    !S.g.waitingForOpponent &&
+    S.g.turnDeadline
+  ) {
+    refresh();
+  }
+}, 1000);
 
 /* ---------- Shashka yurishlari ---------- */
 
@@ -930,9 +934,7 @@ $('field').addEventListener('pointerdown', (e) => {
     g.turn !== g.you ||
     S.busy ||
     S.q.length
-  ) {
-    return;
-  }
+  ) return;
 
   const r = $('field').getBoundingClientRect();
 
@@ -967,7 +969,6 @@ $('field').addEventListener('pointerdown', (e) => {
 
     S.sel = null;
     refresh();
-
     return;
   }
 
@@ -1007,12 +1008,9 @@ function showAway(m) {
 
   S.awayTimer = setInterval(() => {
     n = Math.max(0, n - 1);
-
     upd();
 
-    if (!n) {
-      clearInterval(S.awayTimer);
-    }
+    if (!n) clearInterval(S.awayTimer);
   }, 1000);
 
   haptic('medium');
@@ -1087,9 +1085,7 @@ $('sheetChat').addEventListener('pointerdown', (e) => {
 $('btnSend').onclick = sendChat;
 
 $('chatInput').addEventListener('keydown', (e) => {
-  if (e.key === 'Enter') {
-    sendChat();
-  }
+  if (e.key === 'Enter') sendChat();
 });
 
 /* ---------- Tugmalar ---------- */
@@ -1113,9 +1109,7 @@ $('btnCopyInvite').onclick = copyInviteLink;
 $('btnShareInvite').onclick = shareInviteLink;
 
 $('sheetInvite').addEventListener('pointerdown', (e) => {
-  if (e.target.id === 'sheetInvite') {
-    cancelInvite();
-  }
+  if (e.target.id === 'sheetInvite') cancelInvite();
 });
 
 $('btnMenu').onclick = () =>
@@ -1138,9 +1132,7 @@ $('btnResign').onclick = () => {
       'Haqiqatan ham taslim bo‘lasizmi?',
       (ok) => ok && go()
     );
-  } else if (
-    confirm('Haqiqatan ham taslim bo‘lasizmi?')
-  ) {
+  } else if (confirm('Haqiqatan ham taslim bo‘lasizmi?')) {
     go();
   }
 
