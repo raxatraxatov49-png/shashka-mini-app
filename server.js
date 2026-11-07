@@ -17,6 +17,10 @@ const PUBLIC = path.join(__dirname, 'public');
 const INVITE_TTL = 10 * 60 * 1000;
 const GROUP_TTL = 10 * 60 * 1000;
 
+// Әр ойыншыға бір жүріс үшін берілетін уақыт
+const TURN_SECONDS = 60;
+const TURN_MS = TURN_SECONDS * 1000;
+
 const WEBHOOK_URL = 'https://shashka-mini-app.onrender.com/telegram-webhook';
 const MINI_APP_LINK = 'https://t.me/shashkaoyinibot?startapp=';
 
@@ -195,15 +199,18 @@ function cleanupGroupRoom(code) {
   clearTimeout(room.timer);
 
   if (room.pendingGame && games.has(room.pendingGame.id)) {
-    games.delete(room.pendingGame.id);
+    const pending = room.pendingGame;
+
+    clearTurnTimer(pending);
+    games.delete(pending.id);
 
     for (const id of [
-      room.pendingGame.p.w,
-      room.pendingGame.p.b
+      pending.p.w,
+      pending.p.b
     ]) {
       const user = users.get(id);
 
-      if (user && user.game === room.pendingGame.id) {
+      if (user && user.game === pending.id) {
         user.game = null;
       }
 
@@ -569,8 +576,111 @@ const legalList = (g, side) =>
 const sideOfUser = (g, id) =>
   g.p.w === id ? 'w' : 'b';
 
+/* ---------- 60 sekund timer ---------- */
+
+function clearTurnTimer(g) {
+  if (!g) return;
+
+  if (g.turnTimer) {
+    clearTimeout(g.turnTimer);
+  }
+
+  g.turnTimer = null;
+  g.turnDeadline = null;
+  g.turnTimerSide = null;
+}
+
+function sendTurnTimer(g) {
+  if (
+    !g ||
+    !games.has(g.id) ||
+    g.waitingForOpponent ||
+    g.st.over ||
+    !g.turnDeadline
+  ) {
+    return;
+  }
+
+  const remaining = Math.max(
+    0,
+    Math.ceil((g.turnDeadline - Date.now()) / 1000)
+  );
+
+  const message = {
+    t: 'turn_timer',
+    side: g.st.turn,
+    seconds: remaining,
+    deadline: g.turnDeadline
+  };
+
+  send(users.get(g.p.w), message);
+  send(users.get(g.p.b), message);
+}
+
+function startTurnTimer(g) {
+  if (!g || !games.has(g.id)) return;
+
+  clearTurnTimer(g);
+
+  if (g.waitingForOpponent || g.st.over) return;
+
+  const side = g.st.turn;
+  const deadline = Date.now() + TURN_MS;
+
+  g.turnTimerSide = side;
+  g.turnDeadline = deadline;
+
+  sendTurnTimer(g);
+
+  g.turnTimer = setTimeout(() => {
+    if (!games.has(g.id)) return;
+    if (g.waitingForOpponent || g.st.over) return;
+
+    // Егер кезек ауысып кеткен болса, ескі таймер әсер етпейді.
+    if (
+      g.st.turn !== side ||
+      g.turnTimerSide !== side ||
+      g.turnDeadline !== deadline
+    ) {
+      return;
+    }
+
+    // Сервер кешігіп орындаса, қалған уақытты қайта тексереді.
+    const remaining = deadline - Date.now();
+
+    if (remaining > 0) {
+      g.turnTimer = setTimeout(() => {
+        if (
+          games.has(g.id) &&
+          !g.waitingForOpponent &&
+          !g.st.over &&
+          g.st.turn === side &&
+          g.turnTimerSide === side &&
+          g.turnDeadline === deadline
+        ) {
+          finish(g, G.other(side), 'timeout');
+        }
+      }, remaining);
+
+      if (g.turnTimer.unref) g.turnTimer.unref();
+      return;
+    }
+
+    finish(g, G.other(side), 'timeout');
+  }, TURN_MS);
+
+  if (g.turnTimer.unref) g.turnTimer.unref();
+}
+
 function gameState(g, uid) {
   const you = sideOfUser(g, uid);
+
+  const remaining = g.turnDeadline
+    ? Math.max(
+        0,
+        Math.ceil((g.turnDeadline - Date.now()) / 1000)
+      )
+    : null;
 
   return {
     t: 'game',
@@ -586,7 +696,9 @@ function gameState(g, uid) {
     score: g.st.score,
     chainPos: g.st.chain ? g.st.chain.pos : null,
     chat: g.chat,
-    waitingForOpponent: Boolean(g.waitingForOpponent)
+    waitingForOpponent: Boolean(g.waitingForOpponent),
+    turnSeconds: remaining,
+    turnDeadline: g.turnDeadline || null
   };
 }
 
@@ -633,6 +745,9 @@ function startGame(a, b, groupInfo = null) {
     st: G.newGame(),
     chat: [],
     timers: {},
+    turnTimer: null,
+    turnDeadline: null,
+    turnTimerSide: null,
     lastChat: {},
     groupInfo,
     waitingForOpponent: false
@@ -643,6 +758,9 @@ function startGame(a, b, groupInfo = null) {
 
   send(a, gameState(g, a.id));
   send(b, gameState(g, b.id));
+
+  // Кездейсоқ және дос ойынында таймер бірден басталады.
+  startTurnTimer(g);
 
   return g;
 }
@@ -663,6 +781,7 @@ function ensureRoomUser(player) {
     u = {
       id,
       name,
+      username: player.username || '',
       avatar: null,
       game: null,
       ws: null
@@ -697,6 +816,9 @@ function createPendingGroupGame(room) {
     st: G.newGame(),
     chat: [],
     timers: {},
+    turnTimer: null,
+    turnDeadline: null,
+    turnTimerSide: null,
     lastChat: {},
     groupInfo: {
       chatId: room.chatId,
@@ -721,6 +843,8 @@ function finish(g, winner, reason) {
   if (!games.has(g.id)) return;
 
   games.delete(g.id);
+
+  clearTurnTimer(g);
   Object.values(g.timers).forEach(clearTimeout);
 
   for (const id of [g.p.w, g.p.b]) {
@@ -749,13 +873,22 @@ function finish(g, winner, reason) {
       ? users.get(winnerId)
       : null;
 
-    const resultText = winnerUser
-      ? `🏆 ЖЕҢІМПАЗ: ${playerLink({
+    let resultText;
+
+    if (winnerUser) {
+      resultText =
+        `🏆 ЖЕҢІМПАЗ: ${playerLink({
           id: winnerId,
           name: winnerUser.name,
           username: winnerUser.username || ''
-        })}`
-      : '🤝 Ойын тең аяқталды!';
+        })}`;
+
+      if (reason === 'timeout') {
+        resultText += '\n⏰ Қарсыласының уақыты аяқталды.';
+      }
+    } else {
+      resultText = '🤝 Ойын тең аяқталды!';
+    }
 
     telegramApi('sendMessage', {
       chat_id: g.groupInfo.chatId,
@@ -810,7 +943,9 @@ function joinGroupGame(u, token) {
       games.has(existingGame.id) &&
       (existingGame.p.w === u.id || existingGame.p.b === u.id)
     ) {
-      return send(u, gameState(existingGame, u.id));
+      send(u, gameState(existingGame, u.id));
+      sendTurnTimer(existingGame);
+      return;
     }
 
     return send(u, {
@@ -877,6 +1012,9 @@ function joinGroupGame(u, token) {
   g.waitingForOpponent = false;
 
   clearTimeout(room.timer);
+
+  // Топтық ойында таймер екі ойыншы кірген кезде ғана басталады.
+  startTurnTimer(g);
 
   send(first, gameState(g, first.id));
   send(second, gameState(g, second.id));
@@ -1079,6 +1217,15 @@ function handle(u, m) {
         return send(u, gameState(g, u.id));
       }
 
+      // Таймер бітіп қойған болса, жүрісті қабылдамаймыз.
+      if (
+        g.turnTimerSide === side &&
+        g.turnDeadline &&
+        Date.now() >= g.turnDeadline
+      ) {
+        return finish(g, G.other(side), 'timeout');
+      }
+
       const step = G.applyMove(g.st, m.from, m.to);
 
       if (!step) {
@@ -1103,6 +1250,16 @@ function handle(u, m) {
 
       if (g.st.over) {
         finish(g, g.st.over.winner, g.st.over.reason);
+        return;
+      }
+
+      // Кезек ауысқан кезде жаңа 60 секунд беріледі.
+      // Бірнеше рет ұру кезінде кезек ауыспаса,
+      // бұрынғы таймер жалғаса береді.
+      if (g.st.turn !== g.turnTimerSide) {
+        startTurnTimer(g);
+      } else {
+        sendTurnTimer(g);
       }
 
       return;
@@ -1242,6 +1399,9 @@ function onAuth(ws, m) {
           seconds: GRACE
         });
       }
+
+      // Қайта кіргенде таймер жаңадан басталмайды.
+      sendTurnTimer(g);
     }
   } else {
     u.game = null;
