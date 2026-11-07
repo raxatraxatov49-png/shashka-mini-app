@@ -34,7 +34,7 @@ const WEBHOOK_SECRET = crypto
   .slice(0, 32);
 
 if (!BOT_TOKEN && !DEV) {
-  console.error('BOT_TOKEN o‘rnatilmagan.');
+  console.error('BOT_TOKEN орнатылмаған.');
   process.exit(1);
 }
 
@@ -60,13 +60,13 @@ async function telegramApi(method, data) {
   const result = await response.json();
 
   if (!result.ok) {
-    throw new Error(result.description || 'Telegram API error');
+    throw new Error(result.description || 'Telegram API қатесі');
   }
 
   return result;
 }
 
-/* ---------- Yordamchilar ---------- */
+/* ---------- Көмекші функциялар ---------- */
 
 function escapeHtml(value) {
   return String(value || '')
@@ -115,7 +115,7 @@ function createGroupToken(room, player) {
   return token;
 }
 
-/* ---------- Guruh xonasi ---------- */
+/* ---------- Топтық ойын бөлмесі ---------- */
 
 function roomText(room) {
   let text = '♟️ <b>ШАШКА ОЙЫНЫ</b>\n\n';
@@ -128,10 +128,11 @@ function roomText(room) {
   });
 
   if (room.players.length < 2) {
-    text += '\nЕкінші ойыншыны күтеміз...';
+    text += '\nЕкінші ойыншының қосылуын күтеміз...';
   } else if (!room.started) {
-    text += '\n\n🎮 Екі ойыншы да ойынға кірсін.';
-    text += '\nБірінші кірген ойыншы 90 секунд күтеді.';
+    text += '\n\n📩 Екі ойыншыға да ойынға кіру батырмасы жеке хабарлама арқылы жіберілді.';
+    text += '\n\n📱 Жеке хабарламаларыңызды тексеріңіздер!';
+    text += '\n⏳ Бірінші кірген ойыншыға 1 минут 30 секунд беріледі.';
   } else {
     text += '\n\n♟️ Ойын басталды! Сәттілік!';
   }
@@ -144,23 +145,15 @@ function roomKeyboard(room) {
     return {
       inline_keyboard: [[
         {
-          text: '♟️ ҚОСЫЛУ',
+          text: '♟️ ОЙЫНҒА ҚОСЫЛУ',
           callback_data: 'gj:' + room.code
         }
       ]]
     };
   }
 
-  const rows = room.players.map((player, index) => {
-    const token = createGroupToken(room, player);
-
-    return [{
-      text: `🎮 ${index + 1}-ОЙЫНШЫ — ОЙЫНҒА КІРУ`,
-      url: MINI_APP_LINK + 'group_' + token
-    }];
-  });
-
-  return { inline_keyboard: rows };
+  // Екі ойыншы қосылған соң батырмалар жеке хабарламаға жіберіледі.
+  return { inline_keyboard: [] };
 }
 
 async function updateGroupRoom(room) {
@@ -185,7 +178,7 @@ async function replaceGroupRoomMessage(room) {
         message_id: room.messageId
       });
     } catch (error) {
-      console.error('Old group message delete:', error.message);
+      console.error('Ескі хабарламаны өшіру қатесі:', error.message);
     }
   }
 
@@ -207,7 +200,7 @@ async function answerCallback(id, text, alert = false) {
       show_alert: alert
     });
   } catch (error) {
-    console.error('Callback answer:', error.message);
+    console.error('Жауап жіберу қатесі:', error.message);
   }
 }
 
@@ -242,7 +235,7 @@ const legalList = (g, side) =>
       }))
     : [];
 
-/* ---------- Timer funksiyalari ---------- */
+/* ---------- Таймерлер ---------- */
 
 function clearTurnTimer(g) {
   if (!g) return;
@@ -265,40 +258,52 @@ function clearGroupWaitingTimer(room) {
   room.waitingDeadline = null;
 }
 
-function sendGroupWaiting(room) {
-  if (!room || !room.waitingDeadline || room.started) return;
+function groupWaitingMessage(room) {
+  const remaining = room.waitingDeadline
+    ? Math.max(
+        0,
+        Math.ceil((room.waitingDeadline - Date.now()) / 1000)
+      )
+    : GROUP_WAIT_SECONDS;
 
-  const remaining = Math.max(
-    0,
-    Math.ceil((room.waitingDeadline - Date.now()) / 1000)
-  );
-
-  const message = {
+  return {
     t: 'group_waiting',
     count: room.connected.size,
     seconds: remaining,
-    deadline: room.waitingDeadline,
-    message: 'Қарсыластың кіруін күтіңіз...'
+    deadline: room.waitingDeadline || null,
+    message: 'Қарсыластың ойынға кіруін күтіңіз...'
   };
+}
 
-  for (const id of room.connected) {
-    send(users.get(id), message);
+function sendGroupWaiting(room) {
+  if (!room || !room.waitingDeadline || room.started) return;
+
+  const message = groupWaitingMessage(room);
+
+  // Екі ойыншыға да бірдей уақыт көрсетіледі.
+  for (const player of room.players) {
+    send(users.get(String(player.id)), message);
   }
 }
 
 function startGroupWaitingTimer(room, g, firstPlayerId) {
-  if (
-    !room ||
-    !g ||
-    room.started ||
-    !g.waitingForOpponent ||
-    room.waitingTimer
-  ) return;
+  if (!room || !g || room.started || !g.waitingForOpponent) {
+    return;
+  }
 
-  room.firstConnectedId = String(firstPlayerId);
-  room.waitingDeadline = Date.now() + GROUP_WAIT_MS;
+  // Бірінші кірген ойыншыны тек бір рет белгілейміз.
+  if (!room.firstConnectedId) {
+    room.firstConnectedId = String(firstPlayerId);
+  }
+
+  // Қайта қосылғанда таймер қайта басталмайды.
+  if (!room.waitingDeadline) {
+    room.waitingDeadline = Date.now() + GROUP_WAIT_MS;
+  }
 
   sendGroupWaiting(room);
+
+  if (room.waitingTimer) return;
 
   const deadline = room.waitingDeadline;
 
@@ -309,28 +314,39 @@ function startGroupWaitingTimer(room, g, firstPlayerId) {
       room.started ||
       !g.waitingForOpponent ||
       room.waitingDeadline !== deadline
-    ) return;
+    ) {
+      return;
+    }
 
     const remaining = deadline - Date.now();
 
     if (remaining > 0) {
       room.waitingTimer = setTimeout(check, remaining);
-      if (room.waitingTimer.unref) room.waitingTimer.unref();
+
+      if (room.waitingTimer.unref) {
+        room.waitingTimer.unref();
+      }
+
       return;
     }
 
     room.waitingTimer = null;
 
-    // Қарсылас уақытында кірмесе, бірінші кірген ойыншы жеңеді.
-    if (room.connected.size < 2) {
-      const winnerSide = sideOfUser(g, room.firstConnectedId);
-      finish(g, winnerSide, 'opponent_timeout');
+    if (room.started || !games.has(g.id) || !g.waitingForOpponent) {
+      return;
     }
+
+    // Бірінші кірген ойыншының өзі жеңімпаз болады.
+    const winnerSide = sideOfUser(g, room.firstConnectedId);
+
+    finish(g, winnerSide, 'opponent_timeout');
   };
 
-  room.waitingTimer = setTimeout(check, GROUP_WAIT_MS);
+  room.waitingTimer = setTimeout(check, Math.max(0, deadline - Date.now()));
 
-  if (room.waitingTimer.unref) room.waitingTimer.unref();
+  if (room.waitingTimer.unref) {
+    room.waitingTimer.unref();
+  }
 }
 
 function sendTurnTimer(g) {
@@ -387,7 +403,11 @@ function startTurnTimer(g) {
 
     if (remaining > 0) {
       g.turnTimer = setTimeout(checkTimeout, remaining);
-      if (g.turnTimer.unref) g.turnTimer.unref();
+
+      if (g.turnTimer.unref) {
+        g.turnTimer.unref();
+      }
+
       return;
     }
 
@@ -396,10 +416,12 @@ function startTurnTimer(g) {
 
   g.turnTimer = setTimeout(checkTimeout, TURN_MS);
 
-  if (g.turnTimer.unref) g.turnTimer.unref();
+  if (g.turnTimer.unref) {
+    g.turnTimer.unref();
+  }
 }
 
-/* ---------- Guruhni tozalash ---------- */
+/* ---------- Топтық бөлмені тазалау ---------- */
 
 function cleanupGroupRoom(code) {
   const room = groupRooms.get(code);
@@ -443,6 +465,8 @@ function cleanupGroupRoom(code) {
   groupRooms.delete(code);
 }
 
+/* ---------- Жеке хабарлама ---------- */
+
 async function sendPlayerGroupLink(room, player) {
   const userId = String(player.id);
   const token = createGroupToken(room, player);
@@ -451,9 +475,10 @@ async function sendPlayerGroupLink(room, player) {
     await telegramApi('sendMessage', {
       chat_id: userId,
       text:
-        '♟️ ШАШКА ОЙЫНЫ\n\n' +
-        'Сіз топтық ойынға шақырылдыңыз!\n' +
+        '♟️ <b>ШАШКА ОЙЫНЫ</b>\n\n' +
+        'Сіз топтық ойынға шақырылдыңыз!\n\n' +
         'Ойынға кіру үшін төмендегі батырманы басыңыз.',
+      parse_mode: 'HTML',
       reply_markup: {
         inline_keyboard: [[
           {
@@ -467,7 +492,11 @@ async function sendPlayerGroupLink(room, player) {
     room.entered.add(userId);
     return true;
   } catch (error) {
-    console.error('Private link error:', error.message);
+    console.error(
+      `Жеке хабарлама жіберілмеді (${userId}):`,
+      error.message
+    );
+
     return false;
   }
 }
@@ -475,16 +504,35 @@ async function sendPlayerGroupLink(room, player) {
 async function sendLinksToBothPlayers(room) {
   if (room.players.length !== 2) return;
 
-  await Promise.all(
+  const results = await Promise.all(
     room.players.map(player => sendPlayerGroupLink(room, player))
   );
+
+  room.privateSent = results.filter(Boolean).length;
 
   try {
     await updateGroupRoom(room);
   } catch (error) {
-    console.error('Lobby update:', error.message);
+    console.error('Топ хабарламасын жаңарту қатесі:', error.message);
+  }
+
+  // Жеке хабарламаға жібере алмаған жағдайда топқа ескерту.
+  if (room.privateSent < 2) {
+    try {
+      await telegramApi('sendMessage', {
+        chat_id: room.chatId,
+        text:
+          '⚠️ Кейбір ойыншыларға жеке хабарлама жіберілмеді.\n' +
+          'Ботқа жеке чатта /start командасын жіберіп, қайта тексеріңіздер.',
+        reply_to_message_id: room.messageId || undefined
+      });
+    } catch (error) {
+      console.error('Ескерту жіберу қатесі:', error.message);
+    }
   }
 }
+
+/* ---------- Топқа қосылу ---------- */
 
 async function handleGroupCallback(query) {
   const data = String(query.data || '');
@@ -498,7 +546,11 @@ async function handleGroupCallback(query) {
   const room = groupRooms.get(code);
 
   if (!room || room.started) {
-    await answerCallback(query.id, 'Бұл ойынның уақыты аяқталған.', true);
+    await answerCallback(
+      query.id,
+      'Бұл ойынның уақыты аяқталған.',
+      true
+    );
     return true;
   }
 
@@ -507,17 +559,21 @@ async function handleGroupCallback(query) {
   );
 
   if (already) {
-    await answerCallback(query.id, 'Сіз ойынға қосылдыңыз.');
+    await answerCallback(query.id, 'Сіз ойынға қосылып қойғансыз.');
     return true;
   }
 
   if (room.players.length >= 2) {
-    await answerCallback(query.id, 'Ойыншылар толып кетті.', true);
+    await answerCallback(query.id, 'Ойыншылар саны толды.', true);
     return true;
   }
 
   if (groupPlayerRooms.has(userId)) {
-    await answerCallback(query.id, 'Сіз басқа топтық ойынға қосылғансыз.', true);
+    await answerCallback(
+      query.id,
+      'Сіз басқа топтық ойынға қосылғансыз.',
+      true
+    );
     return true;
   }
 
@@ -539,7 +595,7 @@ async function handleGroupCallback(query) {
     try {
       await updateGroupRoom(room);
     } catch (error) {
-      console.error('Lobby update:', error.message);
+      console.error('Топ хабарламасын жаңарту қатесі:', error.message);
     }
   }
 
@@ -572,6 +628,7 @@ async function handleTelegramWebhook(req, res) {
 
     if (update.callback_query) {
       await handleGroupCallback(update.callback_query);
+
       res.writeHead(200);
       return res.end('ok');
     }
@@ -623,11 +680,10 @@ async function handleTelegramWebhook(req, res) {
         pendingGame: null,
         started: false,
         timer: null,
-
-        // 90 секунд күту таймері
         waitingTimer: null,
         waitingDeadline: null,
-        firstConnectedId: null
+        firstConnectedId: null,
+        privateSent: 0
       };
 
       room.timer = setTimeout(() => {
@@ -655,12 +711,12 @@ async function handleTelegramWebhook(req, res) {
       await telegramApi('sendMessage', {
         chat_id: message.chat.id,
         text:
-          '♟ Қош келдіңіз!\n\n' +
+          '♟️ Қош келдіңіз!\n\n' +
           'Шашка ойынын бастаңыз және қарсыластарыңызды жеңіңіз! 🎮',
         reply_markup: {
           inline_keyboard: [[
             {
-              text: 'БАСТАУ',
+              text: '🎮 ОЙЫНДЫ БАСТАУ',
               web_app: {
                 url: 'https://shashka-mini-app.onrender.com'
               }
@@ -673,7 +729,7 @@ async function handleTelegramWebhook(req, res) {
     res.writeHead(200);
     res.end('ok');
   } catch (error) {
-    console.error('Telegram webhook error:', error.message);
+    console.error('Telegram webhook қатесі:', error.message);
     res.writeHead(200);
     res.end('ok');
   }
@@ -686,12 +742,12 @@ async function setupTelegramWebhook() {
     await telegramApi('setMyCommands', {
       commands: [{
         command: 'game',
-        description: 'Shashka o‘yinini yaratish'
+        description: 'Шашка ойынын құру'
       }],
       scope: { type: 'all_group_chats' }
     });
 
-    console.log('Telegram /game komandasi sozlandi');
+    console.log('/game командасы орнатылды');
 
     const result = await telegramApi('setWebhook', {
       url: WEBHOOK_URL,
@@ -701,7 +757,7 @@ async function setupTelegramWebhook() {
 
     console.log('Telegram webhook:', result.description);
   } catch (error) {
-    console.error('Telegram setup error:', error.message);
+    console.error('Telegram баптау қатесі:', error.message);
   }
 }
 
@@ -750,7 +806,7 @@ const wss = new WebSocketServer({
   maxPayload: 4096
 });
 
-/* ---------- Game state ---------- */
+/* ---------- Ойын күйі ---------- */
 
 function gameState(g, uid) {
   const you = sideOfUser(g, uid);
@@ -760,6 +816,10 @@ function gameState(g, uid) {
         0,
         Math.ceil((g.turnDeadline - Date.now()) / 1000)
       )
+    : null;
+
+  const room = g.groupInfo
+    ? groupRooms.get(g.groupInfo.code)
     : null;
 
   return {
@@ -778,7 +838,8 @@ function gameState(g, uid) {
     chat: g.chat,
     waitingForOpponent: Boolean(g.waitingForOpponent),
     turnSeconds: remaining,
-    turnDeadline: g.turnDeadline || null
+    turnDeadline: g.turnDeadline || null,
+    groupWaitDeadline: room ? room.waitingDeadline : null
   };
 }
 
@@ -803,7 +864,7 @@ function removeUserInvite(userId) {
   if (code) removeInvite(code);
 }
 
-/* ---------- O‘yinni boshlash ---------- */
+/* ---------- Ойынды бастау ---------- */
 
 function startGame(a, b, groupInfo = null) {
   dequeue(a.id);
@@ -863,6 +924,9 @@ function ensureRoomUser(player) {
     };
 
     users.set(id, u);
+  } else {
+    u.name = playerName(player);
+    u.username = player.username || '';
   }
 
   return u;
@@ -909,7 +973,7 @@ function createPendingGroupGame(room) {
   return g;
 }
 
-/* ---------- O‘yinni tugatish ---------- */
+/* ---------- Ойынды аяқтау ---------- */
 
 function finish(g, winner, reason) {
   if (!games.has(g.id)) return;
@@ -954,8 +1018,8 @@ function finish(g, winner, reason) {
       resultText =
         `🏆 <b>ЖЕҢІМПАЗ:</b> ${playerLink({
           id: winnerId,
-          name: winnerUser.name,
-          username: winnerUser.username || ''
+          username: winnerUser.username || '',
+          first_name: winnerUser.username ? '' : winnerUser.name
         })}`;
 
       if (reason === 'timeout') {
@@ -963,7 +1027,7 @@ function finish(g, winner, reason) {
       } else if (reason === 'opponent_timeout') {
         resultText += '\n⏰ Қарсыласы 1 минут 30 секунд ішінде ойынға кірмеді.';
       } else if (reason === 'resign') {
-        resultText += '\n🏁 Қарсыласы ойынды тоқтатты.';
+        resultText += '\n🏁 Қарсыласы ойынды аяқтады.';
       } else if (reason === 'left') {
         resultText += '\n📴 Қарсыласының байланысы үзілді.';
       }
@@ -988,10 +1052,7 @@ function finish(g, winner, reason) {
             message_id: messageId
           });
         } catch (error) {
-          console.error(
-            'Old group message delete:',
-            error.message
-          );
+          console.error('Ескі хабарламаны өшіру қатесі:', error.message);
         }
       }
 
@@ -1004,16 +1065,13 @@ function finish(g, winner, reason) {
           parse_mode: 'HTML'
         });
       } catch (error) {
-        console.error(
-          'Group result error:',
-          error.message
-        );
+        console.error('Жеңімпаз хабарламасы қатесі:', error.message);
       }
     })();
   }
 }
 
-/* ---------- Guruh Mini App ulanishi ---------- */
+/* ---------- Топтық ойынды бастау ---------- */
 
 function startGroupMatch(room, g) {
   if (!room || !g || room.started || !games.has(g.id)) return;
@@ -1045,7 +1103,7 @@ function startGroupMatch(room, g) {
   send(second, { t: 'group_started' });
 
   replaceGroupRoomMessage(room).catch(error => {
-    console.error('Started group message:', error.message);
+    console.error('Ойын басталғандағы хабарлама қатесі:', error.message);
   });
 }
 
@@ -1111,7 +1169,7 @@ function joinGroupGame(u, token) {
     g = createPendingGroupGame(room);
   }
 
-  // Кім бірінші қосылса, сол 90 секундтық таймердің жеңімпазы болады.
+  // Бірінші нақты кірген ойыншыны белгілейміз.
   if (!room.firstConnectedId) {
     room.firstConnectedId = String(u.id);
   }
@@ -1131,40 +1189,16 @@ function joinGroupGame(u, token) {
     return;
   }
 
-  if (!room.waitingDeadline) {
-    startGroupWaitingTimer(room, g, room.firstConnectedId);
-  }
+  startGroupWaitingTimer(room, g, room.firstConnectedId);
 
   send(u, gameState(g, u.id));
+  send(u, groupWaitingMessage(room));
 
-  send(u, {
-    t: 'group_waiting',
-    count: room.connected.size,
-    seconds: Math.max(
-      0,
-      Math.ceil((room.waitingDeadline - Date.now()) / 1000)
-    ),
-    deadline: room.waitingDeadline,
-    message: 'Қарсыластың кіруін күтіңіз...'
-  });
-
-  const firstConnected = users.get(room.firstConnectedId);
-
-  if (firstConnected && firstConnected.id !== u.id) {
-    send(firstConnected, {
-      t: 'group_waiting',
-      count: room.connected.size,
-      seconds: Math.max(
-        0,
-        Math.ceil((room.waitingDeadline - Date.now()) / 1000)
-      ),
-      deadline: room.waitingDeadline,
-      message: 'Қарсыластың кіруін күтіңіз...'
-    });
-  }
+  // Екінші ойыншы кіргенде бірінші ойыншыға да жаңартылған күй жіберіледі.
+  sendGroupWaiting(room);
 }
 
-/* ---------- Do‘st bilan o‘ynash ---------- */
+/* ---------- Досыңмен ойнау ---------- */
 
 function createInvite(u) {
   if (u.game && games.has(u.game)) {
@@ -1254,7 +1288,7 @@ function joinInvite(u, code) {
   startGame(owner, u);
 }
 
-/* ---------- Xabarlarni boshqarish ---------- */
+/* ---------- Хабарламаларды басқару ---------- */
 
 function handle(u, m) {
   switch (m.t) {
@@ -1407,7 +1441,7 @@ function handle(u, m) {
   }
 }
 
-/* ---------- Auth ---------- */
+/* ---------- Авторизация ---------- */
 
 function onAuth(ws, m) {
   let info = null;
@@ -1468,29 +1502,27 @@ function onAuth(ws, m) {
           room.firstConnectedId = String(u.id);
         }
 
-        if (!room.waitingDeadline && room.pendingGame) {
+        const first = users.get(String(room.players[0].id));
+        const second = users.get(String(room.players[1].id));
+
+        const bothConnected =
+          first && second &&
+          first.ws && first.ws.readyState === 1 &&
+          second.ws && second.ws.readyState === 1 &&
+          room.connected.has(String(first.id)) &&
+          room.connected.has(String(second.id));
+
+        if (bothConnected && room.pendingGame) {
+          startGroupMatch(room, room.pendingGame);
+        } else if (room.pendingGame) {
           startGroupWaitingTimer(
             room,
             room.pendingGame,
             room.firstConnectedId
           );
-        }
 
-        send(u, {
-          t: 'group_waiting',
-          count: room.connected.size,
-          seconds: room.waitingDeadline
-            ? Math.max(
-                0,
-                Math.ceil((room.waitingDeadline - Date.now()) / 1000)
-              )
-            : GROUP_WAIT_SECONDS,
-          deadline: room.waitingDeadline || null,
-          message: 'Қарсыластың кіруін күтіңіз...'
-        });
-
-        if (room.players.length === 2 && room.pendingGame) {
-          startGroupMatch(room, room.pendingGame);
+          send(u, groupWaitingMessage(room));
+          sendGroupWaiting(room);
         }
       }
     } else {
@@ -1515,7 +1547,7 @@ function onAuth(ws, m) {
   }
 }
 
-/* ---------- WebSocket ulanishi ---------- */
+/* ---------- WebSocket қосылымы ---------- */
 
 wss.on('connection', ws => {
   ws.isAlive = true;
@@ -1571,17 +1603,8 @@ wss.on('connection', ws => {
     if (!g) return;
 
     if (g.waitingForOpponent) {
-      const otherId = g.p[G.other(sideOfUser(g, u.id))];
-      const other = users.get(otherId);
-
       if (room && room.waitingDeadline) {
         sendGroupWaiting(room);
-      } else {
-        send(other, {
-          t: 'group_waiting',
-          count: room ? room.connected.size : 0,
-          message: 'Қарсыластың кіруін күтіңіз...'
-        });
       }
 
       return;
@@ -1613,12 +1636,12 @@ setInterval(() => {
   });
 }, 15000).unref();
 
-/* ---------- Server ---------- */
+/* ---------- Серверді іске қосу ---------- */
 
 if (require.main === module) {
   server.listen(PORT, () => {
     console.log(
-      `Shashka server: http://localhost:${PORT}${DEV ? ' (DEV rejim)' : ''}`
+      `Shashka сервері: http://localhost:${PORT}${DEV ? ' (DEV режимі)' : ''}`
     );
 
     setupTelegramWebhook();
