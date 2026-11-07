@@ -1,3 +1,4 @@
+
 <!doctype html>
 <html lang="uz">
 <head>
@@ -23,6 +24,12 @@
     <p>Hozir qidirayotgan o‘yinchi bilan bellashing</p>
     <button id="btnBatl" class="batl">BATL</button>
     <button id="btnCancel" class="ghost hidden">Bekor qilish</button>
+  </section>
+
+  <section class="card brown friend-card">
+    <h2>Do‘st bilan o‘ynash</h2>
+    <p>Do‘stingizga taklif havolasini yuboring va birga shashka o‘ynang</p>
+    <button id="btnFriend" class="batl">DO‘ST BILAN O‘YNASH</button>
   </section>
 </main>
 
@@ -57,6 +64,29 @@
 
   <div id="away" class="away hidden"></div>
 </main>
+
+<div id="sheetInvite" class="sheet hidden">
+  <div class="panel">
+    <div class="phead">
+      <b>Do‘stni taklif qilish</b>
+      <button id="btnCloseInvite" class="x" aria-label="Yopish">×</button>
+    </div>
+
+    <p id="inviteStatus">Taklif havolasi tayyorlanmoqda...</p>
+
+    <input
+      id="inviteLink"
+      type="text"
+      readonly
+      placeholder="Taklif havolasi"
+      autocomplete="off"
+    >
+
+    <button id="btnCopyInvite" class="batl" disabled>Havolani nusxalash</button>
+    <button id="btnShareInvite" class="batl" disabled>Telegram orqali yuborish</button>
+    <button id="btnCancelInvite" class="ghost">Taklifni bekor qilish</button>
+  </div>
+</div>
 
 <div id="sheetMenu" class="sheet hidden">
   <div class="panel small">
