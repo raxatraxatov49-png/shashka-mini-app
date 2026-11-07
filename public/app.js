@@ -37,6 +37,7 @@ const S = {
   inviteLink: '',
   joinCode: null,
   groupCode: null,
+  groupWaiting: false,
   fatal: false
 };
 
@@ -70,8 +71,6 @@ function getStartCode() {
 
 /* ---------- Guruh o‘yini ---------- */
 
-// Bu yerda endi oddiy xona kodi emas,
-// har bir o‘yinшы uchun alohida 32 belgili token keladi.
 function getGroupCode() {
   const value = getStartValue();
 
@@ -339,19 +338,16 @@ function onMsg(m) {
       setAva($('meAva'), m.me);
       $('meName').textContent = m.me.name;
 
-      // Guruh o‘yiniga shaxsiy token orqali kirish
       S.groupCode = getGroupCode();
 
       if (S.groupCode) {
-        $('sheetInvite').classList.remove('hidden');
+        S.groupWaiting = true;
 
-        showInviteStatus(
-          '♟️ O‘yin xonasiga ulanmoqda...'
-        );
+        $('sheetInvite').classList.add('hidden');
 
         send({
           t: 'group_join',
-          code: S.groupCode
+          token: S.groupCode
         });
       } else {
         if (!S.joinCode) {
@@ -376,13 +372,39 @@ function onMsg(m) {
     }
 
     case 'group_waiting':
-      $('sheetInvite').classList.remove('hidden');
+      S.groupWaiting = true;
 
-      showInviteStatus(
-        m.message ||
-        'Sіз ойынға кірдіңіз. Екінші ойыншының кіруін күтіңіз...'
-      );
+      if (S.g) {
+        S.g.waitingForOpponent = true;
+        S.g.legal = [];
 
+        $('sheetInvite').classList.add('hidden');
+
+        refresh();
+        show('game');
+      } else {
+        $('sheetInvite').classList.remove('hidden');
+
+        showInviteStatus(
+          m.message ||
+          'Ikkinchi o‘yinchining kirishini kuting...'
+        );
+      }
+
+      break;
+
+    case 'group_started':
+      S.groupWaiting = false;
+
+      if (S.g) {
+        S.g.waitingForOpponent = false;
+        refresh();
+        show('game');
+      }
+
+      $('sheetInvite').classList.add('hidden');
+
+      haptic('heavy');
       break;
 
     case 'group_error':
@@ -390,14 +412,14 @@ function onMsg(m) {
 
       showInviteStatus(
         m.code === 'expired'
-          ? 'Бұл ойынның уақыты аяқталған. Топта /game деп жазыңыз.'
+          ? 'Bu o‘yinning vaqti tugagan. Guruhda /game deb yozing.'
           : m.code === 'full'
-            ? 'Бұл ойын бөлмесі толып кетті.'
+            ? 'Bu o‘yin xonasi to‘lib ketdi.'
             : m.code === 'busy'
-              ? 'Сіз қазір басқа ойындасыз.'
+              ? 'Siz hozir boshqa o‘yindasiz.'
               : m.code === 'waiting'
-                ? 'Екінші ойыншы әлі ойынға кірген жоқ.'
-                : 'Ойын бөлмесіне қосылу мүмкін болмады.'
+                ? 'Ikkinchi o‘yinchi hali o‘yinga kirmagan.'
+                : 'O‘yin xonasiga qo‘shilish imkoni bo‘lmadi.'
       );
 
       break;
@@ -474,7 +496,7 @@ function onMsg(m) {
       S.fatal = true;
 
       fatal(
-        'Boshқа qurilmada ochildi',
+        'Boshqa qurilmada ochildi',
         'Bu hisob boshqa joyda ochilgan. Shu yerda davom etish uchun o‘yinni qayta oching.'
       );
 
@@ -537,7 +559,6 @@ function startGame(m) {
   S.sel = null;
   S.unread = 0;
   S.joinCode = null;
-  S.groupCode = null;
 
   S.g = {
     id: m.id,
@@ -548,9 +569,14 @@ function startGame(m) {
     legal: m.legal,
     score: m.score,
     chainPos: m.chainPos,
+    waitingForOpponent: Boolean(
+      m.waitingForOpponent || S.groupWaiting
+    ),
     over: null,
     last: null
   };
+
+  S.groupWaiting = S.g.waitingForOpponent;
 
   setSearching(false);
 
@@ -799,12 +825,13 @@ function refresh() {
   const g = S.g;
   if (!g) return;
 
-  const mine = g.turn === g.you && !g.over;
+  const waiting = Boolean(g.waitingForOpponent);
+  const mine = g.turn === g.you && !g.over && !waiting;
 
   $('myAva').classList.toggle('turn', mine);
   $('oppAva').classList.toggle(
     'turn',
-    !mine && !g.over
+    !mine && !g.over && !waiting
   );
 
   const must =
@@ -814,27 +841,37 @@ function refresh() {
 
   ms.textContent = g.over
     ? ''
-    : mine
-      ? (
-          g.chainPos != null
-            ? 'Urishni davom ettiring!'
-            : must
-              ? 'Urish majburiy!'
-              : 'Sizning yurishingiz'
-        )
-      : 'Kutilmoqda';
+    : waiting
+      ? 'Ikkinchi o‘yinchi kutilmoqda...'
+      : mine
+        ? (
+            g.chainPos != null
+              ? 'Urishni davom ettiring!'
+              : must
+                ? 'Urish majburiy!'
+                : 'Sizning yurishingiz'
+          )
+        : 'Kutilmoqda';
 
   ms.classList.toggle('hot', must);
 
   $('oppSub').textContent =
-    g.over ? '' : mine ? '' : 'O‘ylanmoqda…';
+    g.over
+      ? ''
+      : waiting
+        ? 'O‘yin boshlanishini kutmoqda...'
+        : mine
+          ? ''
+          : 'O‘ylanmoqda…';
 
   $('myCap').textContent = g.score[g.you];
 
   $('oppCap').textContent =
     g.score[g.you === 'w' ? 'b' : 'w'];
 
-  if (g.chainPos != null && mine) {
+  if (waiting) {
+    S.sel = null;
+  } else if (g.chainPos != null && mine) {
     S.sel = g.chainPos;
   } else if (mine && S.sel == null) {
     const f = [
@@ -889,6 +926,7 @@ $('field').addEventListener('pointerdown', (e) => {
   if (
     !g ||
     g.over ||
+    g.waitingForOpponent ||
     g.turn !== g.you ||
     S.busy ||
     S.q.length
