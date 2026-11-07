@@ -1,3 +1,4 @@
+
 (() => {
 'use strict';
 
@@ -12,250 +13,8 @@ if (tg) {
 
 const $ = (id) => document.getElementById(id);
 
-/* ---------- TIL SOZLAMALARI ---------- */
-
-const LANG_KEY = 'shashka_language';
-
-let LANG = 'uz';
-
-try {
-  LANG = localStorage.getItem(LANG_KEY) || 'uz';
-} catch (e) {}
-
-if (LANG !== 'uz' && LANG !== 'kk') LANG = 'uz';
-
-const KZ = {
-  'Taklif havolasi tayyorlanmoqda...':'Шақыру сілтемесі дайындалуда...',
-  'Havola nusxalandi! Do‘stingizga yuboring.':'Сілтеме көшірілді! Досыңызға жіберіңіз.',
-  'Havolani bosib ushlab, nusxalashingiz mumkin.':'Сілтемені басып ұстап, көшіре аласыз.',
-  'Keling, birga shashka o‘ynaymiz!':'Келіңіз, бірге дойбы ойнайық!',
-  'Telegram ichida oching':'Telegram ішінде ашыңыз',
-  'Bu o‘yin faqat Telegram Mini App sifatida ishlaydi.':'Бұл ойын тек Telegram Mini App ішінде жұмыс істейді.',
-  'Raqib qidirilmoqda…':'Қарсылас ізделуде…',
-  'BATL':'ОЙНАУ',
-  'Do‘stingizning o‘yin xonasiga ulanmoqda...':'Досыңыздың ойын бөлмесіне қосылуда...',
-  'Ikkinchi o‘yinchining kirishini kuting...':'Екінші ойыншының кіруін күтіңіз...',
-  'Bu o‘yinning vaqti tugagan. Guruhda /game deb yozing.':'Бұл ойынның уақыты аяқталды. Топта /game деп жазыңыз.',
-  'Bu o‘yin xonasi to‘lib ketdi.':'Бұл ойын бөлмесі толып кетті.',
-  'Siz hozir boshqa o‘yindasiz.':'Сіз қазір басқа ойындасыз.',
-  'Ikkinchi o‘yinchi hali o‘yinga kirmagan.':'Екінші ойыншы әлі ойынға кірмеді.',
-  'O‘yin xonasiga qo‘shilish imkoni bo‘lmadi.':'Ойын бөлмесіне қосылу мүмкін болмады.',
-  'Havola tayyor! Uni do‘stingizga yuboring.':'Сілтеме дайын! Оны досыңызға жіберіңіз.',
-  'Do‘stingiz qo‘shildi! O‘yin boshlanmoqda...':'Досыңыз қосылды! Ойын басталуда...',
-  'Taklif muddati tugadi. Yangi taklif yarating.':'Шақыру мерзімі аяқталды. Жаңа шақыру жасаңыз.',
-  'Boshqa qurilmada ochildi':'Басқа құрылғыда ашылды',
-  'Bu hisob boshqa joyda ochilgan. Shu yerda davom etish uchun o‘yinni qayta oching.':'Бұл аккаунт басқа құрылғыда ашылған. Жалғастыру үшін ойынды қайта ашыңыз.',
-  'Kirish xatosi':'Кіру қатесі',
-  'Telegram orqali tasdiqlab bo‘lmadi. O‘yinni bot orqali qayta oching.':'Telegram арқылы растау мүмкін болмады. Ойынды бот арқылы қайта ашыңыз.',
-  'Taklif havolasi noto‘g‘ri yoki mavjud emas.':'Шақыру сілтемесі қате немесе жарамсыз.',
-  'Taklif havolasining muddati tugagan.':'Шақыру сілтемесінің мерзімі аяқталған.',
-  'O‘zingizning taklif havolangiz orqali qo‘shila olmaysiz.':'Өз шақыру сілтемеңіз арқылы қосыла алмайсыз.',
-  'O‘yinchi hozir boshqa o‘yinda.':'Ойыншы қазір басқа ойында.',
-  'Durang':'Тең ойын',
-  'Siz yutdingiz!':'Сіз жеңдіңіз!',
-  'Siz yutqazdingiz':'Сіз жеңілдіңіз',
-  'Raqibning barcha shashkalari olindi':'Қарсыластың барлық дойбылары алынды',
-  'Barcha shashkalaringiz olindi':'Барлық дойбыларыңыз алынды',
-  'Raqibda yurish imkoni qolmadi':'Қарсыластың жүріс жасау мүмкіндігі қалмады',
-  'Sizda yurish imkoni qolmadi':'Сізде жүріс жасау мүмкіндігі қалмады',
-  'Raqib taslim bo‘ldi':'Қарсылас берілді',
-  'Siz taslim bo‘ldingiz':'Сіз берілдіңіз',
-  'Raqib o‘yindan chiqib ketdi':'Қарсылас ойыннан шықты',
-  'Aloqa uzilgani uchun o‘yin tugadi':'Байланыс үзілгендіктен ойын аяқталды',
-  'Raqibning vaqti tugadi':'Қарсыластың уақыты аяқталды',
-  'Sizning vaqtingiz tugadi':'Сіздің уақытыңыз аяқталды',
-  'Raqib 90 soniya ichida o‘yinga kirmadi':'Қарсылас 90 секунд ішінде ойынға кірмеді',
-  'Siz 90 soniya ichida o‘yinga kirmadingiz':'Сіз 90 секунд ішінде ойынға кірмедіңіз',
-  '15 ta yurish davomida urish va oddiy shashka yurishi bo‘lmadi':'15 жүріс бойы ұру немесе қарапайым жүріс жасалмады',
-  'Ikkinchi o‘yinchi kutilmoqda...':'Екінші ойыншы күтілуде...',
-  'Raqib kirishiga:':'Қарсыластың кіруіне:',
-  'Urishni davom ettiring!':'Ұруды жалғастырыңыз!',
-  'Urish majburiy!':'Ұру міндетті!',
-  'Sizning yurishingiz':'Сіздің жүрісіңіз',
-  'Kutilmoqda':'Күтілуде',
-  'O‘yin boshlanishini kutmoqda...':'Ойынның басталуын күтуде...',
-  'O‘ylanmoqda…':'Ойланып жатыр…',
-  'Raqib aloqadan uzildi.':'Қарсыласпен байланыс үзілді.',
-  'soniyada qaytmasa, g‘alaba sizga beriladi.':'секунд ішінде оралмаса, жеңіс сізге беріледі.',
-  'Haqiqatan ham taslim bo‘lasizmi?':'Шынымен берілгіңіз келе ме?',
-  'Sozlamalar':'Баптаулар',
-  'Til':'Тіл',
-  'Yopish':'Жабу',
-  'Menyu':'Мәзір',
-  'Chat':'Чат',
-  'Do‘st bilan o‘ynash':'Доспен ойнау',
-  'Tasodifiy raqib':'Кездейсоқ қарсылас',
-  'Do‘stni taklif qilish':'Досты шақыру',
-  'Havolani nusxalash':'Сілтемені көшіру',
-  'Yuborish':'Жіберу',
-  'Bekor qilish':'Болдырмау',
-  'Taslim bo‘lish':'Берілу',
-  'Qayta o‘ynash':'Қайта ойнау',
-  'Asosiy menyu':'Басты мәзір',
-  'Xabar yozing...':'Хабар жазыңыз...',
-  'Yutish':'Жеңу'
-};
-
-function tr(text) {
-  return LANG === 'kk' ? (KZ[text] || text) : text;
-}
-
-const originalText = new WeakMap();
-
-function translateNode(node) {
-  if (!node || node.nodeType !== 3) return;
-
-  const parent = node.parentElement;
-
-  if (
-    parent &&
-    (
-      parent.closest('.m') ||
-      ['meName', 'myName', 'oppName'].includes(parent.id)
-    )
-  ) return;
-
-  let original = originalText.get(node);
-
-  if (original === undefined) {
-    original = node.nodeValue;
-    originalText.set(node, original);
-  }
-
-  const translated = tr(original);
-
-  if (node.nodeValue !== translated) {
-    node.nodeValue = translated;
-  }
-}
-
-function translatePage() {
-  document.querySelectorAll('body *').forEach((el) => {
-    if (
-      el.closest('.m') ||
-      ['meName', 'myName', 'oppName'].includes(el.id)
-    ) return;
-
-    el.childNodes.forEach(translateNode);
-
-    ['placeholder', 'title', 'aria-label'].forEach((attr) => {
-      if (el.hasAttribute(attr)) {
-        const value = el.getAttribute(attr);
-        const translated = tr(value);
-
-        if (translated !== value) {
-          if (!el.dataset['original' + attr]) {
-            el.dataset['original' + attr] = value;
-          }
-          el.setAttribute(attr, translated);
-        } else if (el.dataset['original' + attr]) {
-          el.setAttribute(attr, el.dataset['original' + attr]);
-        }
-      }
-    });
-  });
-}
-
-function createLanguageSettings() {
-  const panel = document.querySelector('#sheetMenu .panel.small');
-  if (!panel || $('languageSettings')) return;
-
-  const box = document.createElement('div');
-  box.id = 'languageSettings';
-
-  box.style.cssText = `
-    margin-bottom:14px;
-    padding:14px;
-    border-radius:14px;
-    background:rgba(0,0,0,.06);
-    text-align:center;
-  `;
-
-  box.innerHTML = `
-    <div id="languageTitle" style="font-weight:800;margin-bottom:10px">
-      ⚙️ Sozlamalar
-    </div>
-    <div id="languageLabel" style="font-size:13px;margin-bottom:10px">
-      🌐 Til
-    </div>
-    <div style="display:flex;gap:8px">
-      <button type="button" id="langUz" style="
-        flex:1;padding:11px 5px;border:0;border-radius:10px;
-        font-weight:800;background:#efe3cf;color:#2b1f17">
-        🇺🇿 O‘zbekcha
-      </button>
-      <button type="button" id="langKz" style="
-        flex:1;padding:11px 5px;border:0;border-radius:10px;
-        font-weight:800;background:#efe3cf;color:#2b1f17">
-        🇰🇿 Қазақша
-      </button>
-    </div>
-  `;
-
-  panel.insertBefore(box, panel.firstChild);
-
-  $('langUz').onclick = () => changeLanguage('uz');
-  $('langKz').onclick = () => changeLanguage('kk');
-
-  updateLanguageButtons();
-}
-
-function updateLanguageButtons() {
-  const uz = $('langUz');
-  const kz = $('langKz');
-
-  if (!uz || !kz) return;
-
-  uz.style.opacity = LANG === 'uz' ? '1' : '.55';
-  kz.style.opacity = LANG === 'kk' ? '1' : '.55';
-}
-
-function changeLanguage(lang) {
-  if (lang !== 'uz' && lang !== 'kk') return;
-
-  LANG = lang;
-
-  try {
-    localStorage.setItem(LANG_KEY, lang);
-  } catch (e) {}
-
-  translatePage();
-  updateLanguageButtons();
-
-  if ($('languageTitle')) {
-    $('languageTitle').textContent = tr('Sozlamalar');
-    $('languageLabel').textContent = '🌐 ' + tr('Til');
-  }
-
-  if (S.g) refresh();
-
-  haptic('sel');
-}
-
-const textObserver = new MutationObserver((records) => {
-  records.forEach((record) => {
-    if (record.type === 'characterData') {
-      translateNode(record.target);
-    }
-
-    record.addedNodes && record.addedNodes.forEach((node) => {
-      if (node.nodeType === 3) {
-        translateNode(node);
-      } else if (node.nodeType === 1) {
-        node.querySelectorAll('*').forEach((el) => {
-          el.childNodes.forEach(translateNode);
-        });
-        node.childNodes.forEach(translateNode);
-      }
-    });
-  });
-});
-
-textObserver.observe(document.body, {
-  childList: true,
-  subtree: true,
-  characterData: true
-});
+// Бұрынғы мәтін шақыруларын өзгертпей сақтау үшін
+const tr = (text) => text;
 
 /* ---------- HAPTIC ---------- */
 
@@ -296,14 +55,12 @@ const CROWN = '<svg viewBox="0 0 24 24"><path d="M3 18l-1-11 5 4 5-7 5 7 5-4-1 1
 function getStartValue() {
   const values = [];
 
-  // Telegram WebApp start_param
   try {
     if (tg && tg.initDataUnsafe && tg.initDataUnsafe.start_param) {
       values.push(tg.initDataUnsafe.start_param);
     }
   } catch (e) {}
 
-  // Telegram initData ichidan start_param
   try {
     if (tg && tg.initData) {
       const data = new URLSearchParams(tg.initData);
@@ -312,7 +69,6 @@ function getStartValue() {
     }
   } catch (e) {}
 
-  // Oddiy URL parametrlar
   try {
     const params = new URLSearchParams(location.search);
 
@@ -327,7 +83,6 @@ function getStartValue() {
     });
   } catch (e) {}
 
-  // URL hash ichidan ham tekshirish
   try {
     const hash = location.hash || '';
     const hashParams = new URLSearchParams(
@@ -345,7 +100,6 @@ function getStartValue() {
     });
   } catch (e) {}
 
-  // Telegram ayrim holatlarda parametrni URL ichida kodlangan holda beradi
   for (const value of values) {
     if (typeof value !== 'string') continue;
 
@@ -384,7 +138,7 @@ function getGroupCode() {
 
 function showInviteStatus(message) {
   const el = $('inviteStatus');
-  if (el) el.textContent = tr(message);
+  if (el) el.textContent = message;
 }
 
 /* ---------- DO‘ST BILAN O‘YNASH ---------- */
@@ -437,7 +191,7 @@ async function copyInviteLink() {
 function shareInviteLink() {
   if (!S.inviteLink) return;
 
-  const text = tr('Keling, birga shashka o‘ynaymiz!');
+  const text = 'Keling, birga shashka o‘ynaymiz!';
 
   const shareUrl =
     'https://t.me/share/url?url=' + encodeURIComponent(S.inviteLink) +
@@ -526,6 +280,10 @@ function connect() {
       Math.min(1000 * 2 ** S.retry++, 5000)
     );
   };
+
+  ws.onerror = (e) => {
+    console.error('WebSocket xatosi:', e);
+  };
 }
 
 const send = (m) =>
@@ -535,8 +293,8 @@ const send = (m) =>
 function fatal(t, s) {
   S.fatal = true;
 
-  $('fatalTitle').textContent = tr(t);
-  $('fatalSub').textContent = tr(s);
+  $('fatalTitle').textContent = t;
+  $('fatalSub').textContent = s;
 
   $('fatal').classList.remove('hidden');
 }
@@ -623,8 +381,8 @@ function setSearching(on) {
   b.classList.toggle('busy', on);
 
   b.innerHTML = on
-    ? '<span class="spin"></span>' + tr('Raqib qidirilmoqda…')
-    : tr('BATL');
+    ? '<span class="spin"></span>Raqib qidirilmoqda…'
+    : 'BATL';
 
   $('btnCancel').classList.toggle('hidden', !on);
 }
@@ -1068,13 +826,11 @@ async function doOver(m) {
     draw ? '🤝' : win ? '🏆' : '😔';
 
   $('resTitle').textContent =
-    tr(
-      draw
-        ? 'Durang'
-        : win
-          ? 'Siz yutdingiz!'
-          : 'Siz yutqazdingiz'
-    );
+    draw
+      ? 'Durang'
+      : win
+        ? 'Siz yutdingiz!'
+        : 'Siz yutqazdingiz';
 
   const R = {
     no_pieces: win
@@ -1104,7 +860,7 @@ async function doOver(m) {
     draw: '15 ta yurish davomida urish va oddiy shashka yurishi bo‘lmadi'
   };
 
-  $('resSub').textContent = tr(R[m.reason] || '');
+  $('resSub').textContent = R[m.reason] || '';
 
   $('sheetMenu').classList.add('hidden');
   $('away').classList.add('hidden');
@@ -1148,7 +904,7 @@ function refresh() {
 
   const ms = $('mySub');
 
-  let waitingText = tr('Ikkinchi o‘yinchi kutilmoqda...');
+  let waitingText = 'Ikkinchi o‘yinchi kutilmoqda...';
 
   if (waiting && g.groupWaitDeadline) {
     const seconds = Math.max(
@@ -1156,7 +912,7 @@ function refresh() {
       Math.ceil((g.groupWaitDeadline - Date.now()) / 1000)
     );
 
-    waitingText = `⏳ ${tr('Raqib kirishiga:')} ${formatClock(seconds)}`;
+    waitingText = `⏳ Raqib kirishiga: ${formatClock(seconds)}`;
   }
 
   ms.textContent = g.over
@@ -1166,12 +922,12 @@ function refresh() {
       : mine
         ? (
             g.chainPos != null
-              ? tr('Urishni davom ettiring!')
+              ? 'Urishni davom ettiring!'
               : must
-                ? tr('Urish majburiy!')
-                : tr('Sizning yurishingiz')
+                ? 'Urish majburiy!'
+                : 'Sizning yurishingiz'
           )
-        : tr('Kutilmoqda');
+        : 'Kutilmoqda';
 
   ms.classList.toggle('hot', must);
 
@@ -1179,10 +935,10 @@ function refresh() {
     g.over
       ? ''
       : waiting
-        ? tr('O‘yin boshlanishini kutmoqda...')
+        ? 'O‘yin boshlanishini kutmoqda...'
         : mine
           ? ''
-          : tr('O‘ylanmoqda…');
+          : 'O‘ylanmoqda…';
 
   if (
     !waiting &&
@@ -1248,7 +1004,7 @@ function refresh() {
   });
 }
 
-/* Тайmerni yangilash */
+/* Таймерді жаңарту */
 setInterval(() => {
   if (!S.g || S.g.over) return;
 
@@ -1340,7 +1096,7 @@ function showAway(m) {
 
   const upd = () => {
     el.textContent =
-      `${tr('Raqib aloqadan uzildi.')} ${n} ${tr('soniyada qaytmasa, g‘alaba sizga beriladi.')}`;
+      `Raqib aloqadan uzildi. ${n} soniyada qaytmasa, g‘alaba sizga beriladi.`;
   };
 
   upd();
@@ -1469,10 +1225,10 @@ $('btnResign').onclick = () => {
 
   if (tg && tg.showConfirm) {
     tg.showConfirm(
-      tr('Haqiqatan ham taslim bo‘lasizmi?'),
+      'Haqiqatan ham taslim bo‘lasizmi?',
       (ok) => ok && go()
     );
-  } else if (confirm(tr('Haqiqatan ham taslim bo‘lasizmi?'))) {
+  } else if (confirm('Haqiqatan ham taslim bo‘lasizmi?')) {
     go();
   }
 
@@ -1503,10 +1259,6 @@ $('btnAgain').onclick = () => {
 };
 
 /* ---------- ISHGA TUSHIRISH ---------- */
-
-createLanguageSettings();
-translatePage();
-updateLanguageButtons();
 
 connect();
 
