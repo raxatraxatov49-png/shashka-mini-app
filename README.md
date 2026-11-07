@@ -1,0 +1,1 @@
+# shashka-mini-app
