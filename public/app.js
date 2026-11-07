@@ -38,6 +38,7 @@ const S = {
   joinCode: null,
   groupCode: null,
   groupWaiting: false,
+  groupWaitDeadline: null,
   fatal: false
 };
 
@@ -350,7 +351,7 @@ function onMsg(m) {
           $('sheetInvite').classList.remove('hidden');
 
           showInviteStatus(
-            'Do‘stingizning o‘yin xonasiga ulanmoqda...'
+            'Do‘stingizning o‘yin xonasына ulanmoqda...'
           );
 
           send({
@@ -363,12 +364,19 @@ function onMsg(m) {
       break;
     }
 
-    case 'group_waiting':
+    case 'group_waiting': {
       S.groupWaiting = true;
+
+      if (m.deadline) {
+        S.groupWaitDeadline = m.deadline;
+      } else if (m.seconds != null && !S.groupWaitDeadline) {
+        S.groupWaitDeadline = Date.now() + m.seconds * 1000;
+      }
 
       if (S.g) {
         S.g.waitingForOpponent = true;
         S.g.legal = [];
+        S.g.groupWaitDeadline = S.groupWaitDeadline;
 
         $('sheetInvite').classList.add('hidden');
 
@@ -383,12 +391,15 @@ function onMsg(m) {
       }
 
       break;
+    }
 
     case 'group_started':
       S.groupWaiting = false;
+      S.groupWaitDeadline = null;
 
       if (S.g) {
         S.g.waitingForOpponent = false;
+        S.g.groupWaitDeadline = null;
         refresh();
         show('game');
       }
@@ -551,6 +562,7 @@ function startGame(m) {
     ),
     turnDeadline: m.turnDeadline || null,
     turnTimerSide: m.turnDeadline ? m.turn : null,
+    groupWaitDeadline: S.groupWaitDeadline,
     over: null,
     last: null
   };
@@ -739,6 +751,10 @@ async function doOver(m) {
   g.over = m;
   g.legal = [];
   g.turnDeadline = null;
+  g.groupWaitDeadline = null;
+
+  S.groupWaitDeadline = null;
+  S.groupWaiting = false;
 
   refresh();
 
@@ -776,7 +792,11 @@ async function doOver(m) {
 
     timeout: win
       ? 'Raqibning vaqti tugadi'
-      : 'Sizning vaqtingiz tugadi',
+      : 'Sizning уақытыңыз tugadi',
+
+    opponent_timeout: win
+      ? 'Raqib 90 soniya ichida o‘yinga kirmadi'
+      : 'Сіз 90 секунд ішінде ойынға кірмедіңіз',
 
     draw: '15 ta yurish davomida urish va oddiy shashka yurishi bo‘lmadi'
   };
@@ -799,6 +819,14 @@ async function doOver(m) {
 
 /* ---------- Ko‘rinishni yangilash ---------- */
 
+function formatClock(seconds) {
+  const safe = Math.max(0, seconds);
+  const mm = String(Math.floor(safe / 60)).padStart(2, '0');
+  const ss = String(safe % 60).padStart(2, '0');
+
+  return `${mm}:${ss}`;
+}
+
 function refresh() {
   const g = S.g;
   if (!g) return;
@@ -817,10 +845,21 @@ function refresh() {
 
   const ms = $('mySub');
 
+  let waitingText = 'Ikkinchi o‘yinchi kutilmoqda...';
+
+  if (waiting && g.groupWaitDeadline) {
+    const seconds = Math.max(
+      0,
+      Math.ceil((g.groupWaitDeadline - Date.now()) / 1000)
+    );
+
+    waitingText = `⏳ Qarshiластың кіруіне: ${formatClock(seconds)}`;
+  }
+
   ms.textContent = g.over
     ? ''
     : waiting
-      ? 'Ikkinchi o‘yinchi kutilmoqda...'
+      ? waitingText
       : mine
         ? (
             g.chainPos != null
@@ -837,12 +876,11 @@ function refresh() {
     g.over
       ? ''
       : waiting
-        ? 'O‘yin boshlanishini kutmoqda...'
+        ? 'Ойын басталуын күтіңіз...'
         : mine
           ? ''
           : 'O‘ylanmoqda…';
 
-  // Serverdagi taymerning qolgan vaqtini ko‘rsatish.
   if (
     !waiting &&
     !g.over &&
@@ -854,10 +892,7 @@ function refresh() {
       Math.ceil((g.turnDeadline - Date.now()) / 1000)
     );
 
-    const mm = String(Math.floor(seconds / 60)).padStart(2, '0');
-    const ss = String(seconds % 60).padStart(2, '0');
-
-    const clock = ` ⏱ ${mm}:${ss}`;
+    const clock = ` ⏱ ${formatClock(seconds)}`;
 
     if (g.turnTimerSide === g.you) {
       ms.textContent += clock;
@@ -910,14 +945,16 @@ function refresh() {
   });
 }
 
-// Таймерді әр секунд сайын экранда жаңарту.
+// Екі таймерді де экранда әр секунд сайын жаңарту.
 setInterval(() => {
-  if (
-    S.g &&
-    !S.g.over &&
-    !S.g.waitingForOpponent &&
-    S.g.turnDeadline
-  ) {
+  if (!S.g || S.g.over) return;
+
+  if (S.g.waitingForOpponent && S.g.groupWaitDeadline) {
+    refresh();
+    return;
+  }
+
+  if (S.g.turnDeadline) {
     refresh();
   }
 }, 1000);
@@ -1141,6 +1178,8 @@ $('btnResign').onclick = () => {
 
 $('btnToMenu').onclick = () => {
   S.g = null;
+  S.groupWaiting = false;
+  S.groupWaitDeadline = null;
 
   $('result').classList.add('hidden');
   show('menu');
@@ -1148,6 +1187,8 @@ $('btnToMenu').onclick = () => {
 
 $('btnAgain').onclick = () => {
   S.g = null;
+  S.groupWaiting = false;
+  S.groupWaitDeadline = null;
 
   $('result').classList.add('hidden');
   show('menu');
