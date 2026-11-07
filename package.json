@@ -1,0 +1,13 @@
+{
+  "name": "shashka-miniapp",
+  "version": "1.0.0",
+  "description": "Telegram Mini App: Shashka (checkers) - tasodifiy raqib, real vaqt, chat",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "DEV=1 node server.js",
+    "test": "node --test"
+  },
+  "engines": { "node": ">=18" },
+  "dependencies": { "ws": "^8.18.0" }
+}

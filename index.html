@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="uz">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#efe3cf">
+<title>Shashka</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<main id="menu" class="screen active">
+  <header class="who">
+    <div class="ava" id="meAva"></div>
+    <div><b id="meName">…</b><small>Shashka o‘yinchisi</small></div>
+  </header>
+
+  <h1>Shashka</h1>
+
+  <section class="card brown">
+    <h2>Tasodifiy raqib</h2>
+    <p>Hozir qidirayotgan o‘yinchi bilan bellashing</p>
+    <button id="btnBatl" class="batl">BATL</button>
+    <button id="btnCancel" class="ghost hidden">Bekor qilish</button>
+  </section>
+</main>
+
+<main id="game" class="screen">
+  <div class="gtitle">Klassik stol</div>
+
+  <div class="prow" id="rowOpp">
+    <div class="ava ring" id="oppAva"></div>
+    <div class="pinfo"><b id="oppName"></b><small id="oppSub"></small></div>
+    <div class="chip"><i id="oppDot" class="pdot"></i>× <span id="oppCap">0</span></div>
+  </div>
+
+  <div class="boardwrap">
+    <div class="board">
+      <div class="field" id="field">
+        <div class="squares" id="squares"></div>
+        <div class="pieces" id="pieces"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="prow" id="rowMe">
+    <div class="ava ring" id="myAva"></div>
+    <div class="pinfo"><b id="myName"></b><small id="mySub"></small></div>
+    <div class="chip"><i id="myDot" class="pdot"></i>× <span id="myCap">0</span></div>
+  </div>
+
+  <nav class="dock">
+    <button id="btnMenu"><svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></svg>Menyu</button>
+    <button id="btnChat"><svg viewBox="0 0 24 24"><path d="M4 5h16v11H9l-5 4z"/></svg>Chat<span id="badge" class="badge hidden">0</span></button>
+  </nav>
+
+  <div id="away" class="away hidden"></div>
+</main>
+
+<div id="sheetMenu" class="sheet hidden">
+  <div class="panel small">
+    <button id="btnResign" class="danger">Taslim bo‘lish</button>
+    <button id="btnCloseMenu" class="ghost">Yopish</button>
+  </div>
+</div>
+
+<div id="sheetChat" class="sheet hidden">
+  <div class="panel">
+    <div class="phead"><b>Chat</b><button id="btnCloseChat" class="x" aria-label="Yopish">×</button></div>
+    <div id="msgs" class="msgs"></div>
+    <div class="compose">
+      <input id="chatInput" maxlength="300" placeholder="Xabar yozing…" autocomplete="off" enterkeyhint="send">
+      <button id="btnSend" aria-label="Yuborish"><svg viewBox="0 0 24 24"><path d="M3 11l18-8-8 18-2-8z"/></svg></button>
+    </div>
+  </div>
+</div>
+
+<div id="result" class="modal hidden">
+  <div class="dialog">
+    <div id="resEmoji" class="emoji"></div>
+    <h3 id="resTitle"></h3>
+    <p id="resSub"></p>
+    <button id="btnAgain" class="batl">Yana o‘ynash</button>
+    <button id="btnToMenu" class="ghost">Bosh menyu</button>
+  </div>
+</div>
+
+<div id="conn" class="conn hidden">Aloqa uzildi. Qayta ulanmoqda…</div>
+<div id="fatal" class="modal hidden"><div class="dialog"><h3 id="fatalTitle"></h3><p id="fatalSub"></p></div></div>
+
+<script src="app.js"></script>
+</body>
+</html>
