@@ -142,6 +142,7 @@ function translatePage() {
       if (el.hasAttribute(attr)) {
         const value = el.getAttribute(attr);
         const translated = tr(value);
+
         if (translated !== value) {
           if (!el.dataset['original' + attr]) {
             el.dataset['original' + attr] = value;
@@ -231,7 +232,6 @@ function changeLanguage(lang) {
   haptic('sel');
 }
 
-/* HTML ichidagi matnlar keyin o‘zgarsa ham tarjima qilinadi. */
 const textObserver = new MutationObserver((records) => {
   records.forEach((record) => {
     if (record.type === 'characterData') {
@@ -283,6 +283,7 @@ const S = {
   inviteLink: '',
   joinCode: null,
   groupCode: null,
+  groupJoinSent: false,
   groupWaiting: false,
   groupWaitDeadline: null,
   fatal: false
@@ -293,25 +294,80 @@ const CROWN = '<svg viewBox="0 0 24 24"><path d="M3 18l-1-11 5 4 5-7 5 7 5-4-1 1
 /* ---------- START PARAMETRLARI ---------- */
 
 function getStartValue() {
-  let value = '';
+  const values = [];
 
+  // Telegram WebApp start_param
   try {
-    value = tg && tg.initDataUnsafe && tg.initDataUnsafe.start_param
-      ? tg.initDataUnsafe.start_param
-      : '';
+    if (tg && tg.initDataUnsafe && tg.initDataUnsafe.start_param) {
+      values.push(tg.initDataUnsafe.start_param);
+    }
   } catch (e) {}
 
-  if (!value) {
-    const p = new URLSearchParams(location.search);
-    value = p.get('startapp') || p.get('invite') || '';
+  // Telegram initData ichidan start_param
+  try {
+    if (tg && tg.initData) {
+      const data = new URLSearchParams(tg.initData);
+      const value = data.get('start_param');
+      if (value) values.push(value);
+    }
+  } catch (e) {}
+
+  // Oddiy URL parametrlar
+  try {
+    const params = new URLSearchParams(location.search);
+
+    [
+      'tgWebAppStartParam',
+      'startapp',
+      'start_param',
+      'invite'
+    ].forEach((key) => {
+      const value = params.get(key);
+      if (value) values.push(value);
+    });
+  } catch (e) {}
+
+  // URL hash ichidan ham tekshirish
+  try {
+    const hash = location.hash || '';
+    const hashParams = new URLSearchParams(
+      hash.startsWith('#') ? hash.slice(1) : hash
+    );
+
+    [
+      'tgWebAppStartParam',
+      'startapp',
+      'start_param',
+      'invite'
+    ].forEach((key) => {
+      const value = hashParams.get(key);
+      if (value) values.push(value);
+    });
+  } catch (e) {}
+
+  // Telegram ayrim holatlarda parametrni URL ichida kodlangan holda beradi
+  for (const value of values) {
+    if (typeof value !== 'string') continue;
+
+    const clean = value.trim();
+
+    if (
+      clean.startsWith('group_') ||
+      clean.startsWith('invite_')
+    ) {
+      return clean;
+    }
   }
 
-  return value;
+  return values.find(v => typeof v === 'string' && v.trim()) || '';
 }
 
 function getStartCode() {
   const value = getStartValue();
-  return value.startsWith('invite_') ? value.slice(7) : '';
+
+  return value.startsWith('invite_')
+    ? value.slice(7)
+    : '';
 }
 
 function getGroupCode() {
@@ -320,7 +376,10 @@ function getGroupCode() {
   if (!value.startsWith('group_')) return '';
 
   const token = value.slice(6);
-  return /^[a-f0-9]{32}$/.test(token) ? token : '';
+
+  return /^[a-f0-9]{32}$/i.test(token)
+    ? token.toLowerCase()
+    : '';
 }
 
 function showInviteStatus(message) {
@@ -582,8 +641,10 @@ function onMsg(m) {
 
       S.groupCode = getGroupCode();
 
-      if (S.groupCode) {
+      if (S.groupCode && !S.groupJoinSent) {
+        S.groupJoinSent = true;
         S.groupWaiting = true;
+
         $('sheetInvite').classList.add('hidden');
 
         send({
@@ -619,22 +680,15 @@ function onMsg(m) {
         S.groupWaitDeadline = Date.now() + m.seconds * 1000;
       }
 
+      $('sheetInvite').classList.add('hidden');
+
       if (S.g) {
         S.g.waitingForOpponent = true;
         S.g.legal = [];
         S.g.groupWaitDeadline = S.groupWaitDeadline;
 
-        $('sheetInvite').classList.add('hidden');
-
         refresh();
         show('game');
-      } else {
-        $('sheetInvite').classList.add('hidden');
-
-        showInviteStatus(
-          m.message ||
-          'Ikkinchi o‘yinchining kirishini kuting...'
-        );
       }
 
       break;
@@ -1429,6 +1483,7 @@ $('btnToMenu').onclick = () => {
   S.g = null;
   S.groupWaiting = false;
   S.groupWaitDeadline = null;
+  S.groupJoinSent = false;
 
   $('result').classList.add('hidden');
   show('menu');
@@ -1438,6 +1493,7 @@ $('btnAgain').onclick = () => {
   S.g = null;
   S.groupWaiting = false;
   S.groupWaitDeadline = null;
+  S.groupJoinSent = false;
 
   $('result').classList.add('hidden');
   show('menu');
