@@ -120,3 +120,40 @@ h1 { font-size: 40px; margin: 36px 0 14px 4px; letter-spacing: -.5px; }
 
 @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition-duration: .01s !important; } }
 @media (max-height: 640px) { .prow { min-height: 54px; } .ava.ring { width: 44px; height: 44px; } .dock button { height: 46px; } }
+/* DO‘ST BILAN O‘YNASH */
+.friend-card {
+  margin-top: 14px;
+}
+
+.friend-card .batl {
+  background: var(--brown1);
+}
+
+/* TAKLIF OYNASI */
+#sheetInvite .panel {
+  gap: 12px;
+}
+
+#inviteStatus {
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+#inviteLink {
+  width: 100%;
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid var(--dark);
+  border-radius: 12px;
+  background: var(--light);
+  color: var(--ink);
+  font-size: 13px;
+}
+
+#btnShareInvite {
+  margin-top: 8px;
+}
+
+#btnCancelInvite {
+  margin-top: 4px;
+}
