@@ -11,10 +11,13 @@ if (tg) {
 }
 
 const $ = (id) => document.getElementById(id);
+
 const haptic = (k) => {
   try {
     tg && tg.HapticFeedback &&
-    (k === 'sel' ? tg.HapticFeedback.selectionChanged() : tg.HapticFeedback.impactOccurred(k));
+    (k === 'sel'
+      ? tg.HapticFeedback.selectionChanged()
+      : tg.HapticFeedback.impactOccurred(k));
   } catch (e) {}
 };
 
@@ -31,14 +34,16 @@ const S = {
   awayTimer: null,
   inviteCode: null,
   inviteLink: '',
-  joinCode: null
+  joinCode: null,
+  groupCode: null,
+  fatal: false
 };
 
 const CROWN = '<svg viewBox="0 0 24 24"><path d="M3 18l-1-11 5 4 5-7 5 7 5-4-1 11z"/></svg>';
 
-/* ---------- Do‘st bilan o‘ynash ---------- */
+/* ---------- Start parametrlarini o‘qish ---------- */
 
-function getStartCode() {
+function getStartValue() {
   let value = '';
 
   try {
@@ -52,7 +57,21 @@ function getStartCode() {
     value = p.get('startapp') || p.get('invite') || '';
   }
 
+  return value;
+}
+
+/* ---------- Do‘st bilan o‘ynash ---------- */
+
+function getStartCode() {
+  const value = getStartValue();
   return value.startsWith('invite_') ? value.slice(7) : '';
+}
+
+/* ---------- Guruh o‘yini ---------- */
+
+function getGroupCode() {
+  const value = getStartValue();
+  return value.startsWith('group_') ? value.slice(6) : '';
 }
 
 function showInviteStatus(message) {
@@ -89,6 +108,7 @@ async function copyInviteLink() {
       const input = $('inviteLink');
       input.focus();
       input.select();
+
       const copied = document.execCommand('copy');
       if (!copied) throw new Error('Copy failed');
     }
@@ -99,6 +119,7 @@ async function copyInviteLink() {
     const input = $('inviteLink');
     input.focus();
     input.select();
+
     showInviteStatus('Havolani bosib ushlab, nusxalashingiz mumkin.');
   }
 }
@@ -107,6 +128,7 @@ function shareInviteLink() {
   if (!S.inviteLink) return;
 
   const text = 'Keling, birga shashka o‘ynaymiz!';
+
   const shareUrl =
     'https://t.me/share/url?url=' + encodeURIComponent(S.inviteLink) +
     '&text=' + encodeURIComponent(text);
@@ -124,8 +146,10 @@ function shareInviteLink() {
 
 function cancelInvite() {
   send({ t: 'invite_cancel' });
+
   S.inviteCode = null;
   S.inviteLink = '';
+
   $('sheetInvite').classList.add('hidden');
 }
 
@@ -145,7 +169,10 @@ function connect() {
     const p = new URLSearchParams(location.search);
 
     if (tg && tg.initData) {
-      ws.send(JSON.stringify({ t: 'auth', initData: tg.initData }));
+      ws.send(JSON.stringify({
+        t: 'auth',
+        initData: tg.initData
+      }));
     } else if (p.get('dev')) {
       ws.send(JSON.stringify({
         t: 'auth',
@@ -155,7 +182,10 @@ function connect() {
         }
       }));
     } else {
-      fatal('Telegram ichida oching', 'Bu o‘yin faqat Telegram Mini App sifatida ishlaydi.');
+      fatal(
+        'Telegram ichida oching',
+        'Bu o‘yin faqat Telegram Mini App sifatida ishlaydi.'
+      );
     }
   };
 
@@ -173,22 +203,30 @@ function connect() {
     $('conn').classList.remove('hidden');
     setSearching(false);
 
-    setTimeout(connect, Math.min(1000 * 2 ** S.retry++, 5000));
+    setTimeout(
+      connect,
+      Math.min(1000 * 2 ** S.retry++, 5000)
+    );
   };
 }
 
 const send = (m) =>
-  S.ws && S.ws.readyState === 1 && S.ws.send(JSON.stringify(m));
+  S.ws && S.ws.readyState === 1 &&
+  S.ws.send(JSON.stringify(m));
 
 function fatal(t, s) {
   S.fatal = true;
+
   $('fatalTitle').textContent = t;
   $('fatalSub').textContent = s;
+
   $('fatal').classList.remove('hidden');
 }
 
 document.addEventListener('visibilitychange', () => {
-  if (!document.hidden && (!S.ws || S.ws.readyState > 1)) connect();
+  if (!document.hidden && (!S.ws || S.ws.readyState > 1)) {
+    connect();
+  }
 });
 
 /* ---------- Yordamchilar ---------- */
@@ -204,16 +242,25 @@ function setAva(el, p) {
 
   const letter = () => {
     el.textContent = '';
+
     el.style.background =
-      COLORS[[...p.name].reduce((a, c) => a + c.codePointAt(0), 0) % COLORS.length];
+      COLORS[
+        [...p.name].reduce(
+          (a, c) => a + c.codePointAt(0),
+          0
+        ) % COLORS.length
+      ];
+
     el.append((p.name[0] || '?').toUpperCase());
   };
 
   if (p.avatar) {
     const im = new Image();
+
     im.referrerPolicy = 'no-referrer';
     im.onerror = letter;
     im.src = p.avatar;
+
     el.append(im);
   } else {
     letter();
@@ -228,8 +275,14 @@ function show(id) {
   if (tg) {
     try {
       id === 'game'
-        ? (tg.BackButton.show(), tg.enableClosingConfirmation())
-        : (tg.BackButton.hide(), tg.disableClosingConfirmation());
+        ? (
+            tg.BackButton.show(),
+            tg.enableClosingConfirmation()
+          )
+        : (
+            tg.BackButton.hide(),
+            tg.disableClosingConfirmation()
+          );
     } catch (e) {}
   }
 }
@@ -237,7 +290,9 @@ function show(id) {
 if (tg) {
   try {
     tg.BackButton.onClick(() => {
-      if (S.g && !S.g.over) $('sheetMenu').classList.remove('hidden');
+      if (S.g && !S.g.over) {
+        $('sheetMenu').classList.remove('hidden');
+      }
     });
   } catch (e) {}
 }
@@ -246,7 +301,9 @@ function setSearching(on) {
   S.searching = on;
 
   const b = $('btnBatl');
+
   b.classList.toggle('busy', on);
+
   b.innerHTML = on
     ? '<span class="spin"></span>Raqib qidirilmoqda…'
     : 'BATL';
@@ -254,25 +311,78 @@ function setSearching(on) {
   $('btnCancel').classList.toggle('hidden', !on);
 }
 
-/* ---------- Xabarlar ---------- */
+/* ---------- Xabarlarni boshqarish ---------- */
 
 function onMsg(m) {
   switch (m.t) {
     case 'hello': {
       S.me = m.me;
+
       setAva($('meAva'), m.me);
       $('meName').textContent = m.me.name;
 
-      // Taklif havolasi orqali kirgan bo‘lsa, xonaga qo‘shiladi.
-      if (!S.joinCode) S.joinCode = getStartCode();
+      // Guruh o‘yiniga kirish
+      S.groupCode = getGroupCode();
 
-      if (S.joinCode) {
+      if (S.groupCode) {
         $('sheetInvite').classList.remove('hidden');
-        showInviteStatus('Do‘stingizning o‘yin xonasiga ulanmoqda...');
-        send({ t: 'invite_join', code: S.joinCode });
+
+        showInviteStatus(
+          'Guruhdagi shashka xonasiga ulanmoqda...'
+        );
+
+        send({
+          t: 'group_join',
+          code: S.groupCode
+        });
+      } else {
+        // Do‘st taklif havolasi
+        if (!S.joinCode) {
+          S.joinCode = getStartCode();
+        }
+
+        if (S.joinCode) {
+          $('sheetInvite').classList.remove('hidden');
+
+          showInviteStatus(
+            'Do‘stingizning o‘yin xonasiga ulanmoqda...'
+          );
+
+          send({
+            t: 'invite_join',
+            code: S.joinCode
+          });
+        }
       }
+
       break;
     }
+
+    case 'group_waiting':
+      $('sheetInvite').classList.remove('hidden');
+
+      showInviteStatus(
+        m.count === 2
+          ? 'Ikki o‘yinchi qo‘shildi! O‘yin boshlanmoqda...'
+          : 'Siz qo‘shildingiz! Ikkinchi o‘yinchi kutilmoqda...'
+      );
+
+      break;
+
+    case 'group_error':
+      $('sheetInvite').classList.remove('hidden');
+
+      showInviteStatus(
+        m.code === 'expired'
+          ? 'Bu guruh o‘yinining muddati tugagan. Guruhda /game yozing.'
+          : m.code === 'full'
+            ? 'Bu o‘yin xonasi to‘ldi.'
+            : m.code === 'busy'
+              ? 'Siz hozir boshqa o‘yindasiz.'
+              : 'O‘yin xonasiga ulanib bo‘lmadi.'
+      );
+
+      break;
 
     case 'searching':
       setSearching(true);
@@ -290,26 +400,37 @@ function onMsg(m) {
       $('btnCopyInvite').disabled = false;
       $('btnShareInvite').disabled = false;
 
-      showInviteStatus('Havola tayyor! Uni do‘stingizga yuboring.');
+      showInviteStatus(
+        'Havola tayyor! Uni do‘stingizga yuboring.'
+      );
+
       break;
     }
 
     case 'invite_joined':
-      showInviteStatus('Do‘stingiz qo‘shildi! O‘yin boshlanmoqda...');
+      showInviteStatus(
+        'Do‘stingiz qo‘shildi! O‘yin boshlanmoqda...'
+      );
       break;
 
     case 'invite_expired':
       S.inviteCode = null;
       S.inviteLink = '';
+
       $('inviteLink').value = '';
       $('btnCopyInvite').disabled = true;
       $('btnShareInvite').disabled = true;
-      showInviteStatus('Taklif havolasi muddati tugadi. Yangi taklif yarating.');
+
+      showInviteStatus(
+        'Taklif havolasi muddati tugadi. Yangi taklif yarating.'
+      );
+
       break;
 
     case 'invite_cancelled':
       S.inviteCode = null;
       S.inviteLink = '';
+
       $('sheetInvite').classList.add('hidden');
       break;
 
@@ -333,10 +454,12 @@ function onMsg(m) {
 
     case 'replaced':
       S.fatal = true;
+
       fatal(
         'Boshqa qurilmada ochildi',
         'Bu hisob boshqa joyda ochilgan. Shu yerda davom etish uchun o‘yinni qayta oching.'
       );
+
       break;
 
     case 'error':
@@ -346,14 +469,23 @@ function onMsg(m) {
           'Telegram orqali tasdiqlab bo‘lmadi. O‘yinni bot orqali qayta oching.'
         );
       } else if (m.code === 'invite_invalid') {
-        showInviteStatus('Taklif havolasi noto‘g‘ri yoki mavjud emas.');
+        showInviteStatus(
+          'Taklif havolasi noto‘g‘ri yoki mavjud emas.'
+        );
       } else if (m.code === 'invite_expired') {
-        showInviteStatus('Taklif havolasining muddati tugagan.');
+        showInviteStatus(
+          'Taklif havolasining muddati tugagan.'
+        );
       } else if (m.code === 'invite_self') {
-        showInviteStatus('O‘zingizning taklif havolangiz orqali qo‘shila olmaysiz.');
+        showInviteStatus(
+          'O‘zingizning taklif havolangiz orqali qo‘shila olmaysiz.'
+        );
       } else if (m.code === 'busy') {
-        showInviteStatus('O‘yinchi hozir boshqa o‘yinda.');
+        showInviteStatus(
+          'O‘yinchi hozir boshqa o‘yinda.'
+        );
       }
+
       break;
   }
 }
@@ -376,7 +508,9 @@ const rc = (i) => {
 
 const place = (el, i) => {
   const [r, c] = rc(i);
-  el.style.transform = `translate(${c * 100}%,${r * 100}%)`;
+
+  el.style.transform =
+    `translate(${c * 100}%,${r * 100}%)`;
 };
 
 function startGame(m) {
@@ -385,6 +519,7 @@ function startGame(m) {
   S.sel = null;
   S.unread = 0;
   S.joinCode = null;
+  S.groupCode = null;
 
   S.g = {
     id: m.id,
@@ -407,7 +542,9 @@ function startGame(m) {
     'sheetInvite',
     'result',
     'away'
-  ].forEach((i) => $(i).classList.add('hidden'));
+  ].forEach((i) => {
+    $(i).classList.add('hidden');
+  });
 
   const opp = m.players[m.you === 'w' ? 'b' : 'w'];
   const me = m.players[m.you];
@@ -418,13 +555,16 @@ function startGame(m) {
   $('oppName').textContent = opp.name;
   $('myName').textContent = me.name;
 
-  $('oppDot').className = 'pdot ' + (m.you === 'w' ? 'b' : 'w');
+  $('oppDot').className =
+    'pdot ' + (m.you === 'w' ? 'b' : 'w');
+
   $('myDot').className = 'pdot ' + m.you;
 
   buildSquares();
   renderPieces();
 
   $('msgs').textContent = '';
+
   m.chat.forEach((c) => addChat(c, true));
 
   updateBadge();
@@ -436,6 +576,7 @@ let sqEls = [];
 
 function buildSquares() {
   const wrap = $('squares');
+
   wrap.textContent = '';
   sqEls = [];
 
@@ -451,7 +592,9 @@ function buildSquares() {
     const i = r * 8 + c;
     const el = document.createElement('div');
 
-    el.className = 'sq' + ((r + c) % 2 ? ' d' : '');
+    el.className =
+      'sq' + ((r + c) % 2 ? ' d' : '');
+
     wrap.append(el);
     sqEls[i] = el;
   }
@@ -463,30 +606,36 @@ function pieceEl(p, i) {
   const el = document.createElement('div');
 
   el.className =
-    'pc ' + p.toLowerCase() + (p === p.toUpperCase() ? ' king' : '');
+    'pc ' +
+    p.toLowerCase() +
+    (p === p.toUpperCase() ? ' king' : '');
 
   el.innerHTML = '<i></i>';
   el.firstChild.insertAdjacentHTML('beforeend', CROWN);
 
   place(el, i);
+
   return el;
 }
 
 function renderPieces() {
   const wrap = $('pieces');
+
   wrap.textContent = '';
   pcEls = new Map();
 
   S.g.board.forEach((p, i) => {
     if (p) {
       const el = pieceEl(p, i);
+
       wrap.append(el);
       pcEls.set(i, el);
     }
   });
 }
 
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const sleep = (ms) =>
+  new Promise((r) => setTimeout(r, ms));
 
 async function pump() {
   if (S.busy) return;
@@ -495,8 +644,12 @@ async function pump() {
 
   while (S.q.length) {
     const m = S.q.shift();
-    if (m.t === 'move') await doMove(m);
-    else await doOver(m);
+
+    if (m.t === 'move') {
+      await doMove(m);
+    } else {
+      await doOver(m);
+    }
   }
 
   S.busy = false;
@@ -512,16 +665,21 @@ async function doMove(m) {
   if (el) {
     pcEls.delete(from);
     pcEls.set(to, el);
+
     place(el, to);
 
     if (king) el.classList.add('king');
 
     el.style.zIndex = 2;
-    setTimeout(() => (el.style.zIndex = ''), 300);
+
+    setTimeout(() => {
+      el.style.zIndex = '';
+    }, 300);
   }
 
   if (cap != null) {
     const ce = pcEls.get(cap);
+
     pcEls.delete(cap);
 
     if (ce) {
@@ -542,11 +700,14 @@ async function doMove(m) {
   });
 
   S.sel = null;
+
   refresh();
 
   await sleep(cap != null ? 340 : 260);
 
-  const ok = g.board.every((p, i) => !!p === pcEls.has(i));
+  const ok = g.board.every(
+    (p, i) => !!p === pcEls.has(i)
+  );
 
   if (!ok && !S.q.length) {
     renderPieces();
@@ -560,6 +721,7 @@ async function doOver(m) {
 
   g.over = m;
   g.legal = [];
+
   refresh();
 
   await sleep(500);
@@ -567,9 +729,15 @@ async function doOver(m) {
   const win = m.result === g.you;
   const draw = m.result === 'draw';
 
-  $('resEmoji').textContent = draw ? '🤝' : win ? '🏆' : '😔';
+  $('resEmoji').textContent =
+    draw ? '🤝' : win ? '🏆' : '😔';
+
   $('resTitle').textContent =
-    draw ? 'Durang' : win ? 'Siz yutdingiz!' : 'Siz yutqazdingiz';
+    draw
+      ? 'Durang'
+      : win
+        ? 'Siz yutdingiz!'
+        : 'Siz yutqazdingiz';
 
   const R = {
     no_pieces: win
@@ -592,6 +760,7 @@ async function doOver(m) {
   };
 
   $('resSub').textContent = R[m.reason] || '';
+
   $('sheetMenu').classList.add('hidden');
   $('away').classList.add('hidden');
   $('result').classList.remove('hidden');
@@ -600,11 +769,13 @@ async function doOver(m) {
 
   try {
     tg && tg.HapticFeedback &&
-    tg.HapticFeedback.notificationOccurred(draw ? 'warning' : win ? 'success' : 'error');
+    tg.HapticFeedback.notificationOccurred(
+      draw ? 'warning' : win ? 'success' : 'error'
+    );
   } catch (e) {}
 }
 
-/* Ko‘rinishni yangilash */
+/* ---------- Ko‘rinishni yangilash ---------- */
 
 function refresh() {
   const g = S.g;
@@ -613,38 +784,57 @@ function refresh() {
   const mine = g.turn === g.you && !g.over;
 
   $('myAva').classList.toggle('turn', mine);
-  $('oppAva').classList.toggle('turn', !mine && !g.over);
+  $('oppAva').classList.toggle(
+    'turn',
+    !mine && !g.over
+  );
 
-  const must = mine && g.legal.some((m) => m.cap != null);
+  const must =
+    mine && g.legal.some((m) => m.cap != null);
+
   const ms = $('mySub');
 
   ms.textContent = g.over
     ? ''
     : mine
-      ? (g.chainPos != null
-          ? 'Urishni davom ettiring!'
-          : must
-            ? 'Urish majburiy!'
-            : 'Sizning yurishingiz')
+      ? (
+          g.chainPos != null
+            ? 'Urishni davom ettiring!'
+            : must
+              ? 'Urish majburiy!'
+              : 'Sizning yurishingiz'
+        )
       : 'Kutilmoqda';
 
   ms.classList.toggle('hot', must);
 
-  $('oppSub').textContent = g.over ? '' : mine ? '' : 'O‘ylanmoqda…';
+  $('oppSub').textContent =
+    g.over ? '' : mine ? '' : 'O‘ylanmoqda…';
 
   $('myCap').textContent = g.score[g.you];
-  $('oppCap').textContent = g.score[g.you === 'w' ? 'b' : 'w'];
+
+  $('oppCap').textContent =
+    g.score[g.you === 'w' ? 'b' : 'w'];
 
   if (g.chainPos != null && mine) {
     S.sel = g.chainPos;
   } else if (mine && S.sel == null) {
-    const f = [...new Set(g.legal.map((m) => m.from))];
-    if (f.length === 1) S.sel = f[0];
+    const f = [
+      ...new Set(g.legal.map((m) => m.from))
+    ];
+
+    if (f.length === 1) {
+      S.sel = f[0];
+    }
   }
 
-  if (!mine) S.sel = null;
+  if (!mine) {
+    S.sel = null;
+  }
 
-  const movable = new Set(mine ? g.legal.map((m) => m.from) : []);
+  const movable = new Set(
+    mine ? g.legal.map((m) => m.from) : []
+  );
 
   pcEls.forEach((el, i) => {
     el.classList.toggle('can', movable.has(i));
@@ -653,25 +843,50 @@ function refresh() {
 
   sqEls.forEach((el, i) => {
     const t = S.sel != null
-      ? g.legal.find((m) => m.from === S.sel && m.to === i)
+      ? g.legal.find(
+          (m) => m.from === S.sel && m.to === i
+        )
       : null;
 
     el.classList.toggle('tgt', !!t);
-    el.classList.toggle('cap', !!(t && t.cap != null));
+    el.classList.toggle(
+      'cap',
+      !!(t && t.cap != null)
+    );
+
     el.classList.toggle('sel', i === S.sel);
-    el.classList.toggle('last', !!g.last && g.last.includes(i));
+
+    el.classList.toggle(
+      'last',
+      !!g.last && g.last.includes(i)
+    );
   });
 }
+
+/* ---------- Shashka yurishlari ---------- */
 
 $('field').addEventListener('pointerdown', (e) => {
   const g = S.g;
 
-  if (!g || g.over || g.turn !== g.you || S.busy || S.q.length) return;
+  if (
+    !g ||
+    g.over ||
+    g.turn !== g.you ||
+    S.busy ||
+    S.q.length
+  ) {
+    return;
+  }
 
   const r = $('field').getBoundingClientRect();
 
-  let c = Math.floor(((e.clientX - r.left) / r.width) * 8);
-  let rw = Math.floor(((e.clientY - r.top) / r.height) * 8);
+  let c = Math.floor(
+    ((e.clientX - r.left) / r.width) * 8
+  );
+
+  let rw = Math.floor(
+    ((e.clientY - r.top) / r.height) * 8
+  );
 
   if (c < 0 || c > 7 || rw < 0 || rw > 7) return;
 
@@ -682,10 +897,21 @@ $('field').addEventListener('pointerdown', (e) => {
 
   const i = rw * 8 + c;
 
-  if (S.sel != null && g.legal.some((m) => m.from === S.sel && m.to === i)) {
-    send({ t: 'move', from: S.sel, to: i });
+  if (
+    S.sel != null &&
+    g.legal.some(
+      (m) => m.from === S.sel && m.to === i
+    )
+  ) {
+    send({
+      t: 'move',
+      from: S.sel,
+      to: i
+    });
+
     S.sel = null;
     refresh();
+
     return;
   }
 
@@ -725,8 +951,12 @@ function showAway(m) {
 
   S.awayTimer = setInterval(() => {
     n = Math.max(0, n - 1);
+
     upd();
-    if (!n) clearInterval(S.awayTimer);
+
+    if (!n) {
+      clearInterval(S.awayTimer);
+    }
   }, 1000);
 
   haptic('medium');
@@ -747,7 +977,11 @@ function addChat(m, silent) {
   box.append(d);
   box.scrollTop = box.scrollHeight;
 
-  if (!mine && !silent && $('sheetChat').classList.contains('hidden')) {
+  if (
+    !mine &&
+    !silent &&
+    $('sheetChat').classList.contains('hidden')
+  ) {
     S.unread++;
     updateBadge();
     haptic('light');
@@ -756,6 +990,7 @@ function addChat(m, silent) {
 
 function updateBadge() {
   const b = $('badge');
+
   b.textContent = S.unread > 9 ? '9+' : S.unread;
   b.classList.toggle('hidden', !S.unread);
 }
@@ -766,13 +1001,18 @@ function sendChat() {
 
   if (!t) return;
 
-  send({ t: 'chat', text: t });
+  send({
+    t: 'chat',
+    text: t
+  });
+
   i.value = '';
 }
 
 $('btnChat').onclick = () => {
   S.unread = 0;
   updateBadge();
+
   $('sheetChat').classList.remove('hidden');
 
   const b = $('msgs');
@@ -791,7 +1031,9 @@ $('sheetChat').addEventListener('pointerdown', (e) => {
 $('btnSend').onclick = sendChat;
 
 $('chatInput').addEventListener('keydown', (e) => {
-  if (e.key === 'Enter') sendChat();
+  if (e.key === 'Enter') {
+    sendChat();
+  }
 });
 
 /* ---------- Tugmalar ---------- */
@@ -804,7 +1046,8 @@ $('btnBatl').onclick = () => {
   }
 };
 
-$('btnCancel').onclick = () => send({ t: 'cancel' });
+$('btnCancel').onclick = () =>
+  send({ t: 'cancel' });
 
 $('btnFriend').onclick = openInviteSheet;
 
@@ -814,7 +1057,9 @@ $('btnCopyInvite').onclick = copyInviteLink;
 $('btnShareInvite').onclick = shareInviteLink;
 
 $('sheetInvite').addEventListener('pointerdown', (e) => {
-  if (e.target.id === 'sheetInvite') cancelInvite();
+  if (e.target.id === 'sheetInvite') {
+    cancelInvite();
+  }
 });
 
 $('btnMenu').onclick = () =>
@@ -833,8 +1078,13 @@ $('btnResign').onclick = () => {
   const go = () => send({ t: 'resign' });
 
   if (tg && tg.showConfirm) {
-    tg.showConfirm('Haqiqatan ham taslim bo‘lasizmi?', (ok) => ok && go());
-  } else if (confirm('Haqiqatan ham taslim bo‘lasizmi?')) {
+    tg.showConfirm(
+      'Haqiqatan ham taslim bo‘lasizmi?',
+      (ok) => ok && go()
+    );
+  } else if (
+    confirm('Haqiqatan ham taslim bo‘lasizmi?')
+  ) {
     go();
   }
 
@@ -843,17 +1093,22 @@ $('btnResign').onclick = () => {
 
 $('btnToMenu').onclick = () => {
   S.g = null;
+
   $('result').classList.add('hidden');
   show('menu');
 };
 
 $('btnAgain').onclick = () => {
   S.g = null;
+
   $('result').classList.add('hidden');
   show('menu');
+
   setSearching(true);
   send({ t: 'find' });
 };
+
+/* ---------- Ishga tushirish ---------- */
 
 connect();
 
