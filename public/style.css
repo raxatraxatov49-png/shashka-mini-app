@@ -607,3 +607,201 @@ h1 {
   .ava.ring { width: 44px; height: 44px; }
   .dock button { height: 46px; }
 }
+
+/* ===== DARK THEME ===== */
+
+:root {
+  --bg: #101010;
+  --bg2: #181818;
+  --ink: #f2f2f2;
+  --muted: #a0a0a0;
+
+  --light: #d8cbb5;
+  --dark: #75583e;
+  --frame: #080808;
+
+  --brown1: #292929;
+  --brown2: #151515;
+  --cream: #f0e5d2;
+
+  --green: #4caf50;
+  --red: #d94b4b;
+}
+
+html,
+body {
+  background: #101010 !important;
+  color: #f2f2f2 !important;
+}
+
+body::before {
+  background:
+    radial-gradient(120% 60% at 50% 0%, #252525 0%, transparent 70%),
+    repeating-linear-gradient(
+      45deg,
+      transparent 0 60px,
+      rgba(255,255,255,.015) 60px 61px
+    ),
+    #101010 !important;
+}
+
+/* Menu */
+.card.brown {
+  background: linear-gradient(160deg, #303030, #151515) !important;
+}
+
+.card {
+  box-shadow: 0 18px 40px rgba(0,0,0,.5);
+}
+
+.who small,
+.pinfo small {
+  color: #a0a0a0 !important;
+}
+
+.ghost {
+  color: #eeeeee;
+}
+
+.card .ghost {
+  background: rgba(255,255,255,.08) !important;
+}
+
+/* Game information */
+.chip {
+  background: #252525 !important;
+  color: #eeeeee !important;
+  box-shadow: 0 2px 8px rgba(0,0,0,.35);
+}
+
+.pdot.w {
+  background: #f3efe6;
+}
+
+.pdot.b {
+  background: #111111;
+}
+
+/* Board frame */
+.board {
+  background: #080808 !important;
+  background-image: linear-gradient(135deg,#252525,#080808) !important;
+  box-shadow:
+    0 14px 34px rgba(0,0,0,.65),
+    inset 0 0 0 2px #444 !important;
+}
+
+/* Bottom menu */
+.dock {
+  background: #202020 !important;
+  box-shadow: 0 8px 24px rgba(0,0,0,.5);
+}
+
+.dock button {
+  color: #eeeeee !important;
+}
+
+.dock button:active {
+  background: rgba(255,255,255,.12) !important;
+}
+
+/* Sheets and modals */
+.sheet,
+.modal {
+  background: rgba(0,0,0,.72) !important;
+}
+
+.panel,
+.dialog {
+  background: #1c1c1c !important;
+  color: #f2f2f2 !important;
+  border: 1px solid #333;
+}
+
+.panel .ghost,
+.dialog .ghost {
+  background: #303030 !important;
+  color: #eeeeee !important;
+}
+
+.x {
+  color: #aaaaaa !important;
+}
+
+/* Chat */
+.m {
+  background: #303030 !important;
+  color: #f2f2f2 !important;
+}
+
+.m.me {
+  background: #494949 !important;
+  color: #ffffff !important;
+}
+
+.m.opp {
+  background: #292929 !important;
+}
+
+.msgs:empty::before {
+  color: #999 !important;
+}
+
+.compose input {
+  background: #292929 !important;
+  color: #ffffff !important;
+  border-color: #444 !important;
+}
+
+.compose input::placeholder {
+  color: #999;
+}
+
+.compose input:focus {
+  border-color: #888 !important;
+}
+
+.compose button {
+  background: #444 !important;
+}
+
+/* Invite window */
+#inviteStatus {
+  color: #aaaaaa !important;
+}
+
+#inviteLink {
+  background: #292929 !important;
+  color: #ffffff !important;
+  border-color: #555 !important;
+}
+
+/* Waiting message */
+.away {
+  background: #292313 !important;
+  color: #ffe4a0 !important;
+  border-color: #b58b32 !important;
+}
+
+/* Connection indicator */
+.conn {
+  background: #303030 !important;
+  color: #ffffff !important;
+}
+
+/* Buttons */
+.batl {
+  background: #eeeeee !important;
+  color: #151515 !important;
+}
+
+.danger {
+  background: #c73535 !important;
+  color: #ffffff !important;
+}
+
+/* Friend card */
+.friend-card .batl {
+  background: #eeeeee !important;
+  color: #151515 !important;
+}
