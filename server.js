@@ -15,6 +15,14 @@ const GRACE = Number(process.env.GRACE_SECONDS) || 30;
 const PUBLIC = path.join(__dirname, 'public');
 const INVITE_TTL = 10 * 60 * 1000;
 
+const WEBHOOK_URL = 'https://shashka-mini-app.onrender.com/telegram-webhook';
+
+const WEBHOOK_SECRET = crypto
+  .createHash('sha256')
+  .update(BOT_TOKEN)
+  .digest('hex')
+  .slice(0, 32);
+
 if (!BOT_TOKEN && !DEV) {
   console.error('BOT_TOKEN o‘rnatilmagan. Telegram bot tokenini BOT_TOKEN muhit o‘zgaruvchisiga yozing.');
   process.exit(1);
@@ -29,8 +37,102 @@ const MIME = {
   '.ico': 'image/x-icon'
 };
 
+async function telegramApi(method, data) {
+  const response = await fetch(
+    `https://api.telegram.org/bot${BOT_TOKEN}/${method}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    }
+  );
+
+  const result = await response.json();
+
+  if (!result.ok) {
+    throw new Error(result.description || 'Telegram API error');
+  }
+
+  return result;
+}
+
+async function handleTelegramWebhook(req, res) {
+  if (
+    req.headers['x-telegram-bot-api-secret-token'] !== WEBHOOK_SECRET
+  ) {
+    res.writeHead(403);
+    return res.end('Forbidden');
+  }
+
+  try {
+    let body = '';
+
+    for await (const chunk of req) {
+      body += chunk;
+
+      if (body.length > 1024 * 1024) {
+        res.writeHead(413);
+        return res.end('Too large');
+      }
+    }
+
+    const update = JSON.parse(body);
+    const message = update.message;
+
+    if (
+      message &&
+      typeof message.text === 'string' &&
+      /^\/start(?:@\w+)?(?:\s|$)/.test(message.text)
+    ) {
+      await telegramApi('sendMessage', {
+        chat_id: message.chat.id,
+        text: '♟ Қош келдіңіз!\n\nШашка ойынын бастаңыз және қарсыластарыңызды жеңіңіз! 🎮',
+        reply_markup: {
+          inline_keyboard: [
+            [
+              {
+                text: 'БАСТАУ',
+                web_app: {
+                  url: 'https://shashka-mini-app.onrender.com'
+                }
+              }
+            ]
+          ]
+        }
+      });
+    }
+
+    res.writeHead(200);
+    res.end('ok');
+  } catch (error) {
+    console.error('Telegram webhook error:', error.message);
+    res.writeHead(200);
+    res.end('ok');
+  }
+}
+
+async function setupTelegramWebhook() {
+  if (!BOT_TOKEN || DEV) return;
+
+  try {
+    const result = await telegramApi('setWebhook', {
+      url: WEBHOOK_URL,
+      secret_token: WEBHOOK_SECRET,
+      allowed_updates: ['message']
+    });
+
+    console.log('Telegram webhook:', result.description);
+  } catch (error) {
+    console.error('Webhook setup error:', error.message);
+  }
+}
+
 const server = http.createServer((req, res) => {
   const url = decodeURIComponent((req.url || '/').split('?')[0]);
+
+  if (req.method === 'POST' && url === '/telegram-webhook') {
+    return handleTelegramWebhook(req, res);
+  }
 
   if (url === '/health') {
     res.writeHead(200, { 'Content-Type': 'text/plain' });
@@ -518,6 +620,7 @@ setInterval(() => {
 if (require.main === module) {
   server.listen(PORT, () => {
     console.log(`Shashka server: http://localhost:${PORT}${DEV ? '  (DEV rejim)' : ''}`);
+    setupTelegramWebhook();
   });
 }
 
