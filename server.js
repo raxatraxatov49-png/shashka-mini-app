@@ -1,3 +1,4 @@
+
 'use strict';
 
 const http = require('http');
@@ -58,9 +59,220 @@ async function telegramApi(method, data) {
   return result;
 }
 
-/* ---------- Telegram webhook ---------- */
+/* ---------- Guruh o‘йындары ---------- */
 
 const groupRooms = new Map();
+const groupTokens = new Map();
+const groupPlayerRooms = new Map();
+
+function playerName(player) {
+  if (player.username) return '@' + player.username;
+
+  return [player.first_name, player.last_name]
+    .filter(Boolean)
+    .join(' ') || 'Ойыншы';
+}
+
+function roomText(room) {
+  let text = '♟️ ШАШКА ОЙЫНЫ\n\n';
+
+  room.players.forEach((player, index) => {
+    const entered = room.entered.has(String(player.id));
+    text += `${index + 1}. ${playerName(player)}${entered ? ' ✅' : ''}\n`;
+  });
+
+  if (room.players.length < 2) {
+    text += '\nЕкінші ойыншыны күтеміз...';
+  } else if (room.entered.size < 2) {
+    text += '\nЕкі ойыншы да «ОЙЫНҒА КІРУ» батырмасын бассын.';
+  } else {
+    text += '\nЕкі ойыншы да кірді! Ойынға қосылу күтілуде...';
+  }
+
+  return text;
+}
+
+function roomKeyboard(room) {
+  if (room.players.length < 2) {
+    return {
+      inline_keyboard: [[
+        { text: '♟️ ҚОСЫЛУ', callback_data: 'gj:' + room.code }
+      ]]
+    };
+  }
+
+  return {
+    inline_keyboard: [[
+      { text: '🎮 ОЙЫНҒА КІРУ', callback_data: 'ge:' + room.code }
+    ]]
+  };
+}
+
+async function updateGroupRoom(room) {
+  if (!room.messageId) return;
+
+  await telegramApi('editMessageText', {
+    chat_id: room.chatId,
+    message_id: room.messageId,
+    text: roomText(room),
+    reply_markup: roomKeyboard(room)
+  });
+}
+
+async function answerCallback(id, text, alert = false) {
+  try {
+    await telegramApi('answerCallbackQuery', {
+      callback_query_id: id,
+      text,
+      show_alert: alert
+    });
+  } catch (error) {
+    console.error('Callback answer:', error.message);
+  }
+}
+
+async function handleGroupCallback(query) {
+  const data = String(query.data || '');
+  const from = query.from;
+  const userId = String(from.id);
+
+  const joinMatch = data.match(/^gj:([a-f0-9]{12})$/);
+  const enterMatch = data.match(/^ge:([a-f0-9]{12})$/);
+
+  if (!joinMatch && !enterMatch) return false;
+
+  const code = (joinMatch || enterMatch)[1];
+  const room = groupRooms.get(code);
+
+  if (!room || room.started) {
+    await answerCallback(
+      query.id,
+      'Бұл ойынның уақыты аяқталған.',
+      true
+    );
+    return true;
+  }
+
+  if (joinMatch) {
+    const already = room.players.some(
+      player => String(player.id) === userId
+    );
+
+    if (already) {
+      await answerCallback(query.id, 'Сіз ойынға қосылдыңыз.');
+      return true;
+    }
+
+    if (room.players.length >= 2) {
+      await answerCallback(query.id, 'Ойыншылар толып кетті.', true);
+      return true;
+    }
+
+    if (groupPlayerRooms.has(userId)) {
+      await answerCallback(
+        query.id,
+        'Сіз басқа топтық ойынға қосылғансыз.',
+        true
+      );
+      return true;
+    }
+
+    room.players.push({
+      id: userId,
+      username: from.username || '',
+      first_name: from.first_name || '',
+      last_name: from.last_name || ''
+    });
+
+    groupPlayerRooms.set(userId, code);
+
+    await answerCallback(query.id, 'Сіз ойынға қосылдыңыз!');
+
+    try {
+      await updateGroupRoom(room);
+    } catch (error) {
+      console.error('Lobby update:', error.message);
+    }
+
+    return true;
+  }
+
+  // ОЙЫНҒА КІРУ
+  if (room.players.length !== 2) {
+    await answerCallback(
+      query.id,
+      'Алдымен екі ойыншы қосылуы керек.',
+      true
+    );
+    return true;
+  }
+
+  const player = room.players.find(
+    item => String(item.id) === userId
+  );
+
+  if (!player) {
+    await answerCallback(
+      query.id,
+      'Сіз бұл ойынға қосылмағансыз.',
+      true
+    );
+    return true;
+  }
+
+  let token = room.tokens.get(userId);
+
+  if (!token) {
+    token = crypto.randomBytes(16).toString('hex');
+    room.tokens.set(userId, token);
+
+    groupTokens.set(token, {
+      code,
+      userId
+    });
+  }
+
+  try {
+    await telegramApi('sendMessage', {
+      chat_id: userId,
+      text:
+        '♟️ ШАШКА ОЙЫНЫ\n\n' +
+        'Сіз топтық ойынға шақырылдыңыз!\n' +
+        'Ойынға кіру үшін төмендегі батырманы басыңыз.',
+      reply_markup: {
+        inline_keyboard: [[
+          {
+            text: '🎮 ОЙЫНҒА КІРУ',
+            url: MINI_APP_LINK + 'group_' + token
+          }
+        ]]
+      }
+    });
+
+    room.entered.add(userId);
+
+    await answerCallback(
+      query.id,
+      'Сілтеме жеке чатыңызға жіберілді!'
+    );
+
+    try {
+      await updateGroupRoom(room);
+    } catch (error) {
+      console.error('Lobby update:', error.message);
+    }
+  } catch (error) {
+    await answerCallback(
+      query.id,
+      'Алдымен ботқа жеке чатта /start жіберіңіз. Содан кейін қайта басыңыз.',
+      true
+    );
+  }
+
+  return true;
+}
+
+/* ---------- Telegram webhook ---------- */
 
 async function handleTelegramWebhook(req, res) {
   if (
@@ -83,6 +295,15 @@ async function handleTelegramWebhook(req, res) {
     }
 
     const update = JSON.parse(body);
+
+    // Батырма басылған кезде
+    if (update.callback_query) {
+      await handleGroupCallback(update.callback_query);
+
+      res.writeHead(200);
+      return res.end('ok');
+    }
+
     const message = update.message;
 
     if (!message || typeof message.text !== 'string') {
@@ -90,7 +311,7 @@ async function handleTelegramWebhook(req, res) {
       return res.end('ok');
     }
 
-    // Guruhda /game komandasi
+    // Топта /game
     if (
       /^\/game(?:@\w+)?(?:\s|$)/.test(message.text) &&
       ['group', 'supergroup'].includes(message.chat.type)
@@ -100,33 +321,38 @@ async function handleTelegramWebhook(req, res) {
       const room = {
         code,
         chatId: message.chat.id,
+        messageId: null,
         players: [],
+        entered: new Set(),
+        connected: new Set(),
+        tokens: new Map(),
+        started: false,
         timer: null
       };
 
       room.timer = setTimeout(() => {
         groupRooms.delete(code);
+
+        for (const player of room.players) {
+          groupPlayerRooms.delete(String(player.id));
+        }
+
+        for (const token of room.tokens.values()) {
+          groupTokens.delete(token);
+        }
       }, GROUP_TTL);
 
       if (room.timer.unref) room.timer.unref();
 
       groupRooms.set(code, room);
 
-      await telegramApi('sendMessage', {
+      const sent = await telegramApi('sendMessage', {
         chat_id: message.chat.id,
-        text:
-          '♟️ ШАШКА ОЙЫНЫ\n\n' +
-          'Екі ойыншы қосылсын!\n' +
-          'Ойынды бастау үшін төмендегі батырманы басыңыз.',
-        reply_markup: {
-          inline_keyboard: [[
-            {
-              text: '♟️ ШАШКА ОЙНАУ',
-              url: MINI_APP_LINK + 'group_' + code
-            }
-          ]]
-        }
+        text: roomText(room),
+        reply_markup: roomKeyboard(room)
       });
+
+      room.messageId = sent.result.message_id;
     }
 
     // Жеке чатта /start
@@ -182,7 +408,7 @@ async function setupTelegramWebhook() {
     const result = await telegramApi('setWebhook', {
       url: WEBHOOK_URL,
       secret_token: WEBHOOK_SECRET,
-      allowed_updates: ['message']
+      allowed_updates: ['message', 'callback_query']
     });
 
     console.log('Telegram webhook:', result.description);
@@ -364,7 +590,6 @@ function finish(g, winner, reason) {
     }
   }
 
-  // Guruhda жеңімпазды жариялау
   if (g.groupInfo) {
     const winnerId = winner === 'w'
       ? g.p.w
@@ -388,19 +613,60 @@ function finish(g, winner, reason) {
     }).catch((err) => {
       console.error('Group result error:', err.message);
     });
+
+    const room = groupRooms.get(g.groupInfo.code);
+
+    if (room) {
+      clearTimeout(room.timer);
+
+      for (const player of room.players) {
+        groupPlayerRooms.delete(String(player.id));
+      }
+
+      for (const token of room.tokens.values()) {
+        groupTokens.delete(token);
+      }
+
+      groupRooms.delete(g.groupInfo.code);
+    }
   }
 }
 
-/* ---------- Guruh o‘yiniga qo‘shilish ---------- */
+/* ---------- Guruh Mini App ulanishi ---------- */
 
-function joinGroupGame(u, code) {
+function joinGroupGame(u, token) {
   if (
-    typeof code !== 'string' ||
-    !/^[a-f0-9]{12}$/.test(code)
+    typeof token !== 'string' ||
+    !/^[a-f0-9]{32}$/.test(token)
   ) {
     return send(u, {
       t: 'group_error',
       code: 'invalid'
+    });
+  }
+
+  const tokenInfo = groupTokens.get(token);
+
+  if (!tokenInfo || tokenInfo.userId !== String(u.id)) {
+    return send(u, {
+      t: 'group_error',
+      code: 'invalid'
+    });
+  }
+
+  const room = groupRooms.get(tokenInfo.code);
+
+  if (!room) {
+    return send(u, {
+      t: 'group_error',
+      code: 'expired'
+    });
+  }
+
+  if (room.players.length !== 2) {
+    return send(u, {
+      t: 'group_error',
+      code: 'waiting'
     });
   }
 
@@ -411,71 +677,60 @@ function joinGroupGame(u, code) {
     });
   }
 
-  const room = groupRooms.get(code);
+  if (room.started) {
+    const existingGame = [...games.values()].find(
+      g => g.groupInfo && g.groupInfo.code === room.code &&
+        (g.p.w === u.id || g.p.b === u.id)
+    );
 
-  if (!room) {
+    if (existingGame) {
+      return send(u, gameState(existingGame, u.id));
+    }
+
     return send(u, {
       t: 'group_error',
       code: 'expired'
     });
   }
 
-  if (room.players.includes(u.id)) {
-    return send(u, {
-      t: 'group_waiting',
-      count: room.players.length
-    });
-  }
+  room.connected.add(String(u.id));
 
-  if (room.players.length >= 2) {
-    return send(u, {
-      t: 'group_error',
-      code: 'full'
-    });
-  }
-
-  room.players.push(u.id);
   dequeue(u.id);
   removeUserInvite(u.id);
 
-  if (room.players.length === 1) {
-    return send(u, {
+  if (room.connected.size < 2) {
+    send(u, {
       t: 'group_waiting',
-      count: 1
+      count: 1,
+      message: 'Екінші ойыншының кіруін күтіңіз...'
     });
+
+    return;
   }
 
-  const first = users.get(room.players[0]);
+  const first = users.get(room.players[0].id);
+  const second = users.get(room.players[1].id);
 
-  if (!first || !first.ws || first.ws.readyState !== 1) {
-    room.players = [u.id];
-
-    return send(u, {
+  if (
+    !first || !second ||
+    !first.ws || first.ws.readyState !== 1 ||
+    !second.ws || second.ws.readyState !== 1
+  ) {
+    send(u, {
       t: 'group_waiting',
-      count: 1
+      count: room.connected.size,
+      message: 'Екінші ойыншының қосылуын күтіңіз...'
     });
+
+    return;
   }
 
-  if (first.game && games.has(first.game)) {
-    clearTimeout(room.timer);
-    groupRooms.delete(code);
-
-    return send(u, {
-      t: 'group_error',
-      code: 'busy'
-    });
-  }
-
+  room.started = true;
   clearTimeout(room.timer);
-  groupRooms.delete(code);
 
-  send(first, {
-    t: 'group_waiting',
-    count: 2
-  });
-
-  startGame(first, u, {
-    chatId: room.chatId
+  startGame(first, second, {
+    chatId: room.chatId,
+    code: room.code
   });
 }
 
@@ -607,9 +862,7 @@ function handle(u, m) {
       }
 
       if (queue.includes(u.id)) {
-        return send(u, {
-          t: 'searching'
-        });
+        return send(u, { t: 'searching' });
       }
 
       queue = queue.filter((id) => {
@@ -629,9 +882,7 @@ function handle(u, m) {
 
       queue.push(u.id);
 
-      return send(u, {
-        t: 'searching'
-      });
+      return send(u, { t: 'searching' });
     }
 
     case 'cancel':
@@ -646,9 +897,7 @@ function handle(u, m) {
 
     case 'invite_cancel':
       removeUserInvite(u.id);
-      return send(u, {
-        t: 'invite_cancelled'
-      });
+      return send(u, { t: 'invite_cancelled' });
 
     case 'move': {
       const g = games.get(u.game);
@@ -771,6 +1020,8 @@ function onAuth(ws, m) {
     return ws.close();
   }
 
+  info.id = String(info.id);
+
   let u = users.get(info.id);
 
   if (u && u.ws && u.ws !== ws) {
@@ -869,6 +1120,15 @@ wss.on('connection', (ws) => {
     u.ws = null;
     dequeue(u.id);
     removeUserInvite(u.id);
+
+    // Ойын басталмаған кезде Mini App-тан шықса,
+    // қайта кіргенде сол токенмен қосыла алады.
+    const roomCode = groupPlayerRooms.get(String(u.id));
+    const room = roomCode && groupRooms.get(roomCode);
+
+    if (room && !room.started) {
+      room.connected.delete(String(u.id));
+    }
 
     const g = u.game && games.get(u.game);
 
