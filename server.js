@@ -1,4 +1,3 @@
-
 'use strict';
 
 const http = require('http');
@@ -422,10 +421,36 @@ async function handleTelegramWebhook(req, res) {
       return res.end('ok');
     }
 
+    /* ---------- /game ---------- */
+
     if (
       /^\/game(?:@\w+)?(?:\s|$)/.test(message.text) &&
       ['group', 'supergroup'].includes(message.chat.type)
     ) {
+      const creatorId = String(message.from.id);
+
+      // Егер адам қазір топтық матчта болса,
+      // жаңа /game бөлмесін аша алмайды.
+      if (groupPlayerRooms.has(creatorId)) {
+        await telegramApi('sendMessage', {
+          chat_id: message.chat.id,
+          reply_to_message_id: message.message_id,
+          text:
+            `⛔ ${playerLink({
+              id: creatorId,
+              username: message.from.username || '',
+              first_name: message.from.first_name || '',
+              last_name: message.from.last_name || ''
+            })}\n\n` +
+            'Сіз қазір шашка ойнап жатырсыз!\n' +
+            'Жаңа ойын ашу үшін алдымен қазіргі ойынды аяқтаңыз. ♟️',
+          parse_mode: 'HTML'
+        });
+
+        res.writeHead(200);
+        return res.end('ok');
+      }
+
       const code = crypto.randomBytes(6).toString('hex');
 
       const room = {
