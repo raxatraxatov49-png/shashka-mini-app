@@ -1,5 +1,6 @@
 
 'use strict';
+
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
@@ -115,6 +116,22 @@ async function setupTelegramWebhook() {
   if (!BOT_TOKEN || DEV) return;
 
   try {
+    // Guruhlar uchun /game komandasini chiqarish
+    await telegramApi('setMyCommands', {
+      commands: [
+        {
+          command: 'game',
+          description: 'O‘yin yaratish'
+        }
+      ],
+      scope: {
+        type: 'all_group_chats'
+      }
+    });
+
+    console.log('Telegram /game komandasi sozlandi');
+
+    // Webhook sozlash
     const result = await telegramApi('setWebhook', {
       url: WEBHOOK_URL,
       secret_token: WEBHOOK_SECRET,
@@ -123,7 +140,7 @@ async function setupTelegramWebhook() {
 
     console.log('Telegram webhook:', result.description);
   } catch (error) {
-    console.error('Webhook setup error:', error.message);
+    console.error('Telegram setup error:', error.message);
   }
 }
 
@@ -157,6 +174,7 @@ const server = http.createServer((req, res) => {
       'Content-Type': MIME[path.extname(file)] || 'application/octet-stream',
       'Cache-Control': 'no-cache'
     });
+
     res.end(data);
   });
 });
