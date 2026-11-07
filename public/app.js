@@ -18,7 +18,7 @@ const $ = (id) => document.getElementById(id);
 
 const tr = (text) => text;
 
-/* ---------- HAPTIC ---------- */
+/* ---------- ДІРІЛ ӘСЕРІ ---------- */
 
 const haptic = (k) => {
   try {
@@ -52,7 +52,7 @@ const S = {
 
 const CROWN = '<svg viewBox="0 0 24 24"><path d="M3 18l-1-11 5 4 5-7 5 7 5-4-1 11z"/></svg>';
 
-/* ---------- START PARAMETRLARI ---------- */
+/* ---------- БАСТАПҚЫ ПАРАМЕТРЛЕР ---------- */
 
 function getStartValue() {
   const values = [];
@@ -143,7 +143,7 @@ function showInviteStatus(message) {
   if (el) el.textContent = message;
 }
 
-/* ---------- DO‘ST BILAN O‘YNASH ---------- */
+/* ---------- ДОСПЕН ОЙНАУ ---------- */
 
 function openInviteSheet() {
   S.inviteCode = null;
@@ -153,7 +153,7 @@ function openInviteSheet() {
   $('btnCopyInvite').disabled = true;
   $('btnShareInvite').disabled = true;
 
-  showInviteStatus('Taklif havolasi tayyorlanmoqda...');
+  showInviteStatus('Шақыру сілтемесі дайындалуда...');
   $('sheetInvite').classList.remove('hidden');
 
   send({ t: 'invite_create' });
@@ -176,24 +176,24 @@ async function copyInviteLink() {
       input.select();
 
       const copied = document.execCommand('copy');
-      if (!copied) throw new Error('Copy failed');
+      if (!copied) throw new Error('Көшіру сәтсіз аяқталды');
     }
 
-    showInviteStatus('Havola nusxalandi! Do‘stingizga yuboring.');
+    showInviteStatus('Сілтеме көшірілді! Енді досыңызға жіберіңіз.');
     haptic('light');
   } catch (e) {
     const input = $('inviteLink');
     input.focus();
     input.select();
 
-    showInviteStatus('Havolani bosib ushlab, nusxalashingiz mumkin.');
+    showInviteStatus('Сілтемені басып ұстап, көшіріп алыңыз.');
   }
 }
 
 function shareInviteLink() {
   if (!S.inviteLink) return;
 
-  const text = 'Keling, birga shashka o‘ynaymiz!';
+  const text = 'Кел, бірге дойбы ойнайық!';
 
   const shareUrl =
     'https://t.me/share/url?url=' + encodeURIComponent(S.inviteLink) +
@@ -219,7 +219,7 @@ function cancelInvite() {
   $('sheetInvite').classList.add('hidden');
 }
 
-/* ---------- ULANISH ---------- */
+/* ---------- ҚОСЫЛУ ---------- */
 
 function connect() {
   if (
@@ -255,8 +255,8 @@ function connect() {
       }));
     } else {
       fatal(
-        'Telegram ichida oching',
-        'Bu o‘yin faqat Telegram Mini App sifatida ishlaydi.'
+        'Telegram арқылы ашыңыз',
+        'Бұл ойын тек Telegram Mini App ішінде жұмыс істейді.'
       );
     }
   };
@@ -284,7 +284,7 @@ function connect() {
   };
 
   ws.onerror = (e) => {
-    console.error('WebSocket xatosi:', e);
+    console.error('WebSocket қатесі:', e);
   };
 }
 
@@ -307,7 +307,7 @@ document.addEventListener('visibilitychange', () => {
   }
 });
 
-/* ---------- YORDAMCHILAR ---------- */
+/* ---------- КӨМЕКШІ ФУНКЦИЯЛАР ---------- */
 
 const COLORS = [
   '#3aa6a0', '#e0954a', '#5b7fc7', '#b8627d',
@@ -383,13 +383,13 @@ function setSearching(on) {
   b.classList.toggle('busy', on);
 
   b.innerHTML = on
-    ? '<span class="spin"></span>Raqib qidirilmoqda…'
-    : 'BATL';
+    ? '<span class="spin"></span>Қарсылас ізделуде…'
+    : 'ОЙНАУ';
 
   $('btnCancel').classList.toggle('hidden', !on);
 }
 
-/* ---------- XABARLARNI BOSHQARISH ---------- */
+/* ---------- ХАБАРЛАРДЫ ӨҢДЕУ ---------- */
 
 function onMsg(m) {
   switch (m.t) {
@@ -418,7 +418,7 @@ function onMsg(m) {
           $('sheetInvite').classList.remove('hidden');
 
           showInviteStatus(
-            'Do‘stingizning o‘yin xonasiga ulanmoqda...'
+            'Досыңыздың ойын бөлмесіне қосылуда...'
           );
 
           send({
@@ -474,14 +474,14 @@ function onMsg(m) {
 
       showInviteStatus(
         m.code === 'expired'
-          ? 'Bu o‘yinning vaqti tugagan. Guruhda /game deb yozing.'
+          ? 'Бұл ойынның уақыты аяқталды. Топқа /game деп жазыңыз.'
           : m.code === 'full'
-            ? 'Bu o‘yin xonasi to‘lib ketdi.'
+            ? 'Бұл ойын бөлмесінде бос орын жоқ.'
             : m.code === 'busy'
-              ? 'Siz hozir boshqa o‘yindasiz.'
+              ? 'Сіз қазір басқа ойындасыз.'
               : m.code === 'waiting'
-                ? 'Ikkinchi o‘yinchi hali o‘yinga kirmagan.'
-                : 'O‘yin xonasiga qo‘shilish imkoni bo‘lmadi.'
+                ? 'Екінші ойыншы әлі ойынға кірген жоқ.'
+                : 'Ойын бөлмесіне қосылу мүмкін болмады.'
       );
 
       break;
@@ -502,12 +502,12 @@ function onMsg(m) {
       $('btnCopyInvite').disabled = false;
       $('btnShareInvite').disabled = false;
 
-      showInviteStatus('Havola tayyor! Uni do‘stingizga yuboring.');
+      showInviteStatus('Сілтеме дайын! Оны досыңызға жіберіңіз.');
       break;
     }
 
     case 'invite_joined':
-      showInviteStatus('Do‘stingiz qo‘shildi! O‘yin boshlanmoqda...');
+      showInviteStatus('Досыңыз қосылды! Ойын басталуда...');
       break;
 
     case 'invite_expired':
@@ -518,7 +518,7 @@ function onMsg(m) {
       $('btnCopyInvite').disabled = true;
       $('btnShareInvite').disabled = true;
 
-      showInviteStatus('Taklif muddati tugadi. Yangi taklif yarating.');
+      showInviteStatus('Шақыру мерзімі аяқталды. Жаңа шақыру жасаңыз.');
       break;
 
     case 'invite_cancelled':
@@ -557,31 +557,31 @@ function onMsg(m) {
       S.fatal = true;
 
       fatal(
-        'Boshqa qurilmada ochildi',
-        'Bu hisob boshqa joyda ochilgan. Shu yerda davom etish uchun o‘yinni qayta oching.'
+        'Басқа құрылғыда ашылды',
+        'Бұл есептік жазба басқа жерде ашылған. Осы жерде жалғастыру үшін ойынды қайта ашыңыз.'
       );
       break;
 
     case 'error':
       if (m.code === 'auth') {
         fatal(
-          'Kirish xatosi',
-          'Telegram orqali tasdiqlab bo‘lmadi. O‘yinni bot orqali qayta oching.'
+          'Кіру қатесі',
+          'Telegram арқылы растау мүмкін болмады. Ойынды бот арқылы қайта ашыңыз.'
         );
       } else if (m.code === 'invite_invalid') {
-        showInviteStatus('Taklif havolasi noto‘g‘ri yoki mavjud emas.');
+        showInviteStatus('Шақыру сілтемесі қате немесе жарамсыз.');
       } else if (m.code === 'invite_expired') {
-        showInviteStatus('Taklif havolasining muddati tugagan.');
+        showInviteStatus('Шақыру сілтемесінің мерзімі аяқталған.');
       } else if (m.code === 'invite_self') {
-        showInviteStatus('O‘zingizning taklif havolangiz orqali qo‘shila olmaysiz.');
+        showInviteStatus('Өзіңіздің шақыру сілтемеңіз арқылы қосыла алмайсыз.');
       } else if (m.code === 'busy') {
-        showInviteStatus('O‘yinchi hozir boshqa o‘yinda.');
+        showInviteStatus('Ойыншы қазір басқа ойында.');
       }
       break;
   }
 }
 
-/* ---------- O‘YIN ---------- */
+/* ---------- ОЙЫН ---------- */
 
 const flip = () => S.g.you === 'b';
 
@@ -829,37 +829,37 @@ async function doOver(m) {
 
   $('resTitle').textContent =
     draw
-      ? 'Durang'
+      ? 'Тең ойын!'
       : win
-        ? 'Siz yutdingiz!'
-        : 'Siz yutqazdingiz';
+        ? 'Сіз жеңдіңіз!'
+        : 'Сіз жеңілдіңіз';
 
   const R = {
     no_pieces: win
-      ? 'Raqibning barcha shashkalari olindi'
-      : 'Barcha shashkalaringiz olindi',
+      ? 'Қарсыластың барлық тастары алынды'
+      : 'Сіздің барлық тастарыңыз алынды',
 
     no_moves: win
-      ? 'Raqibda yurish imkoni qolmadi'
-      : 'Sizda yurish imkoni qolmadi',
+      ? 'Қарсыластың жүретін жолы қалмады'
+      : 'Сіздің жүретін жолыңыз қалмады',
 
     resign: win
-      ? 'Raqib taslim bo‘ldi'
-      : 'Siz taslim bo‘ldingiz',
+      ? 'Қарсылас берілді'
+      : 'Сіз берілдіңіз',
 
     left: win
-      ? 'Raqib o‘yindan chiqib ketdi'
-      : 'Aloqa uzilgani uchun o‘yin tugadi',
+      ? 'Қарсылас ойыннан шығып кетті'
+      : 'Байланыс үзілгендіктен ойын аяқталды',
 
     timeout: win
-      ? 'Raqibning vaqti tugadi'
-      : 'Sizning vaqtingiz tugadi',
+      ? 'Қарсыластың уақыты аяқталды'
+      : 'Сіздің уақытыңыз аяқталды',
 
     opponent_timeout: win
-      ? 'Raqib 90 soniya ichida o‘yinga kirmadi'
-      : 'Siz 90 soniya ichida o‘yinga kirmadingiz',
+      ? 'Қарсылас 90 секунд ішінде ойынға кірмеді'
+      : 'Сіз 90 секунд ішінде ойынға кірмедіңіз',
 
-    draw: '15 ta yurish davomida urish va oddiy shashka yurishi bo‘lmadi'
+    draw: '15 жүріс бойы тасты алу да, қарапайым жүріс те болған жоқ'
   };
 
   $('resSub').textContent = R[m.reason] || '';
@@ -878,7 +878,7 @@ async function doOver(m) {
   } catch (e) {}
 }
 
-/* ---------- KO‘RINISHNI YANGILASH ---------- */
+/* ---------- ЭКРАНДЫ ЖАҢАРТУ ---------- */
 
 function formatClock(seconds) {
   const safe = Math.max(0, seconds);
@@ -906,7 +906,7 @@ function refresh() {
 
   const ms = $('mySub');
 
-  let waitingText = 'Ikkinchi o‘yinchi kutilmoqda...';
+  let waitingText = 'Екінші ойыншы күтілуде...';
 
   if (waiting && g.groupWaitDeadline) {
     const seconds = Math.max(
@@ -914,7 +914,7 @@ function refresh() {
       Math.ceil((g.groupWaitDeadline - Date.now()) / 1000)
     );
 
-    waitingText = `⏳ Raqib kirishiga: ${formatClock(seconds)}`;
+    waitingText = `⏳ Қарсыластың кіруіне: ${formatClock(seconds)}`;
   }
 
   ms.textContent = g.over
@@ -924,12 +924,12 @@ function refresh() {
       : mine
         ? (
             g.chainPos != null
-              ? 'Urishni davom ettiring!'
+              ? 'Тасты алуды жалғастырыңыз!'
               : must
-                ? 'Urish majburiy!'
-                : 'Sizning yurishingiz'
+                ? 'Тасты алу міндетті!'
+                : 'Сіздің кезегіңіз'
           )
-        : 'Kutilmoqda';
+        : 'Кезегін күтіңіз';
 
   ms.classList.toggle('hot', must);
 
@@ -937,10 +937,10 @@ function refresh() {
     g.over
       ? ''
       : waiting
-        ? 'O‘yin boshlanishini kutmoqda...'
+        ? 'Ойынның басталуын күтуде...'
         : mine
           ? ''
-          : 'O‘ylanmoqda…';
+          : 'Ойланып жатыр…';
 
   if (
     !waiting &&
@@ -1006,7 +1006,7 @@ function refresh() {
   });
 }
 
-/* Таймерді жаңарту */
+/* УАҚЫТТЫ ЖАҢАРТУ */
 setInterval(() => {
   if (!S.g || S.g.over) return;
 
@@ -1020,7 +1020,7 @@ setInterval(() => {
   }
 }, 1000);
 
-/* ---------- SHASHKA YURISHLARI ---------- */
+/* ---------- ДОЙБЫ ЖҮРІСТЕРІ ---------- */
 
 $('field').addEventListener('pointerdown', (e) => {
   const g = S.g;
@@ -1082,7 +1082,7 @@ $('field').addEventListener('pointerdown', (e) => {
   refresh();
 });
 
-/* ---------- RAQIB UZILISHI ---------- */
+/* ---------- ҚАРСЫЛАСПЕН БАЙЛАНЫС ---------- */
 
 function showAway(m) {
   clearInterval(S.awayTimer);
@@ -1098,7 +1098,7 @@ function showAway(m) {
 
   const upd = () => {
     el.textContent =
-      `Raqib aloqadan uzildi. ${n} soniyada qaytmasa, g‘alaba sizga beriladi.`;
+      `Қарсыласпен байланыс үзілді. ${n} секунд ішінде оралмаса, жеңіс сізге беріледі.`;
   };
 
   upd();
@@ -1114,7 +1114,7 @@ function showAway(m) {
   haptic('medium');
 }
 
-/* ---------- CHAT ---------- */
+/* ---------- ЧАТ ---------- */
 
 function addChat(m, silent) {
   if (!S.g) return;
@@ -1186,7 +1186,7 @@ $('chatInput').addEventListener('keydown', (e) => {
   if (e.key === 'Enter') sendChat();
 });
 
-/* ---------- TUGMALAR ---------- */
+/* ---------- БАТЫРМАЛАР ---------- */
 
 $('btnBatl').onclick = () => {
   if (!S.searching) {
@@ -1227,10 +1227,10 @@ $('btnResign').onclick = () => {
 
   if (tg && tg.showConfirm) {
     tg.showConfirm(
-      'Haqiqatan ham taslim bo‘lasizmi?',
+      'Шынымен берілгіңіз келе ме?',
       (ok) => ok && go()
     );
-  } else if (confirm('Haqiqatan ham taslim bo‘lasizmi?')) {
+  } else if (confirm('Шынымен берілгіңіз келе ме?')) {
     go();
   }
 
@@ -1260,7 +1260,7 @@ $('btnAgain').onclick = () => {
   send({ t: 'find' });
 };
 
-/* ---------- ISHGA TUSHIRISH ---------- */
+/* ---------- ІСКЕ ҚОСУ ---------- */
 
 connect();
 
