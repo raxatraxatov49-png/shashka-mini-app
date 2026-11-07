@@ -1,3 +1,4 @@
+
 'use strict';
 
 const http = require('http');
@@ -429,8 +430,7 @@ async function handleTelegramWebhook(req, res) {
     ) {
       const creatorId = String(message.from.id);
 
-      // Егер адам қазір топтық матчта болса,
-      // жаңа /game бөлмесін аша алмайды.
+      // Қазір топтық матчта жүрген адам жаңа ойын аша алмайды.
       if (groupPlayerRooms.has(creatorId)) {
         await telegramApi('sendMessage', {
           chat_id: message.chat.id,
@@ -456,6 +456,7 @@ async function handleTelegramWebhook(req, res) {
       const room = {
         code,
         chatId: message.chat.id,
+        commandMessageId: message.message_id,
         messageId: null,
         players: [],
         entered: new Set(),
@@ -849,6 +850,9 @@ function finish(g, winner, reason) {
   }
 
   if (g.groupInfo) {
+    const room = groupRooms.get(g.groupInfo.code);
+    const chatId = g.groupInfo.chatId;
+
     const winnerId = winner === 'w'
       ? g.p.w
       : winner === 'b'
@@ -863,7 +867,7 @@ function finish(g, winner, reason) {
 
     if (winnerUser) {
       resultText =
-        `🏆 ЖЕҢІМПАЗ: ${playerLink({
+        `🏆 <b>ЖЕҢІМПАЗ:</b> ${playerLink({
           id: winnerId,
           name: winnerUser.name,
           username: winnerUser.username || ''
@@ -871,22 +875,55 @@ function finish(g, winner, reason) {
 
       if (reason === 'timeout') {
         resultText += '\n⏰ Қарсыласының уақыты аяқталды.';
+      } else if (reason === 'resign') {
+        resultText += '\n🏁 Қарсыласы ойынды тоқтатты.';
       }
     } else {
       resultText = '🤝 Ойын тең аяқталды!';
     }
 
-    telegramApi('sendMessage', {
-      chat_id: g.groupInfo.chatId,
-      text:
-        '♟️ <b>ШАШКА ОЙЫНЫ АЯҚТАЛДЫ!</b>\n\n' +
-        resultText,
-      parse_mode: 'HTML'
-    }).catch(err => {
-      console.error('Group result error:', err.message);
-    });
+    // Ескі топ хабарламаларының ID-лерін сақтау.
+    const oldMessageIds = room
+      ? [...new Set([
+          room.commandMessageId,
+          room.messageId
+        ].filter(Boolean))]
+      : [];
 
+    // Бөлмені тазалау.
     cleanupGroupRoom(g.groupInfo.code);
+
+    // Ескі хабарламаларды өшіріп, жеңімпазды жариялау.
+    (async () => {
+      for (const messageId of oldMessageIds) {
+        try {
+          await telegramApi('deleteMessage', {
+            chat_id: chatId,
+            message_id: messageId
+          });
+        } catch (error) {
+          console.error(
+            'Old group message delete:',
+            error.message
+          );
+        }
+      }
+
+      try {
+        await telegramApi('sendMessage', {
+          chat_id: chatId,
+          text:
+            '♟️ <b>ШАШКА ОЙЫНЫ АЯҚТАЛДЫ!</b>\n\n' +
+            resultText,
+          parse_mode: 'HTML'
+        });
+      } catch (error) {
+        console.error(
+          'Group result error:',
+          error.message
+        );
+      }
+    })();
   }
 }
 
@@ -981,7 +1018,6 @@ function joinGroupGame(u, token) {
 
   clearTimeout(room.timer);
 
-  // Таймер екі ойыншы да қосылғаннан кейін ғана басталады.
   startTurnTimer(g);
 
   send(first, gameState(g, first.id));
@@ -1343,7 +1379,6 @@ function onAuth(ws, m) {
         });
       }
 
-      // Қайта қосылғанда таймер жаңадан басталмайды.
       sendTurnTimer(g);
     }
   } else {
