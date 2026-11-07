@@ -1,11 +1,11 @@
 
 <!doctype html>
-<html lang="uz">
+<html lang="kk">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <meta name="theme-color" content="#efe3cf">
-<title>Shashka</title>
+<title>Дойбы</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <link rel="stylesheet" href="style.css">
 </head>
@@ -14,27 +14,27 @@
 <main id="menu" class="screen active">
   <header class="who">
     <div class="ava" id="meAva"></div>
-    <div><b id="meName">…</b><small>Shashka o‘yinchisi</small></div>
+    <div><b id="meName">…</b><small>Дойбы ойыншысы</small></div>
   </header>
 
-  <h1>Shashka</h1>
+  <h1>Дойбы</h1>
 
   <section class="card brown">
-    <h2>Tasodifiy raqib</h2>
-    <p>Hozir qidirayotgan o‘yinchi bilan bellashing</p>
-    <button id="btnBatl" class="batl">BATL</button>
-    <button id="btnCancel" class="ghost hidden">Bekor qilish</button>
+    <h2>Кездейсоқ қарсылас</h2>
+    <p>Қазір қарсылас іздеп жүрген ойыншымен ойнаңыз</p>
+    <button id="btnBatl" class="batl">ОЙНАУ</button>
+    <button id="btnCancel" class="ghost hidden">Бас тарту</button>
   </section>
 
   <section class="card brown friend-card">
-    <h2>Do‘st bilan o‘ynash</h2>
-    <p>Do‘stingizga taklif havolasini yuboring va birga shashka o‘ynang</p>
-    <button id="btnFriend" class="batl">DO‘ST BILAN O‘YNASH</button>
+    <h2>Досыңмен ойнау</h2>
+    <p>Досыңа шақыру сілтемесін жіберіп, бірге дойбы ойна</p>
+    <button id="btnFriend" class="batl">ДОСЫҢМЕН ОЙНАУ</button>
   </section>
 </main>
 
 <main id="game" class="screen">
-  <div class="gtitle">Klassik stol</div>
+  <div class="gtitle">Классикалық тақта</div>
 
   <div class="prow" id="rowOpp">
     <div class="ava ring" id="oppAva"></div>
@@ -58,8 +58,8 @@
   </div>
 
   <nav class="dock">
-    <button id="btnMenu"><svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></svg>Menyu</button>
-    <button id="btnChat"><svg viewBox="0 0 24 24"><path d="M4 5h16v11H9l-5 4z"/></svg>Chat<span id="badge" class="badge hidden">0</span></button>
+    <button id="btnMenu"><svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></svg>Мәзір</button>
+    <button id="btnChat"><svg viewBox="0 0 24 24"><path d="M4 5h16v11H9l-5 4z"/></svg>Чат<span id="badge" class="badge hidden">0</span></button>
   </nav>
 
   <div id="away" class="away hidden"></div>
@@ -68,40 +68,40 @@
 <div id="sheetInvite" class="sheet hidden">
   <div class="panel">
     <div class="phead">
-      <b>Do‘stni taklif qilish</b>
-      <button id="btnCloseInvite" class="x" aria-label="Yopish">×</button>
+      <b>Досыңды шақыру</b>
+      <button id="btnCloseInvite" class="x" aria-label="Жабу">×</button>
     </div>
 
-    <p id="inviteStatus">Taklif havolasi tayyorlanmoqda...</p>
+    <p id="inviteStatus">Шақыру сілтемесі дайындалуда...</p>
 
     <input
       id="inviteLink"
       type="text"
       readonly
-      placeholder="Taklif havolasi"
+      placeholder="Шақыру сілтемесі"
       autocomplete="off"
     >
 
-    <button id="btnCopyInvite" class="batl" disabled>Havolani nusxalash</button>
-    <button id="btnShareInvite" class="batl" disabled>Telegram orqali yuborish</button>
-    <button id="btnCancelInvite" class="ghost">Taklifni bekor qilish</button>
+    <button id="btnCopyInvite" class="batl" disabled>Сілтемені көшіру</button>
+    <button id="btnShareInvite" class="batl" disabled>Telegram арқылы жіберу</button>
+    <button id="btnCancelInvite" class="ghost">Шақырудан бас тарту</button>
   </div>
 </div>
 
 <div id="sheetMenu" class="sheet hidden">
   <div class="panel small">
-    <button id="btnResign" class="danger">Taslim bo‘lish</button>
-    <button id="btnCloseMenu" class="ghost">Yopish</button>
+    <button id="btnResign" class="danger">Берілeмін</button>
+    <button id="btnCloseMenu" class="ghost">Жабу</button>
   </div>
 </div>
 
 <div id="sheetChat" class="sheet hidden">
   <div class="panel">
-    <div class="phead"><b>Chat</b><button id="btnCloseChat" class="x" aria-label="Yopish">×</button></div>
+    <div class="phead"><b>Чат</b><button id="btnCloseChat" class="x" aria-label="Жабу">×</button></div>
     <div id="msgs" class="msgs"></div>
     <div class="compose">
-      <input id="chatInput" maxlength="300" placeholder="Xabar yozing…" autocomplete="off" enterkeyhint="send">
-      <button id="btnSend" aria-label="Yuborish"><svg viewBox="0 0 24 24"><path d="M3 11l18-8-8 18-2-8z"/></svg></button>
+      <input id="chatInput" maxlength="300" placeholder="Хабарлама жазыңыз…" autocomplete="off" enterkeyhint="send">
+      <button id="btnSend" aria-label="Жіберу"><svg viewBox="0 0 24 24"><path d="M3 11l18-8-8 18-2-8z"/></svg></button>
     </div>
   </div>
 </div>
@@ -111,12 +111,12 @@
     <div id="resEmoji" class="emoji"></div>
     <h3 id="resTitle"></h3>
     <p id="resSub"></p>
-    <button id="btnAgain" class="batl">Yana o‘ynash</button>
-    <button id="btnToMenu" class="ghost">Bosh menyu</button>
+    <button id="btnAgain" class="batl">Қайта ойнау</button>
+    <button id="btnToMenu" class="ghost">Басты мәзір</button>
   </div>
 </div>
 
-<div id="conn" class="conn hidden">Aloqa uzildi. Qayta ulanmoqda…</div>
+<div id="conn" class="conn hidden">Байланыс үзілді. Қайта қосылуда…</div>
 <div id="fatal" class="modal hidden"><div class="dialog"><h3 id="fatalTitle"></h3><p id="fatalSub"></p></div></div>
 
 <script src="app.js"></script>
