@@ -1,4 +1,3 @@
-
 'use strict';
 
 const http = require('http');
@@ -15,8 +14,10 @@ const DEV = process.env.DEV === '1';
 const GRACE = Number(process.env.GRACE_SECONDS) || 30;
 const PUBLIC = path.join(__dirname, 'public');
 const INVITE_TTL = 10 * 60 * 1000;
+const GROUP_TTL = 10 * 60 * 1000;
 
 const WEBHOOK_URL = 'https://shashka-mini-app.onrender.com/telegram-webhook';
+const MINI_APP_LINK = 'https://t.me/shashkaoyinibot?startapp=';
 
 const WEBHOOK_SECRET = crypto
   .createHash('sha256')
@@ -25,7 +26,7 @@ const WEBHOOK_SECRET = crypto
   .slice(0, 32);
 
 if (!BOT_TOKEN && !DEV) {
-  console.error('BOT_TOKEN o‘rnatilmagan. Telegram bot tokenini BOT_TOKEN muhit o‘zgaruvchisiga yozing.');
+  console.error('BOT_TOKEN o‘rnatilmagan.');
   process.exit(1);
 }
 
@@ -57,6 +58,10 @@ async function telegramApi(method, data) {
   return result;
 }
 
+/* ---------- Telegram webhook ---------- */
+
+const groupRooms = new Map();
+
 async function handleTelegramWebhook(req, res) {
   if (
     req.headers['x-telegram-bot-api-secret-token'] !== WEBHOOK_SECRET
@@ -80,25 +85,69 @@ async function handleTelegramWebhook(req, res) {
     const update = JSON.parse(body);
     const message = update.message;
 
+    if (!message || typeof message.text !== 'string') {
+      res.writeHead(200);
+      return res.end('ok');
+    }
+
+    // Guruhda /game komandasi
     if (
-      message &&
-      typeof message.text === 'string' &&
-      /^\/start(?:@\w+)?(?:\s|$)/.test(message.text)
+      /^\/game(?:@\w+)?(?:\s|$)/.test(message.text) &&
+      ['group', 'supergroup'].includes(message.chat.type)
+    ) {
+      const code = crypto.randomBytes(6).toString('hex');
+
+      const room = {
+        code,
+        chatId: message.chat.id,
+        players: [],
+        timer: null
+      };
+
+      room.timer = setTimeout(() => {
+        groupRooms.delete(code);
+      }, GROUP_TTL);
+
+      if (room.timer.unref) room.timer.unref();
+
+      groupRooms.set(code, room);
+
+      await telegramApi('sendMessage', {
+        chat_id: message.chat.id,
+        text:
+          '♟️ ШАШКА ОЙЫНЫ\n\n' +
+          'Екі ойыншы қосылсын!\n' +
+          'Ойынды бастау үшін төмендегі батырманы басыңыз.',
+        reply_markup: {
+          inline_keyboard: [[
+            {
+              text: '♟️ ШАШКА ОЙНАУ',
+              url: MINI_APP_LINK + 'group_' + code
+            }
+          ]]
+        }
+      });
+    }
+
+    // Жеке чатта /start
+    if (
+      /^\/start(?:@\w+)?(?:\s|$)/.test(message.text) &&
+      message.chat.type === 'private'
     ) {
       await telegramApi('sendMessage', {
         chat_id: message.chat.id,
-        text: '♟ Қош келдіңіз!\n\nШашка ойынын бастаңыз және қарсыластарыңызды жеңіңіз! 🎮',
+        text:
+          '♟ Қош келдіңіз!\n\n' +
+          'Шашка ойынын бастаңыз және қарсыластарыңызды жеңіңіз! 🎮',
         reply_markup: {
-          inline_keyboard: [
-            [
-              {
-                text: 'БАСТАУ',
-                web_app: {
-                  url: 'https://shashka-mini-app.onrender.com'
-                }
+          inline_keyboard: [[
+            {
+              text: 'БАСТАУ',
+              web_app: {
+                url: 'https://shashka-mini-app.onrender.com'
               }
-            ]
-          ]
+            }
+          ]]
         }
       });
     }
@@ -116,12 +165,11 @@ async function setupTelegramWebhook() {
   if (!BOT_TOKEN || DEV) return;
 
   try {
-    // Guruhlar uchun /game komandasini chiqarish
     await telegramApi('setMyCommands', {
       commands: [
         {
           command: 'game',
-          description: 'O‘yin yaratish'
+          description: 'Shashka o‘yinini yaratish'
         }
       ],
       scope: {
@@ -131,7 +179,6 @@ async function setupTelegramWebhook() {
 
     console.log('Telegram /game komandasi sozlandi');
 
-    // Webhook sozlash
     const result = await telegramApi('setWebhook', {
       url: WEBHOOK_URL,
       secret_token: WEBHOOK_SECRET,
@@ -143,6 +190,8 @@ async function setupTelegramWebhook() {
     console.error('Telegram setup error:', error.message);
   }
 }
+
+/* ---------- HTTP server ---------- */
 
 const server = http.createServer((req, res) => {
   const url = decodeURIComponent((req.url || '/').split('?')[0]);
@@ -179,6 +228,8 @@ const server = http.createServer((req, res) => {
   });
 });
 
+/* ---------- WebSocket ---------- */
+
 const wss = new WebSocketServer({
   server,
   path: '/ws',
@@ -206,7 +257,11 @@ const pub = (u) => ({
 
 const legalList = (g, side) =>
   g.st.turn === side && !g.st.over
-    ? G.legalMoves(g.st).map(({ from, to, cap }) => ({ from, to, cap }))
+    ? G.legalMoves(g.st).map(({ from, to, cap }) => ({
+        from,
+        to,
+        cap
+      }))
     : [];
 
 const sideOfUser = (g, id) =>
@@ -253,7 +308,9 @@ function removeUserInvite(userId) {
   if (code) removeInvite(code);
 }
 
-function startGame(a, b) {
+/* ---------- O‘yinni boshlash ---------- */
+
+function startGame(a, b, groupInfo = null) {
   dequeue(a.id);
   dequeue(b.id);
 
@@ -266,11 +323,15 @@ function startGame(a, b) {
 
   const g = {
     id: 'g' + ++gameSeq,
-    p: { w: w.id, b: bl.id },
+    p: {
+      w: w.id,
+      b: bl.id
+    },
     st: G.newGame(),
     chat: [],
     timers: {},
-    lastChat: {}
+    lastChat: {},
+    groupInfo
   };
 
   games.set(g.id, g);
@@ -279,6 +340,8 @@ function startGame(a, b) {
   send(a, gameState(g, a.id));
   send(b, gameState(g, b.id));
 }
+
+/* ---------- O‘yinni tugatish ---------- */
 
 function finish(g, winner, reason) {
   if (!games.has(g.id)) return;
@@ -291,6 +354,7 @@ function finish(g, winner, reason) {
 
     if (u) {
       u.game = null;
+
       send(u, {
         t: 'over',
         result: winner || 'draw',
@@ -299,11 +363,130 @@ function finish(g, winner, reason) {
       });
     }
   }
+
+  // Guruhda жеңімпазды жариялау
+  if (g.groupInfo) {
+    const winnerId = winner === 'w'
+      ? g.p.w
+      : winner === 'b'
+        ? g.p.b
+        : null;
+
+    const winnerUser = winnerId
+      ? users.get(winnerId)
+      : null;
+
+    const resultText = winnerUser
+      ? `🏆 ЖЕҢІМПАЗ: ${winnerUser.name}`
+      : '🤝 Ойын тең аяқталды!';
+
+    telegramApi('sendMessage', {
+      chat_id: g.groupInfo.chatId,
+      text:
+        '♟️ ШАШКА ОЙЫНЫ АЯҚТАЛДЫ!\n\n' +
+        resultText
+    }).catch((err) => {
+      console.error('Group result error:', err.message);
+    });
+  }
 }
+
+/* ---------- Guruh o‘yiniga qo‘shilish ---------- */
+
+function joinGroupGame(u, code) {
+  if (
+    typeof code !== 'string' ||
+    !/^[a-f0-9]{12}$/.test(code)
+  ) {
+    return send(u, {
+      t: 'group_error',
+      code: 'invalid'
+    });
+  }
+
+  if (u.game && games.has(u.game)) {
+    return send(u, {
+      t: 'group_error',
+      code: 'busy'
+    });
+  }
+
+  const room = groupRooms.get(code);
+
+  if (!room) {
+    return send(u, {
+      t: 'group_error',
+      code: 'expired'
+    });
+  }
+
+  if (room.players.includes(u.id)) {
+    return send(u, {
+      t: 'group_waiting',
+      count: room.players.length
+    });
+  }
+
+  if (room.players.length >= 2) {
+    return send(u, {
+      t: 'group_error',
+      code: 'full'
+    });
+  }
+
+  room.players.push(u.id);
+  dequeue(u.id);
+  removeUserInvite(u.id);
+
+  if (room.players.length === 1) {
+    return send(u, {
+      t: 'group_waiting',
+      count: 1
+    });
+  }
+
+  const first = users.get(room.players[0]);
+
+  if (!first || !first.ws || first.ws.readyState !== 1) {
+    room.players = [u.id];
+
+    return send(u, {
+      t: 'group_waiting',
+      count: 1
+    });
+  }
+
+  if (first.game && games.has(first.game)) {
+    clearTimeout(room.timer);
+    groupRooms.delete(code);
+
+    return send(u, {
+      t: 'group_error',
+      code: 'busy'
+    });
+  }
+
+  clearTimeout(room.timer);
+  groupRooms.delete(code);
+
+  send(first, {
+    t: 'group_waiting',
+    count: 2
+  });
+
+  startGame(first, u, {
+    chatId: room.chatId
+  });
+}
+
+/* ---------- Do‘st bilan o‘ynash ---------- */
 
 function createInvite(u) {
   if (u.game && games.has(u.game)) {
-    return send(u, { t: 'error', code: 'busy' });
+    return send(u, {
+      t: 'error',
+      code: 'busy'
+    });
   }
 
   const existing = userInvites.get(u.id);
@@ -328,6 +511,7 @@ function createInvite(u) {
 
   invite.timer = setTimeout(() => {
     removeInvite(code);
+
     send(users.get(u.id), {
       t: 'invite_expired',
       code
@@ -347,52 +531,85 @@ function createInvite(u) {
 }
 
 function joinInvite(u, code) {
-  if (typeof code !== 'string' || !/^[a-f0-9]{12}$/.test(code)) {
-    return send(u, { t: 'error', code: 'invite_invalid' });
+  if (
+    typeof code !== 'string' ||
+    !/^[a-f0-9]{12}$/.test(code)
+  ) {
+    return send(u, {
+      t: 'error',
+      code: 'invite_invalid'
+    });
   }
 
   if (u.game && games.has(u.game)) {
-    return send(u, { t: 'error', code: 'busy' });
+    return send(u, {
+      t: 'error',
+      code: 'busy'
+    });
   }
 
   const invite = invites.get(code);
 
   if (!invite) {
-    return send(u, { t: 'error', code: 'invite_expired' });
+    return send(u, {
+      t: 'error',
+      code: 'invite_expired'
+    });
   }
 
   if (invite.ownerId === u.id) {
-    return send(u, { t: 'error', code: 'invite_self' });
+    return send(u, {
+      t: 'error',
+      code: 'invite_self'
+    });
   }
 
   const owner = users.get(invite.ownerId);
 
   if (!owner || !owner.ws || owner.ws.readyState !== 1) {
     removeInvite(code);
-    return send(u, { t: 'error', code: 'invite_expired' });
+
+    return send(u, {
+      t: 'error',
+      code: 'invite_expired'
+    });
   }
 
   if (owner.game && games.has(owner.game)) {
     removeInvite(code);
-    return send(u, { t: 'error', code: 'busy' });
+
+    return send(u, {
+      t: 'error',
+      code: 'busy'
+    });
   }
 
   removeInvite(code);
   dequeue(u.id);
 
-  send(owner, { t: 'invite_joined' });
+  send(owner, {
+    t: 'invite_joined'
+  });
+
   startGame(owner, u);
 }
 
+/* ---------- Xabarlarni boshqarish ---------- */
+
 function handle(u, m) {
   switch (m.t) {
+    case 'group_join':
+      return joinGroupGame(u, m.code);
+
     case 'find': {
       if (u.game && games.has(u.game)) {
         return send(u, gameState(games.get(u.game), u.id));
       }
 
       if (queue.includes(u.id)) {
-        return send(u, { t: 'searching' });
+        return send(u, {
+          t: 'searching'
+        });
       }
 
       queue = queue.filter((id) => {
@@ -404,11 +621,17 @@ function handle(u, m) {
 
       if (oppId) {
         const opp = users.get(oppId);
-        if (opp && !opp.game) return startGame(opp, u);
+
+        if (opp && !opp.game) {
+          return startGame(opp, u);
+        }
       }
 
       queue.push(u.id);
-      return send(u, { t: 'searching' });
+
+      return send(u, {
+        t: 'searching'
+      });
     }
 
     case 'cancel':
@@ -423,12 +646,18 @@ function handle(u, m) {
 
     case 'invite_cancel':
       removeUserInvite(u.id);
-      return send(u, { t: 'invite_cancelled' });
+      return send(u, {
+        t: 'invite_cancelled'
+      });
 
     case 'move': {
       const g = games.get(u.game);
 
-      if (!g || !Number.isInteger(m.from) || !Number.isInteger(m.to)) {
+      if (
+        !g ||
+        !Number.isInteger(m.from) ||
+        !Number.isInteger(m.to)
+      ) {
         return;
       }
 
@@ -471,7 +700,11 @@ function handle(u, m) {
       const g = games.get(u.game);
 
       if (g) {
-        finish(g, G.other(sideOfUser(g, u.id)), 'resign');
+        finish(
+          g,
+          G.other(sideOfUser(g, u.id)),
+          'resign'
+        );
       }
 
       return;
@@ -500,7 +733,10 @@ function handle(u, m) {
       };
 
       g.chat.push(msg);
-      if (g.chat.length > 100) g.chat.shift();
+
+      if (g.chat.length > 100) {
+        g.chat.shift();
+      }
 
       for (const id of [g.p.w, g.p.b]) {
         send(users.get(id), msg);
@@ -510,6 +746,8 @@ function handle(u, m) {
     }
   }
 }
+
+/* ---------- Telegram foydalanuvchisini tekshirish ---------- */
 
 function onAuth(ws, m) {
   let info = null;
@@ -525,7 +763,11 @@ function onAuth(ws, m) {
   }
 
   if (!info) {
-    ws.send(JSON.stringify({ t: 'error', code: 'auth' }));
+    ws.send(JSON.stringify({
+      t: 'error',
+      code: 'auth'
+    }));
+
     return ws.close();
   }
 
@@ -537,14 +779,21 @@ function onAuth(ws, m) {
   }
 
   if (!u) {
-    u = { id: info.id, game: null };
+    u = {
+      id: info.id,
+      game: null
+    };
+
     users.set(info.id, u);
   }
 
   Object.assign(u, info, { ws });
   ws.user = u;
 
-  send(u, { t: 'hello', me: pub(u) });
+  send(u, {
+    t: 'hello',
+    me: pub(u)
+  });
 
   const g = u.game && games.get(u.game);
 
@@ -554,17 +803,28 @@ function onAuth(ws, m) {
 
     send(u, gameState(g, u.id));
 
-    const opp = users.get(g.p[G.other(sideOfUser(g, u.id))]);
+    const opp = users.get(
+      g.p[G.other(sideOfUser(g, u.id))]
+    );
 
-    send(opp, { t: 'away', left: false });
+    send(opp, {
+      t: 'away',
+      left: false
+    });
 
     if (g.timers[opp.id]) {
-      send(u, { t: 'away', left: true, seconds: GRACE });
+      send(u, {
+        t: 'away',
+        left: true,
+        seconds: GRACE
+      });
     }
   } else {
     u.game = null;
   }
 }
+
+/* ---------- WebSocket ulanishi ---------- */
 
 wss.on('connection', (ws) => {
   ws.isAlive = true;
@@ -589,7 +849,9 @@ wss.on('connection', (ws) => {
     if (!m || typeof m.t !== 'string') return;
 
     if (!ws.user) {
-      return m.t === 'auth' ? onAuth(ws, m) : undefined;
+      return m.t === 'auth'
+        ? onAuth(ws, m)
+        : undefined;
     }
 
     if (ws.user.ws !== ws) return;
@@ -614,11 +876,14 @@ wss.on('connection', (ws) => {
 
     const side = sideOfUser(g, u.id);
 
-    send(users.get(g.p[G.other(side)]), {
-      t: 'away',
-      left: true,
-      seconds: GRACE
-    });
+    send(
+      users.get(g.p[G.other(side)]),
+      {
+        t: 'away',
+        left: true,
+        seconds: GRACE
+      }
+    );
 
     g.timers[u.id] = setTimeout(() => {
       finish(g, G.other(side), 'left');
@@ -628,16 +893,23 @@ wss.on('connection', (ws) => {
 
 setInterval(() => {
   wss.clients.forEach((ws) => {
-    if (!ws.isAlive) return ws.terminate();
+    if (!ws.isAlive) {
+      return ws.terminate();
+    }
 
     ws.isAlive = false;
     ws.ping();
   });
 }, 15000).unref();
 
+/* ---------- Serverni ishga tushirish ---------- */
+
 if (require.main === module) {
   server.listen(PORT, () => {
-    console.log(`Shashka server: http://localhost:${PORT}${DEV ? '  (DEV rejim)' : ''}`);
+    console.log(
+      `Shashka server: http://localhost:${PORT}${DEV ? ' (DEV rejim)' : ''}`
+    );
+
     setupTelegramWebhook();
   });
 }
@@ -646,5 +918,6 @@ module.exports = {
   server,
   games,
   users,
-  invites
+  invites,
+  groupRooms
 };
