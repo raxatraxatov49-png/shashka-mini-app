@@ -167,10 +167,6 @@ async function updateGroupRoom(room) {
   });
 }
 
-/*
- * Ескі хабарламаны өшіріп,
- * топқа жаңадан ойын басталғаны туралы хабарлама жібереді.
- */
 async function replaceGroupRoomMessage(room) {
   if (!room) return;
 
@@ -610,6 +606,25 @@ async function handleGroupCallback(query) {
   return true;
 }
 
+/* ---------- Топқа қосылғандағы сәлемдесу ---------- */
+
+async function sendGroupWelcome(chatId) {
+  const text =
+    '♟️ <b>Сәлеметсіздер ме!</b>\n\n' +
+    'Мен — Шашка ойынының ботымын! 🎮\n\n' +
+    'Енді осы топта достарыңызбен шашка ойнай аласыздар.\n\n' +
+    '🎯 Ойынды бастау үшін:\n' +
+    '<b>/game</b> командасын жазыңыз.\n\n' +
+    '👥 Екі ойыншы қосылып, ойын басталады!\n\n' +
+    'Жеңіске жеткен ойыншыны анықтаймыз. Сәтті ойын! 🏆';
+
+  await telegramApi('sendMessage', {
+    chat_id: chatId,
+    text,
+    parse_mode: 'HTML'
+  });
+}
+
 /* ---------- Telegram webhook ---------- */
 
 async function handleTelegramWebhook(req, res) {
@@ -643,7 +658,28 @@ async function handleTelegramWebhook(req, res) {
 
     const message = update.message;
 
-    if (!message || typeof message.text !== 'string') {
+    if (!message) {
+      res.writeHead(200);
+      return res.end('ok');
+    }
+
+    // Бот топқа немесе супертопқа қосылған сәт
+    if (
+      ['group', 'supergroup'].includes(message.chat.type) &&
+      Array.isArray(message.new_chat_members)
+    ) {
+      const botId = BOT_TOKEN.split(':')[0];
+
+      const botWasAdded = message.new_chat_members.some(
+        member => member.is_bot && String(member.id) === botId
+      );
+
+      if (botWasAdded) {
+        await sendGroupWelcome(message.chat.id);
+      }
+    }
+
+    if (typeof message.text !== 'string') {
       res.writeHead(200);
       return res.end('ok');
     }
@@ -1110,7 +1146,6 @@ function startGroupMatch(room, g) {
   send(first, { t: 'group_started' });
   send(second, { t: 'group_started' });
 
-  // Ескі хабарлама өшіріліп, жаңа хабарлама жіберіледі.
   replaceGroupRoomMessage(room).catch(error => {
     console.error('Ойын басталғандағы хабарлама қатесі:', error.message);
   });
