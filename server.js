@@ -14,11 +14,15 @@ const BOT_TOKEN = process.env.BOT_TOKEN || '';
 const DEV = process.env.DEV === '1';
 const GRACE = Number(process.env.GRACE_SECONDS) || 30;
 const PUBLIC = path.join(__dirname, 'public');
+
 const INVITE_TTL = 10 * 60 * 1000;
 const GROUP_TTL = 10 * 60 * 1000;
 
 const TURN_SECONDS = 60;
 const TURN_MS = TURN_SECONDS * 1000;
+
+const GROUP_WAIT_SECONDS = 90;
+const GROUP_WAIT_MS = GROUP_WAIT_SECONDS * 1000;
 
 const WEBHOOK_URL = 'https://shashka-mini-app.onrender.com/telegram-webhook';
 const MINI_APP_LINK = 'https://t.me/shashkaoyinibot?startapp=';
@@ -127,7 +131,7 @@ function roomText(room) {
     text += '\nЕкінші ойыншыны күтеміз...';
   } else if (!room.started) {
     text += '\n\n🎮 Екі ойыншы да ойынға кірсін.';
-    text += '\nБірінші ойыншы тақтаны бірден көреді.';
+    text += '\nБірінші кірген ойыншы 90 секунд күтеді.';
   } else {
     text += '\n\n♟️ Ойын басталды! Сәттілік!';
   }
@@ -171,7 +175,6 @@ async function updateGroupRoom(room) {
   });
 }
 
-// Ескі топ хабарламасын өшіріп, жаңа ойын хабарламасын қалдырады.
 async function replaceGroupRoomMessage(room) {
   if (!room) return;
 
@@ -228,7 +231,7 @@ const pub = (u) => ({
 });
 
 const sideOfUser = (g, id) =>
-  g.p.w === id ? 'w' : 'b';
+  g.p.w === String(id) ? 'w' : 'b';
 
 const legalList = (g, side) =>
   g.st.turn === side && !g.st.over && !g.waitingForOpponent
@@ -239,6 +242,163 @@ const legalList = (g, side) =>
       }))
     : [];
 
+/* ---------- Timer funksiyalari ---------- */
+
+function clearTurnTimer(g) {
+  if (!g) return;
+
+  if (g.turnTimer) clearTimeout(g.turnTimer);
+
+  g.turnTimer = null;
+  g.turnDeadline = null;
+  g.turnTimerSide = null;
+}
+
+function clearGroupWaitingTimer(room) {
+  if (!room) return;
+
+  if (room.waitingTimer) {
+    clearTimeout(room.waitingTimer);
+  }
+
+  room.waitingTimer = null;
+  room.waitingDeadline = null;
+}
+
+function sendGroupWaiting(room) {
+  if (!room || !room.waitingDeadline || room.started) return;
+
+  const remaining = Math.max(
+    0,
+    Math.ceil((room.waitingDeadline - Date.now()) / 1000)
+  );
+
+  const message = {
+    t: 'group_waiting',
+    count: room.connected.size,
+    seconds: remaining,
+    deadline: room.waitingDeadline,
+    message: 'Қарсыластың кіруін күтіңіз...'
+  };
+
+  for (const id of room.connected) {
+    send(users.get(id), message);
+  }
+}
+
+function startGroupWaitingTimer(room, g, firstPlayerId) {
+  if (
+    !room ||
+    !g ||
+    room.started ||
+    !g.waitingForOpponent ||
+    room.waitingTimer
+  ) return;
+
+  room.firstConnectedId = String(firstPlayerId);
+  room.waitingDeadline = Date.now() + GROUP_WAIT_MS;
+
+  sendGroupWaiting(room);
+
+  const deadline = room.waitingDeadline;
+
+  const check = () => {
+    if (
+      !groupRooms.has(room.code) ||
+      !games.has(g.id) ||
+      room.started ||
+      !g.waitingForOpponent ||
+      room.waitingDeadline !== deadline
+    ) return;
+
+    const remaining = deadline - Date.now();
+
+    if (remaining > 0) {
+      room.waitingTimer = setTimeout(check, remaining);
+      if (room.waitingTimer.unref) room.waitingTimer.unref();
+      return;
+    }
+
+    room.waitingTimer = null;
+
+    // Қарсылас уақытында кірмесе, бірінші кірген ойыншы жеңеді.
+    if (room.connected.size < 2) {
+      const winnerSide = sideOfUser(g, room.firstConnectedId);
+      finish(g, winnerSide, 'opponent_timeout');
+    }
+  };
+
+  room.waitingTimer = setTimeout(check, GROUP_WAIT_MS);
+
+  if (room.waitingTimer.unref) room.waitingTimer.unref();
+}
+
+function sendTurnTimer(g) {
+  if (
+    !g ||
+    !games.has(g.id) ||
+    g.waitingForOpponent ||
+    g.st.over ||
+    !g.turnDeadline
+  ) return;
+
+  const remaining = Math.max(
+    0,
+    Math.ceil((g.turnDeadline - Date.now()) / 1000)
+  );
+
+  const message = {
+    t: 'turn_timer',
+    side: g.turnTimerSide,
+    seconds: remaining,
+    deadline: g.turnDeadline
+  };
+
+  send(users.get(g.p.w), message);
+  send(users.get(g.p.b), message);
+}
+
+function startTurnTimer(g) {
+  if (!g || !games.has(g.id)) return;
+
+  clearTurnTimer(g);
+
+  if (g.waitingForOpponent || g.st.over) return;
+
+  const side = g.st.turn;
+  const deadline = Date.now() + TURN_MS;
+
+  g.turnTimerSide = side;
+  g.turnDeadline = deadline;
+
+  sendTurnTimer(g);
+
+  const checkTimeout = () => {
+    if (!games.has(g.id)) return;
+    if (g.waitingForOpponent || g.st.over) return;
+
+    if (
+      g.st.turn !== side ||
+      g.turnTimerSide !== side ||
+      g.turnDeadline !== deadline
+    ) return;
+
+    const remaining = deadline - Date.now();
+
+    if (remaining > 0) {
+      g.turnTimer = setTimeout(checkTimeout, remaining);
+      if (g.turnTimer.unref) g.turnTimer.unref();
+      return;
+    }
+
+    finish(g, G.other(side), 'timeout');
+  };
+
+  g.turnTimer = setTimeout(checkTimeout, TURN_MS);
+
+  if (g.turnTimer.unref) g.turnTimer.unref();
+}
+
 /* ---------- Guruhni tozalash ---------- */
 
 function cleanupGroupRoom(code) {
@@ -246,6 +406,7 @@ function cleanupGroupRoom(code) {
   if (!room) return;
 
   clearTimeout(room.timer);
+  clearGroupWaitingTimer(room);
 
   if (room.pendingGame && games.has(room.pendingGame.id)) {
     const pending = room.pendingGame;
@@ -422,15 +583,12 @@ async function handleTelegramWebhook(req, res) {
       return res.end('ok');
     }
 
-    /* ---------- /game ---------- */
-
     if (
       /^\/game(?:@\w+)?(?:\s|$)/.test(message.text) &&
       ['group', 'supergroup'].includes(message.chat.type)
     ) {
       const creatorId = String(message.from.id);
 
-      // Қазір топтық матчта жүрген адам жаңа ойын аша алмайды.
       if (groupPlayerRooms.has(creatorId)) {
         await telegramApi('sendMessage', {
           chat_id: message.chat.id,
@@ -464,7 +622,12 @@ async function handleTelegramWebhook(req, res) {
         tokens: new Map(),
         pendingGame: null,
         started: false,
-        timer: null
+        timer: null,
+
+        // 90 секунд күту таймері
+        waitingTimer: null,
+        waitingDeadline: null,
+        firstConnectedId: null
       };
 
       room.timer = setTimeout(() => {
@@ -586,84 +749,6 @@ const wss = new WebSocketServer({
   path: '/ws',
   maxPayload: 4096
 });
-
-/* ---------- 60 sekund timer ---------- */
-
-function clearTurnTimer(g) {
-  if (!g) return;
-
-  if (g.turnTimer) clearTimeout(g.turnTimer);
-
-  g.turnTimer = null;
-  g.turnDeadline = null;
-  g.turnTimerSide = null;
-}
-
-function sendTurnTimer(g) {
-  if (
-    !g ||
-    !games.has(g.id) ||
-    g.waitingForOpponent ||
-    g.st.over ||
-    !g.turnDeadline
-  ) return;
-
-  const remaining = Math.max(
-    0,
-    Math.ceil((g.turnDeadline - Date.now()) / 1000)
-  );
-
-  const message = {
-    t: 'turn_timer',
-    side: g.turnTimerSide,
-    seconds: remaining,
-    deadline: g.turnDeadline
-  };
-
-  send(users.get(g.p.w), message);
-  send(users.get(g.p.b), message);
-}
-
-function startTurnTimer(g) {
-  if (!g || !games.has(g.id)) return;
-
-  clearTurnTimer(g);
-
-  if (g.waitingForOpponent || g.st.over) return;
-
-  const side = g.st.turn;
-  const deadline = Date.now() + TURN_MS;
-
-  g.turnTimerSide = side;
-  g.turnDeadline = deadline;
-
-  sendTurnTimer(g);
-
-  const checkTimeout = () => {
-    if (!games.has(g.id)) return;
-    if (g.waitingForOpponent || g.st.over) return;
-
-    if (
-      g.st.turn !== side ||
-      g.turnTimerSide !== side ||
-      g.turnDeadline !== deadline
-    ) return;
-
-    const remaining = deadline - Date.now();
-
-    if (remaining > 0) {
-      g.turnTimer = setTimeout(checkTimeout, remaining);
-      if (g.turnTimer.unref) g.turnTimer.unref();
-      return;
-    }
-
-    finish(g, G.other(side), 'timeout');
-  };
-
-  g.turnTimer = setTimeout(checkTimeout, TURN_MS);
-
-  if (g.turnTimer.unref) g.turnTimer.unref();
-}
 
 /* ---------- Game state ---------- */
 
@@ -874,15 +959,18 @@ function finish(g, winner, reason) {
         })}`;
 
       if (reason === 'timeout') {
-        resultText += '\n⏰ Қарсыласының уақыты аяқталды.';
+        resultText += '\n⏰ Қарсыласының жүріс уақыты аяқталды.';
+      } else if (reason === 'opponent_timeout') {
+        resultText += '\n⏰ Қарсыласы 1 минут 30 секунд ішінде ойынға кірмеді.';
       } else if (reason === 'resign') {
         resultText += '\n🏁 Қарсыласы ойынды тоқтатты.';
+      } else if (reason === 'left') {
+        resultText += '\n📴 Қарсыласының байланысы үзілді.';
       }
     } else {
       resultText = '🤝 Ойын тең аяқталды!';
     }
 
-    // Ескі топ хабарламаларының ID-лерін сақтау.
     const oldMessageIds = room
       ? [...new Set([
           room.commandMessageId,
@@ -890,10 +978,8 @@ function finish(g, winner, reason) {
         ].filter(Boolean))]
       : [];
 
-    // Бөлмені тазалау.
     cleanupGroupRoom(g.groupInfo.code);
 
-    // Ескі хабарламаларды өшіріп, жеңімпазды жариялау.
     (async () => {
       for (const messageId of oldMessageIds) {
         try {
@@ -928,6 +1014,40 @@ function finish(g, winner, reason) {
 }
 
 /* ---------- Guruh Mini App ulanishi ---------- */
+
+function startGroupMatch(room, g) {
+  if (!room || !g || room.started || !games.has(g.id)) return;
+
+  const first = users.get(String(room.players[0].id));
+  const second = users.get(String(room.players[1].id));
+
+  const bothConnected =
+    first && second &&
+    first.ws && first.ws.readyState === 1 &&
+    second.ws && second.ws.readyState === 1 &&
+    room.connected.has(String(first.id)) &&
+    room.connected.has(String(second.id));
+
+  if (!bothConnected) return;
+
+  room.started = true;
+  g.waitingForOpponent = false;
+
+  clearGroupWaitingTimer(room);
+  clearTimeout(room.timer);
+
+  startTurnTimer(g);
+
+  send(first, gameState(g, first.id));
+  send(second, gameState(g, second.id));
+
+  send(first, { t: 'group_started' });
+  send(second, { t: 'group_started' });
+
+  replaceGroupRoomMessage(room).catch(error => {
+    console.error('Started group message:', error.message);
+  });
+}
 
 function joinGroupGame(u, token) {
   if (
@@ -991,6 +1111,11 @@ function joinGroupGame(u, token) {
     g = createPendingGroupGame(room);
   }
 
+  // Кім бірінші қосылса, сол 90 секундтық таймердің жеңімпазы болады.
+  if (!room.firstConnectedId) {
+    room.firstConnectedId = String(u.id);
+  }
+
   const first = users.get(String(room.players[0].id));
   const second = users.get(String(room.players[1].id));
 
@@ -1001,34 +1126,42 @@ function joinGroupGame(u, token) {
     room.connected.has(String(first.id)) &&
     room.connected.has(String(second.id));
 
-  if (!bothConnected) {
-    send(u, gameState(g, u.id));
-
-    send(u, {
-      t: 'group_waiting',
-      count: room.connected.size,
-      message: 'Екінші ойыншының кіруін күтіңіз...'
-    });
-
+  if (bothConnected) {
+    startGroupMatch(room, g);
     return;
   }
 
-  room.started = true;
-  g.waitingForOpponent = false;
+  if (!room.waitingDeadline) {
+    startGroupWaitingTimer(room, g, room.firstConnectedId);
+  }
 
-  clearTimeout(room.timer);
+  send(u, gameState(g, u.id));
 
-  startTurnTimer(g);
-
-  send(first, gameState(g, first.id));
-  send(second, gameState(g, second.id));
-
-  send(first, { t: 'group_started' });
-  send(second, { t: 'group_started' });
-
-  replaceGroupRoomMessage(room).catch(error => {
-    console.error('Started group message:', error.message);
+  send(u, {
+    t: 'group_waiting',
+    count: room.connected.size,
+    seconds: Math.max(
+      0,
+      Math.ceil((room.waitingDeadline - Date.now()) / 1000)
+    ),
+    deadline: room.waitingDeadline,
+    message: 'Қарсыластың кіруін күтіңіз...'
   });
+
+  const firstConnected = users.get(room.firstConnectedId);
+
+  if (firstConnected && firstConnected.id !== u.id) {
+    send(firstConnected, {
+      t: 'group_waiting',
+      count: room.connected.size,
+      seconds: Math.max(
+        0,
+        Math.ceil((room.waitingDeadline - Date.now()) / 1000)
+      ),
+      deadline: room.waitingDeadline,
+      message: 'Қарсыластың кіруін күтіңіз...'
+    });
+  }
 }
 
 /* ---------- Do‘st bilan o‘ynash ---------- */
@@ -1328,40 +1461,36 @@ function onAuth(ws, m) {
       const roomCode = groupPlayerRooms.get(String(u.id));
       const room = roomCode && groupRooms.get(roomCode);
 
-      if (room) room.connected.add(String(u.id));
+      if (room) {
+        room.connected.add(String(u.id));
 
-      send(u, {
-        t: 'group_waiting',
-        count: room ? room.connected.size : 1,
-        message: 'Екінші ойыншының кіруін күтіңіз...'
-      });
+        if (!room.firstConnectedId) {
+          room.firstConnectedId = String(u.id);
+        }
 
-      if (room && room.players.length === 2) {
-        const first = users.get(String(room.players[0].id));
-        const second = users.get(String(room.players[1].id));
+        if (!room.waitingDeadline && room.pendingGame) {
+          startGroupWaitingTimer(
+            room,
+            room.pendingGame,
+            room.firstConnectedId
+          );
+        }
 
-        const bothConnected =
-          first && second &&
-          first.ws && first.ws.readyState === 1 &&
-          second.ws && second.ws.readyState === 1 &&
-          room.connected.has(String(first.id)) &&
-          room.connected.has(String(second.id));
+        send(u, {
+          t: 'group_waiting',
+          count: room.connected.size,
+          seconds: room.waitingDeadline
+            ? Math.max(
+                0,
+                Math.ceil((room.waitingDeadline - Date.now()) / 1000)
+              )
+            : GROUP_WAIT_SECONDS,
+          deadline: room.waitingDeadline || null,
+          message: 'Қарсыластың кіруін күтіңіз...'
+        });
 
-        if (bothConnected && !room.started) {
-          room.started = true;
-          g.waitingForOpponent = false;
-          clearTimeout(room.timer);
-
-          startTurnTimer(g);
-
-          send(first, gameState(g, first.id));
-          send(second, gameState(g, second.id));
-          send(first, { t: 'group_started' });
-          send(second, { t: 'group_started' });
-
-          replaceGroupRoomMessage(room).catch(err => {
-            console.error('Started group message:', err.message);
-          });
+        if (room.players.length === 2 && room.pendingGame) {
+          startGroupMatch(room, room.pendingGame);
         }
       }
     } else {
@@ -1445,11 +1574,15 @@ wss.on('connection', ws => {
       const otherId = g.p[G.other(sideOfUser(g, u.id))];
       const other = users.get(otherId);
 
-      send(other, {
-        t: 'group_waiting',
-        count: room ? room.connected.size : 0,
-        message: 'Екінші ойыншының кіруін күтіңіз...'
-      });
+      if (room && room.waitingDeadline) {
+        sendGroupWaiting(room);
+      } else {
+        send(other, {
+          t: 'group_waiting',
+          count: room ? room.connected.size : 0,
+          message: 'Қарсыластың кіруін күтіңіз...'
+        });
+      }
 
       return;
     }
