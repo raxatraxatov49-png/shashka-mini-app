@@ -1,4 +1,3 @@
-
 (() => {
 'use strict';
 
@@ -351,7 +350,7 @@ function onMsg(m) {
           $('sheetInvite').classList.remove('hidden');
 
           showInviteStatus(
-            'Do‘stingizning o‘yin xonasына ulanmoqda...'
+            'Do‘stingizning o‘yin xonasiga ulanmoqda...'
           );
 
           send({
@@ -384,6 +383,7 @@ function onMsg(m) {
         show('game');
       } else {
         $('sheetInvite').classList.add('hidden');
+
         showInviteStatus(
           m.message ||
           'Ikkinchi o‘yinchining kirishini kuting...'
@@ -457,7 +457,7 @@ function onMsg(m) {
       $('btnCopyInvite').disabled = true;
       $('btnShareInvite').disabled = true;
 
-      showInviteStatus('Taklif havolasi muddati tugadi. Yangi taklif yarating.');
+      showInviteStatus('Taklif muddati tugadi. Yangi taklif yarating.');
       break;
 
     case 'invite_cancelled':
@@ -792,11 +792,11 @@ async function doOver(m) {
 
     timeout: win
       ? 'Raqibning vaqti tugadi'
-      : 'Sizning уақытыңыз tugadi',
+      : 'Sizning vaqtingiz tugadi',
 
     opponent_timeout: win
       ? 'Raqib 90 soniya ichida o‘yinga kirmadi'
-      : 'Сіз 90 секунд ішінде ойынға кірмедіңіз',
+      : 'Siz 90 soniya ichida o‘yinga kirmadingiz',
 
     draw: '15 ta yurish davomida urish va oddiy shashka yurishi bo‘lmadi'
   };
@@ -853,7 +853,7 @@ function refresh() {
       Math.ceil((g.groupWaitDeadline - Date.now()) / 1000)
     );
 
-    waitingText = `⏳ Qarshiластың кіруіне: ${formatClock(seconds)}`;
+    waitingText = `⏳ Raqib kirishiga: ${formatClock(seconds)}`;
   }
 
   ms.textContent = g.over
@@ -876,7 +876,7 @@ function refresh() {
     g.over
       ? ''
       : waiting
-        ? 'Ойын басталуын күтіңіз...'
+        ? 'O‘yin boshlanishini kutmoqda...'
         : mine
           ? ''
           : 'O‘ylanmoqda…';
@@ -945,7 +945,7 @@ function refresh() {
   });
 }
 
-// Екі таймерді де экранда әр секунд сайын жаңарту.
+// Таймерлерді экранда әр секунд сайын жаңарту.
 setInterval(() => {
   if (!S.g || S.g.over) return;
 
