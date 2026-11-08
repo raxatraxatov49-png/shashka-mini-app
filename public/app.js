@@ -16,7 +16,333 @@ if (tg) {
 
 const $ = (id) => document.getElementById(id);
 
-const tr = (text) => text;
+/* ---------- ТІЛДЕР (uz / kk / ru) ---------- */
+
+const LANGS = ['uz', 'kk', 'ru'];
+
+function pickLang(v) {
+  v = String(v || '').toLowerCase().slice(0, 2);
+  return LANGS.includes(v) ? v : null;
+}
+
+let LANG = (() => {
+  try {
+    const q = pickLang(new URLSearchParams(location.search).get('lang'));
+    if (q) return q;
+  } catch (e) {}
+
+  try {
+    const s = pickLang(localStorage.getItem('shashka_lang'));
+    if (s) return s;
+  } catch (e) {}
+
+  try {
+    const c = pickLang(
+      tg && tg.initDataUnsafe && tg.initDataUnsafe.user &&
+      tg.initDataUnsafe.user.language_code
+    );
+    if (c) return c;
+  } catch (e) {}
+
+  return 'kk';
+})();
+
+const I18N = {
+  "kk": {
+    "playerRole": "Дойбы ойыншысы",
+    "menuTitle": "Дойбы",
+    "randomTitle": "Кездейсоқ қарсылас",
+    "randomDesc": "Қазір қарсылас іздеп жүрген ойыншымен ойнаңыз",
+    "play": "ОЙНАУ",
+    "cancel": "Бас тарту",
+    "friendTitle": "Досыңмен ойнау",
+    "friendDesc": "Досыңа шақыру сілтемесін жіберіп, бірге дойбы ойна",
+    "friendBtn": "ДОСЫҢМЕН ОЙНАУ",
+    "boardTitle": "Классикалық тақта",
+    "copyLink": "Сілтемені көшіру",
+    "shareTg": "Telegram арқылы жіберу",
+    "menu": "Мәзір",
+    "chat": "Чат",
+    "inviteFriend": "Досыңды шақыру",
+    "close": "Жабу",
+    "inviteLinkPh": "Шақыру сілтемесі",
+    "cancelInvite": "Шақырудан бас тарту",
+    "resign": "Берілемін",
+    "msgPh": "Хабарлама жазыңыз…",
+    "send": "Жіберу",
+    "again": "Қайта ойнау",
+    "toMenu": "Басты мәзір",
+    "connLost": "Байланыс үзілді. Қайта қосылуда…",
+    "waitFriend": "Дос күтілуде…",
+    "invPreparing": "Шақыру сілтемесі дайындалуда...",
+    "linkCopied": "Сілтеме көшірілді! Енді досыңызға жіберіңіз.",
+    "copyFailed": "Көшіру мүмкін болмады. Сілтеме: {link}",
+    "inviteText": "Кел, бірге дойбы ойнайық!",
+    "openViaTg": "Telegram арқылы ашыңыз",
+    "onlyTgApp": "Бұл ойын тек Telegram Mini App ішінде жұмыс істейді.",
+    "searching": "Қарсылас ізделуде…",
+    "joiningFriend": "Досыңыздың ойын бөлмесіне қосылуда...",
+    "gErrExpired": "Бұл ойынның уақыты аяқталды. Топқа /game деп жазыңыз.",
+    "gErrFull": "Бұл ойын бөлмесінде бос орын жоқ.",
+    "gErrBusy": "Сіз қазір басқа ойындасыз.",
+    "gErrWaiting": "Екінші ойыншы әлі ойынға кірген жоқ.",
+    "gErrJoin": "Ойын бөлмесіне қосылу мүмкін болмады.",
+    "linkReady": "Сілтеме дайын! Оны досыңызға жіберіңіз.",
+    "friendJoined": "Досыңыз қосылды! Ойын басталуда...",
+    "linkExpiredRenew": "Сілтеменің мерзімі өтті. Жаңасы жасалуда...",
+    "inviteExpiredNew": "Шақыру мерзімі аяқталды. Жаңа шақыру жасаңыз.",
+    "replacedTitle": "Басқа құрылғыда ашылды",
+    "replacedSub": "Бұл есептік жазба басқа жерде ашылған. Осы жерде жалғастыру үшін ойынды қайта ашыңыз.",
+    "authTitle": "Кіру қатесі",
+    "authSub": "Telegram арқылы растау мүмкін болмады. Ойынды бот арқылы қайта ашыңыз.",
+    "inviteInvalid": "Шақыру сілтемесі қате немесе жарамсыз.",
+    "inviteExpired": "Шақыру сілтемесінің мерзімі аяқталған.",
+    "inviteSelf": "Өзіңіздің шақыру сілтемеңіз арқылы қосыла алмайсыз.",
+    "playerBusy": "Ойыншы қазір басқа ойында.",
+    "draw": "Тең ойын!",
+    "youWin": "Сіз жеңдіңіз!",
+    "youLose": "Сіз жеңілдіңіз",
+    "rNoPiecesWin": "Қарсыластың барлық тастары алынды",
+    "rNoPiecesLose": "Сіздің барлық тастарыңыз алынды",
+    "rNoMovesWin": "Қарсыластың жүретін жолы қалмады",
+    "rNoMovesLose": "Сіздің жүретін жолыңыз қалмады",
+    "rResignWin": "Қарсылас берілді",
+    "rResignLose": "Сіз берілдіңіз",
+    "rLeftWin": "Қарсылас ойыннан шығып кетті",
+    "rLeftLose": "Байланыс үзілгендіктен ойын аяқталды",
+    "rTimeoutWin": "Қарсыластың уақыты аяқталды",
+    "rTimeoutLose": "Сіздің уақытыңыз аяқталды",
+    "rOppTimeoutWin": "Қарсылас 90 секунд ішінде ойынға кірмеді",
+    "rOppTimeoutLose": "Сіз 90 секунд ішінде ойынға кірмедіңіз",
+    "rDraw": "15 жүріс бойы тасты алу да, қарапайым жүріс те болған жоқ",
+    "waitSecond": "Екінші ойыншы күтілуде...",
+    "waitEnter": "⏳ Қарсыластың кіруіне: {t}",
+    "keepCapturing": "Тасты алуды жалғастырыңыз!",
+    "mustCapture": "Тасты алу міндетті!",
+    "yourTurn": "Сіздің кезегіңіз",
+    "waitTurn": "Кезегін күтіңіз",
+    "waitStart": "Ойынның басталуын күтуде...",
+    "thinking": "Ойланып жатыр…",
+    "youReady": "Сіз дайынсыз",
+    "friendAutoStart": "Дос сілтемемен кіргенде ойын өзі басталады",
+    "awayMsg": "Қарсыласпен байланыс үзілді. {n} секунд ішінде оралмаса, жеңіс сізге беріледі.",
+    "confirmResign": "Шынымен берілгіңіз келе ме?"
+  },
+  "uz": {
+    "playerRole": "Shashka o‘yinchisi",
+    "menuTitle": "Shashka",
+    "randomTitle": "Tasodifiy raqib",
+    "randomDesc": "Hozir raqib izlayotgan o‘yinchi bilan o‘ynang",
+    "play": "O‘YNASH",
+    "cancel": "Bekor qilish",
+    "friendTitle": "Do‘st bilan o‘ynash",
+    "friendDesc": "Do‘stingizga taklif havolasini yuborib, birga shashka o‘ynang",
+    "friendBtn": "DO‘ST BILAN O‘YNASH",
+    "boardTitle": "Klassik taxta",
+    "copyLink": "Havolani nusxalash",
+    "shareTg": "Telegram orqali yuborish",
+    "menu": "Menyu",
+    "chat": "Chat",
+    "inviteFriend": "Do‘stni taklif qilish",
+    "close": "Yopish",
+    "inviteLinkPh": "Taklif havolasi",
+    "cancelInvite": "Taklifni bekor qilish",
+    "resign": "Taslim bo‘laman",
+    "msgPh": "Xabar yozing…",
+    "send": "Yuborish",
+    "again": "Qayta o‘ynash",
+    "toMenu": "Asosiy menyu",
+    "connLost": "Aloqa uzildi. Qayta ulanmoqda…",
+    "waitFriend": "Do‘st kutilmoqda…",
+    "invPreparing": "Taklif havolasi tayyorlanmoqda...",
+    "linkCopied": "Havola nusxalandi! Endi do‘stingizga yuboring.",
+    "copyFailed": "Nusxalab bo‘lmadi. Havola: {link}",
+    "inviteText": "Kel, birga shashka o‘ynaymiz!",
+    "openViaTg": "Telegram orqali oching",
+    "onlyTgApp": "Bu o‘yin faqat Telegram Mini App ichida ishlaydi.",
+    "searching": "Raqib izlanmoqda…",
+    "joiningFriend": "Do‘stingizning o‘yin xonasiga qo‘shilmoqda...",
+    "gErrExpired": "Bu o‘yinning vaqti tugadi. Guruhga /game deb yozing.",
+    "gErrFull": "Bu o‘yin xonasida bo‘sh joy yo‘q.",
+    "gErrBusy": "Siz hozir boshqa o‘yindasiz.",
+    "gErrWaiting": "Ikkinchi o‘yinchi hali o‘yinga kirmadi.",
+    "gErrJoin": "O‘yin xonasiga qo‘shilib bo‘lmadi.",
+    "linkReady": "Havola tayyor! Uni do‘stingizga yuboring.",
+    "friendJoined": "Do‘stingiz qo‘shildi! O‘yin boshlanmoqda...",
+    "linkExpiredRenew": "Havola muddati tugadi. Yangisi yaratilmoqda...",
+    "inviteExpiredNew": "Taklif muddati tugadi. Yangi taklif yarating.",
+    "replacedTitle": "Boshqa qurilmada ochildi",
+    "replacedSub": "Bu hisob boshqa joyda ochilgan. Shu yerda davom etish uchun o‘yinni qayta oching.",
+    "authTitle": "Kirish xatosi",
+    "authSub": "Telegram orqali tasdiqlab bo‘lmadi. O‘yinni bot orqali qayta oching.",
+    "inviteInvalid": "Taklif havolasi noto‘g‘ri yoki yaroqsiz.",
+    "inviteExpired": "Taklif havolasining muddati tugagan.",
+    "inviteSelf": "O‘zingizning taklif havolangiz orqali qo‘shila olmaysiz.",
+    "playerBusy": "O‘yinchi hozir boshqa o‘yinda.",
+    "draw": "Durang!",
+    "youWin": "Siz yutdingiz!",
+    "youLose": "Siz yutqazdingiz",
+    "rNoPiecesWin": "Raqibning barcha toshlari olindi",
+    "rNoPiecesLose": "Sizning barcha toshlaringiz olindi",
+    "rNoMovesWin": "Raqibning yurish imkoni qolmadi",
+    "rNoMovesLose": "Sizning yurish imkoningiz qolmadi",
+    "rResignWin": "Raqib taslim bo‘ldi",
+    "rResignLose": "Siz taslim bo‘ldingiz",
+    "rLeftWin": "Raqib o‘yindan chiqib ketdi",
+    "rLeftLose": "Aloqa uzilgani sababli o‘yin tugadi",
+    "rTimeoutWin": "Raqibning vaqti tugadi",
+    "rTimeoutLose": "Sizning vaqtingiz tugadi",
+    "rOppTimeoutWin": "Raqib 90 soniya ichida o‘yinga kirmadi",
+    "rOppTimeoutLose": "Siz 90 soniya ichida o‘yinga kirmadingiz",
+    "rDraw": "15 yurish davomida tosh olinmadi va oddiy toshda yurish ham bo‘lmadi",
+    "waitSecond": "Ikkinchi o‘yinchi kutilmoqda...",
+    "waitEnter": "⏳ Raqibning kirishiga: {t}",
+    "keepCapturing": "Tosh olishni davom ettiring!",
+    "mustCapture": "Tosh olish majburiy!",
+    "yourTurn": "Sizning navbatingiz",
+    "waitTurn": "Navbatni kuting",
+    "waitStart": "O‘yin boshlanishi kutilmoqda...",
+    "thinking": "O‘ylayapti…",
+    "youReady": "Siz tayyorsiz",
+    "friendAutoStart": "Do‘st havola orqali kirganda o‘yin o‘zi boshlanadi",
+    "awayMsg": "Raqib bilan aloqa uzildi. {n} soniya ichida qaytmasa, g‘alaba sizga beriladi.",
+    "confirmResign": "Haqiqatan taslim bo‘lmoqchimisiz?"
+  },
+  "ru": {
+    "playerRole": "Игрок в шашки",
+    "menuTitle": "Шашки",
+    "randomTitle": "Случайный соперник",
+    "randomDesc": "Сыграйте с игроком, который сейчас ищет соперника",
+    "play": "ИГРАТЬ",
+    "cancel": "Отмена",
+    "friendTitle": "Играть с другом",
+    "friendDesc": "Отправьте другу ссылку-приглашение и играйте вместе",
+    "friendBtn": "ИГРАТЬ С ДРУГОМ",
+    "boardTitle": "Классическая доска",
+    "copyLink": "Скопировать ссылку",
+    "shareTg": "Отправить через Telegram",
+    "menu": "Меню",
+    "chat": "Чат",
+    "inviteFriend": "Пригласить друга",
+    "close": "Закрыть",
+    "inviteLinkPh": "Ссылка-приглашение",
+    "cancelInvite": "Отменить приглашение",
+    "resign": "Сдаться",
+    "msgPh": "Напишите сообщение…",
+    "send": "Отправить",
+    "again": "Играть ещё раз",
+    "toMenu": "Главное меню",
+    "connLost": "Связь потеряна. Переподключение…",
+    "waitFriend": "Ожидание друга…",
+    "invPreparing": "Готовим ссылку-приглашение...",
+    "linkCopied": "Ссылка скопирована! Теперь отправьте её другу.",
+    "copyFailed": "Не удалось скопировать. Ссылка: {link}",
+    "inviteText": "Давай сыграем в шашки вместе!",
+    "openViaTg": "Откройте через Telegram",
+    "onlyTgApp": "Эта игра работает только внутри Telegram Mini App.",
+    "searching": "Поиск соперника…",
+    "joiningFriend": "Подключение к игровой комнате друга...",
+    "gErrExpired": "Время этой игры истекло. Напишите /game в группе.",
+    "gErrFull": "В этой игровой комнате нет свободных мест.",
+    "gErrBusy": "Вы сейчас в другой игре.",
+    "gErrWaiting": "Второй игрок ещё не вошёл в игру.",
+    "gErrJoin": "Не удалось подключиться к игровой комнате.",
+    "linkReady": "Ссылка готова! Отправьте её другу.",
+    "friendJoined": "Друг присоединился! Игра начинается...",
+    "linkExpiredRenew": "Срок ссылки истёк. Создаём новую...",
+    "inviteExpiredNew": "Срок приглашения истёк. Создайте новое.",
+    "replacedTitle": "Открыто на другом устройстве",
+    "replacedSub": "Этот аккаунт открыт в другом месте. Чтобы продолжить здесь, откройте игру заново.",
+    "authTitle": "Ошибка входа",
+    "authSub": "Не удалось подтвердить через Telegram. Откройте игру заново через бота.",
+    "inviteInvalid": "Ссылка-приглашение неверна или недействительна.",
+    "inviteExpired": "Срок действия приглашения истёк.",
+    "inviteSelf": "Нельзя присоединиться по собственной ссылке.",
+    "playerBusy": "Игрок сейчас в другой игре.",
+    "draw": "Ничья!",
+    "youWin": "Вы победили!",
+    "youLose": "Вы проиграли",
+    "rNoPiecesWin": "Все шашки соперника взяты",
+    "rNoPiecesLose": "Все ваши шашки взяты",
+    "rNoMovesWin": "У соперника не осталось ходов",
+    "rNoMovesLose": "У вас не осталось ходов",
+    "rResignWin": "Соперник сдался",
+    "rResignLose": "Вы сдались",
+    "rLeftWin": "Соперник вышел из игры",
+    "rLeftLose": "Игра закончилась из-за потери связи",
+    "rTimeoutWin": "У соперника закончилось время",
+    "rTimeoutLose": "У вас закончилось время",
+    "rOppTimeoutWin": "Соперник не вошёл в игру за 90 секунд",
+    "rOppTimeoutLose": "Вы не вошли в игру за 90 секунд",
+    "rDraw": "За 15 ходов не было ни взятия, ни хода простой шашкой",
+    "waitSecond": "Ожидание второго игрока...",
+    "waitEnter": "⏳ До входа соперника: {t}",
+    "keepCapturing": "Продолжайте брать шашки!",
+    "mustCapture": "Взятие обязательно!",
+    "yourTurn": "Ваш ход",
+    "waitTurn": "Ожидайте хода",
+    "waitStart": "Ожидание начала игры...",
+    "thinking": "Думает…",
+    "youReady": "Вы готовы",
+    "friendAutoStart": "Игра начнётся, когда друг войдёт по ссылке",
+    "awayMsg": "Связь с соперником потеряна. Если он не вернётся за {n} сек., победа достанется вам.",
+    "confirmResign": "Вы действительно хотите сдаться?"
+  }
+};
+
+const tr = (key, vars) => {
+  let s = (I18N[LANG] && I18N[LANG][key]);
+
+  if (s === undefined) s = I18N.kk[key];
+  if (s === undefined) return key;
+
+  if (vars) {
+    s = s.replace(/\{(\w+)\}/g, (m, k) =>
+      vars[k] !== undefined ? String(vars[k]) : m
+    );
+  }
+
+  return s;
+};
+
+function applyStatic() {
+  document.documentElement.lang = LANG;
+
+  document.querySelectorAll('[data-i18n]').forEach((el) => {
+    el.textContent = tr(el.dataset.i18n);
+  });
+
+  document.querySelectorAll('[data-i18n-ph]').forEach((el) => {
+    el.placeholder = tr(el.dataset.i18nPh);
+  });
+
+  document.querySelectorAll('[data-i18n-aria]').forEach((el) => {
+    el.setAttribute('aria-label', tr(el.dataset.i18nAria));
+  });
+}
+
+function setLang(l) {
+  l = pickLang(l);
+
+  if (!l || l === LANG) return;
+
+  LANG = l;
+
+  try { localStorage.setItem('shashka_lang', l); } catch (e) {}
+
+  applyStatic();
+  setSearching(S.searching);
+
+  if (S.g) {
+    if (S.g.invite) {
+      S.g.players.b.name = tr('waitFriend');
+      $('oppName').textContent = tr('waitFriend');
+    }
+
+    refresh();
+  }
+}
+
 
 /* ---------- ДІРІЛ ӘСЕРІ ---------- */
 
@@ -184,7 +510,7 @@ function startInviteRoom() {
     you: 'w',
     players: {
       w: S.me,
-      b: { name: 'Дос күтілуде…', avatar: null }
+      b: { name: tr('waitFriend'), avatar: null }
     },
     board,
     turn: 'w',
@@ -212,7 +538,7 @@ function startInviteRoom() {
   oa.style.background = '';
   oa.classList.add('wait');
 
-  $('oppName').textContent = 'Дос күтілуде…';
+  $('oppName').textContent = tr('waitFriend');
   $('oppDot').className = 'pdot b';
   $('myDot').className = 'pdot w';
 
@@ -221,7 +547,7 @@ function startInviteRoom() {
 
   $('game').classList.add('inviting');
   enableInviteButtons(false);
-  showInviteStatus('Шақыру сілтемесі дайындалуда...');
+  showInviteStatus(tr('invPreparing'));
 
   buildSquares();
   renderPieces();
@@ -268,17 +594,17 @@ async function copyInviteLink() {
       if (!copied) throw new Error('Көшіру сәтсіз аяқталды');
     }
 
-    showInviteStatus('Сілтеме көшірілді! Енді досыңызға жіберіңіз.');
+    showInviteStatus(tr('linkCopied'));
     haptic('light');
   } catch (e) {
-    showInviteStatus('Көшіру мүмкін болмады. Сілтеме: ' + S.inviteLink);
+    showInviteStatus(tr('copyFailed', { link: S.inviteLink }));
   }
 }
 
 function shareInviteLink() {
   if (!S.inviteLink) return;
 
-  const text = 'Кел, бірге дойбы ойнайық!';
+  const text = tr('inviteText');
 
   const shareUrl =
     'https://t.me/share/url?url=' + encodeURIComponent(S.inviteLink) +
@@ -342,8 +668,8 @@ function connect() {
       }));
     } else {
       fatal(
-        'Telegram арқылы ашыңыз',
-        'Бұл ойын тек Telegram Mini App ішінде жұмыс істейді.'
+        tr('openViaTg'),
+        tr('onlyTgApp')
       );
     }
   };
@@ -475,8 +801,8 @@ function setSearching(on) {
   b.classList.toggle('busy', on);
 
   b.innerHTML = on
-    ? '<span class="spin"></span>Қарсылас ізделуде…'
-    : 'ОЙНАУ';
+    ? '<span class="spin"></span>' + tr('searching')
+    : tr('play');
 
   $('btnCancel').classList.toggle('hidden', !on);
 }
@@ -487,6 +813,7 @@ function onMsg(m) {
   switch (m.t) {
     case 'hello': {
       S.me = m.me;
+      if (m.lang) setLang(m.lang);
 
       setAva($('meAva'), m.me);
       $('meName').textContent = m.me.name;
@@ -510,7 +837,7 @@ function onMsg(m) {
           $('sheetInvite').classList.remove('hidden');
 
           showInviteStatus(
-            'Досыңыздың ойын бөлмесіне қосылуда...'
+            tr('joiningFriend')
           );
 
           send({
@@ -568,16 +895,20 @@ function onMsg(m) {
 
       showInviteStatus(
         m.code === 'expired'
-          ? 'Бұл ойынның уақыты аяқталды. Топқа /game деп жазыңыз.'
+          ? tr('gErrExpired')
           : m.code === 'full'
-            ? 'Бұл ойын бөлмесінде бос орын жоқ.'
+            ? tr('gErrFull')
             : m.code === 'busy'
-              ? 'Сіз қазір басқа ойындасыз.'
+              ? tr('gErrBusy')
               : m.code === 'waiting'
-                ? 'Екінші ойыншы әлі ойынға кірген жоқ.'
-                : 'Ойын бөлмесіне қосылу мүмкін болмады.'
+                ? tr('gErrWaiting')
+                : tr('gErrJoin')
       );
 
+      break;
+
+    case 'lang':
+      setLang(m.lang);
       break;
 
     case 'searching':
@@ -595,12 +926,12 @@ function onMsg(m) {
       $('inviteLink').value = S.inviteLink;
       enableInviteButtons(true);
 
-      showInviteStatus('Сілтеме дайын! Оны досыңызға жіберіңіз.');
+      showInviteStatus(tr('linkReady'));
       break;
     }
 
     case 'invite_joined':
-      showInviteStatus('Досыңыз қосылды! Ойын басталуда...');
+      showInviteStatus(tr('friendJoined'));
       break;
 
     case 'invite_expired':
@@ -611,10 +942,10 @@ function onMsg(m) {
       enableInviteButtons(false);
 
       if (S.inviteMode) {
-        showInviteStatus('Сілтеменің мерзімі өтті. Жаңасы жасалуда...');
+        showInviteStatus(tr('linkExpiredRenew'));
         send({ t: 'invite_create' });
       } else {
-        showInviteStatus('Шақыру мерзімі аяқталды. Жаңа шақыру жасаңыз.');
+        showInviteStatus(tr('inviteExpiredNew'));
       }
       break;
 
@@ -655,25 +986,25 @@ function onMsg(m) {
       S.fatal = true;
 
       fatal(
-        'Басқа құрылғыда ашылды',
-        'Бұл есептік жазба басқа жерде ашылған. Осы жерде жалғастыру үшін ойынды қайта ашыңыз.'
+        tr('replacedTitle'),
+        tr('replacedSub')
       );
       break;
 
     case 'error':
       if (m.code === 'auth') {
         fatal(
-          'Кіру қатесі',
-          'Telegram арқылы растау мүмкін болмады. Ойынды бот арқылы қайта ашыңыз.'
+          tr('authTitle'),
+          tr('authSub')
         );
       } else if (m.code === 'invite_invalid') {
-        showInviteStatus('Шақыру сілтемесі қате немесе жарамсыз.');
+        showInviteStatus(tr('inviteInvalid'));
       } else if (m.code === 'invite_expired') {
-        showInviteStatus('Шақыру сілтемесінің мерзімі аяқталған.');
+        showInviteStatus(tr('inviteExpired'));
       } else if (m.code === 'invite_self') {
-        showInviteStatus('Өзіңіздің шақыру сілтемеңіз арқылы қосыла алмайсыз.');
+        showInviteStatus(tr('inviteSelf'));
       } else if (m.code === 'busy') {
-        showInviteStatus('Ойыншы қазір басқа ойында.');
+        showInviteStatus(tr('playerBusy'));
       }
       break;
   }
@@ -930,38 +1261,16 @@ async function doOver(m) {
     draw ? '🤝' : win ? '🏆' : '😔';
 
   $('resTitle').textContent =
-    draw
-      ? 'Тең ойын!'
-      : win
-        ? 'Сіз жеңдіңіз!'
-        : 'Сіз жеңілдіңіз';
+    draw ? tr('draw') : win ? tr('youWin') : tr('youLose');
 
   const R = {
-    no_pieces: win
-      ? 'Қарсыластың барлық тастары алынды'
-      : 'Сіздің барлық тастарыңыз алынды',
-
-    no_moves: win
-      ? 'Қарсыластың жүретін жолы қалмады'
-      : 'Сіздің жүретін жолыңыз қалмады',
-
-    resign: win
-      ? 'Қарсылас берілді'
-      : 'Сіз берілдіңіз',
-
-    left: win
-      ? 'Қарсылас ойыннан шығып кетті'
-      : 'Байланыс үзілгендіктен ойын аяқталды',
-
-    timeout: win
-      ? 'Қарсыластың уақыты аяқталды'
-      : 'Сіздің уақытыңыз аяқталды',
-
-    opponent_timeout: win
-      ? 'Қарсылас 90 секунд ішінде ойынға кірмеді'
-      : 'Сіз 90 секунд ішінде ойынға кірмедіңіз',
-
-    draw: '15 жүріс бойы тасты алу да, қарапайым жүріс те болған жоқ'
+    no_pieces: tr(win ? 'rNoPiecesWin' : 'rNoPiecesLose'),
+    no_moves: tr(win ? 'rNoMovesWin' : 'rNoMovesLose'),
+    resign: tr(win ? 'rResignWin' : 'rResignLose'),
+    left: tr(win ? 'rLeftWin' : 'rLeftLose'),
+    timeout: tr(win ? 'rTimeoutWin' : 'rTimeoutLose'),
+    opponent_timeout: tr(win ? 'rOppTimeoutWin' : 'rOppTimeoutLose'),
+    draw: tr('rDraw')
   };
 
   $('resSub').textContent = R[m.reason] || '';
@@ -1008,7 +1317,7 @@ function refresh() {
 
   const ms = $('mySub');
 
-  let waitingText = 'Екінші ойыншы күтілуде...';
+  let waitingText = tr('waitSecond');
 
   if (waiting && g.groupWaitDeadline) {
     const seconds = Math.max(
@@ -1016,7 +1325,7 @@ function refresh() {
       Math.ceil((g.groupWaitDeadline - Date.now()) / 1000)
     );
 
-    waitingText = `⏳ Қарсыластың кіруіне: ${formatClock(seconds)}`;
+    waitingText = tr('waitEnter', { t: formatClock(seconds) });
   }
 
   ms.textContent = g.over
@@ -1026,12 +1335,12 @@ function refresh() {
       : mine
         ? (
             g.chainPos != null
-              ? 'Тасты алуды жалғастырыңыз!'
+              ? tr('keepCapturing')
               : must
-                ? 'Тасты алу міндетті!'
-                : 'Сіздің кезегіңіз'
+                ? tr('mustCapture')
+                : tr('yourTurn')
           )
-        : 'Кезегін күтіңіз';
+        : tr('waitTurn');
 
   ms.classList.toggle('hot', must);
 
@@ -1039,14 +1348,14 @@ function refresh() {
     g.over
       ? ''
       : waiting
-        ? 'Ойынның басталуын күтуде...'
+        ? tr('waitStart')
         : mine
           ? ''
-          : 'Ойланып жатыр…';
+          : tr('thinking');
 
   if (g.invite) {
-    ms.textContent = 'Сіз дайынсыз';
-    $('oppSub').textContent = 'Дос сілтемемен кіргенде ойын өзі басталады';
+    ms.textContent = tr('youReady');
+    $('oppSub').textContent = tr('friendAutoStart');
   }
 
   if (
@@ -1205,7 +1514,7 @@ function showAway(m) {
 
   const upd = () => {
     el.textContent =
-      `Қарсыласпен байланыс үзілді. ${n} секунд ішінде оралмаса, жеңіс сізге беріледі.`;
+      tr('awayMsg', { n });
   };
 
   upd();
@@ -1338,10 +1647,10 @@ $('btnResign').onclick = () => {
 
   if (tg && tg.showConfirm) {
     tg.showConfirm(
-      'Шынымен берілгіңіз келе ме?',
+      tr('confirmResign'),
       (ok) => ok && go()
     );
-  } else if (confirm('Шынымен берілгіңіз келе ме?')) {
+  } else if (confirm(tr('confirmResign'))) {
     go();
   }
 
@@ -1372,6 +1681,9 @@ $('btnAgain').onclick = () => {
 };
 
 /* ---------- ІСКЕ ҚОСУ ---------- */
+
+applyStatic();
+setSearching(false);
 
 connect();
 
