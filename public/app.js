@@ -42,6 +42,7 @@ const S = {
   awayTimer: null,
   inviteCode: null,
   inviteLink: '',
+  inviteMode: false,
   joinCode: null,
   groupCode: null,
   groupJoinSent: false,
@@ -141,23 +142,106 @@ function getGroupCode() {
 function showInviteStatus(message) {
   const el = $('inviteStatus');
   if (el) el.textContent = message;
+
+  const bar = $('invStatus');
+  if (bar && S.inviteMode) bar.textContent = message;
+}
+
+function enableInviteButtons(on) {
+  ['btnCopyInvite', 'btnShareInvite', 'btnInvCopy', 'btnInvShare'].forEach((id) => {
+    const el = $(id);
+    if (el) el.disabled = !on;
+  });
 }
 
 /* ---------- ДОСПЕН ОЙНАУ ---------- */
 
-function openInviteSheet() {
+function startInviteRoom() {
+  if (!S.me || S.g) return;
+
+  S.inviteMode = true;
   S.inviteCode = null;
   S.inviteLink = '';
 
-  $('inviteLink').value = '';
-  $('btnCopyInvite').disabled = true;
-  $('btnShareInvite').disabled = true;
+  const board = Array(64).fill(null);
 
+  for (let r = 0; r < 8; r++) {
+    for (let c = 0; c < 8; c++) {
+      if ((r + c) % 2 === 1) {
+        if (r < 3) board[r * 8 + c] = 'b';
+        else if (r > 4) board[r * 8 + c] = 'w';
+      }
+    }
+  }
+
+  S.q = [];
+  S.busy = false;
+  S.sel = null;
+  S.unread = 0;
+
+  S.g = {
+    id: 'invite',
+    you: 'w',
+    players: {
+      w: S.me,
+      b: { name: 'Дос күтілуде…', avatar: null }
+    },
+    board,
+    turn: 'w',
+    legal: [],
+    score: { w: 0, b: 0 },
+    chainPos: null,
+    waitingForOpponent: true,
+    turnDeadline: null,
+    turnTimerSide: null,
+    groupWaitDeadline: null,
+    invite: true,
+    over: null,
+    last: null
+  };
+
+  ['sheetMenu', 'sheetChat', 'sheetInvite', 'result', 'away'].forEach((i) => {
+    $(i).classList.add('hidden');
+  });
+
+  setAva($('myAva'), S.me);
+  $('myName').textContent = S.me.name;
+
+  const oa = $('oppAva');
+  oa.textContent = '?';
+  oa.style.background = '';
+  oa.classList.add('wait');
+
+  $('oppName').textContent = 'Дос күтілуде…';
+  $('oppDot').className = 'pdot b';
+  $('myDot').className = 'pdot w';
+
+  $('msgs').textContent = '';
+  updateBadge();
+
+  $('game').classList.add('inviting');
+  enableInviteButtons(false);
   showInviteStatus('Шақыру сілтемесі дайындалуда...');
-  $('sheetInvite').classList.remove('hidden');
+
+  buildSquares();
+  renderPieces();
+  refresh();
+  show('game');
 
   send({ t: 'invite_create' });
   haptic('light');
+}
+
+function leaveInviteRoom() {
+  S.inviteMode = false;
+  S.inviteCode = null;
+  S.inviteLink = '';
+  S.g = null;
+
+  $('game').classList.remove('inviting');
+  $('oppAva').classList.remove('wait');
+
+  show('menu');
 }
 
 function createInviteLink(code) {
@@ -171,22 +255,23 @@ async function copyInviteLink() {
     if (navigator.clipboard && navigator.clipboard.writeText) {
       await navigator.clipboard.writeText(S.inviteLink);
     } else {
-      const input = $('inviteLink');
-      input.focus();
-      input.select();
+      const ta = document.createElement('textarea');
+      ta.value = S.inviteLink;
+      ta.style.cssText = 'position:fixed;left:0;top:0;opacity:0';
+      document.body.append(ta);
+      ta.focus();
+      ta.select();
 
       const copied = document.execCommand('copy');
+      ta.remove();
+
       if (!copied) throw new Error('Көшіру сәтсіз аяқталды');
     }
 
     showInviteStatus('Сілтеме көшірілді! Енді досыңызға жіберіңіз.');
     haptic('light');
   } catch (e) {
-    const input = $('inviteLink');
-    input.focus();
-    input.select();
-
-    showInviteStatus('Сілтемені басып ұстап, көшіріп алыңыз.');
+    showInviteStatus('Көшіру мүмкін болмады. Сілтеме: ' + S.inviteLink);
   }
 }
 
@@ -217,6 +302,8 @@ function cancelInvite() {
   S.inviteLink = '';
 
   $('sheetInvite').classList.add('hidden');
+
+  if (S.inviteMode) leaveInviteRoom();
 }
 
 /* ---------- ҚОСЫЛУ ---------- */
@@ -368,6 +455,11 @@ function show(id) {
 if (tg) {
   try {
     tg.BackButton.onClick(() => {
+      if (S.inviteMode) {
+        cancelInvite();
+        return;
+      }
+
       if (S.g && !S.g.over) {
         $('sheetMenu').classList.remove('hidden');
       }
@@ -427,6 +519,8 @@ function onMsg(m) {
           });
         }
       }
+
+      if (S.inviteMode) send({ t: 'invite_create' });
 
       break;
     }
@@ -499,8 +593,7 @@ function onMsg(m) {
       S.inviteLink = createInviteLink(m.code);
 
       $('inviteLink').value = S.inviteLink;
-      $('btnCopyInvite').disabled = false;
-      $('btnShareInvite').disabled = false;
+      enableInviteButtons(true);
 
       showInviteStatus('Сілтеме дайын! Оны досыңызға жіберіңіз.');
       break;
@@ -515,16 +608,21 @@ function onMsg(m) {
       S.inviteLink = '';
 
       $('inviteLink').value = '';
-      $('btnCopyInvite').disabled = true;
-      $('btnShareInvite').disabled = true;
+      enableInviteButtons(false);
 
-      showInviteStatus('Шақыру мерзімі аяқталды. Жаңа шақыру жасаңыз.');
+      if (S.inviteMode) {
+        showInviteStatus('Сілтеменің мерзімі өтті. Жаңасы жасалуда...');
+        send({ t: 'invite_create' });
+      } else {
+        showInviteStatus('Шақыру мерзімі аяқталды. Жаңа шақыру жасаңыз.');
+      }
       break;
 
     case 'invite_cancelled':
       S.inviteCode = null;
       S.inviteLink = '';
       $('sheetInvite').classList.add('hidden');
+      if (S.inviteMode) leaveInviteRoom();
       break;
 
     case 'game':
@@ -608,6 +706,10 @@ function startGame(m) {
   S.sel = null;
   S.unread = 0;
   S.joinCode = null;
+
+  S.inviteMode = false;
+  $('game').classList.remove('inviting');
+  $('oppAva').classList.remove('wait');
 
   S.g = {
     id: m.id,
@@ -942,6 +1044,11 @@ function refresh() {
           ? ''
           : 'Ойланып жатыр…';
 
+  if (g.invite) {
+    ms.textContent = 'Сіз дайынсыз';
+    $('oppSub').textContent = 'Дос сілтемемен кіргенде ойын өзі басталады';
+  }
+
   if (
     !waiting &&
     !g.over &&
@@ -1199,7 +1306,11 @@ $('btnBatl').onclick = () => {
 $('btnCancel').onclick = () =>
   send({ t: 'cancel' });
 
-$('btnFriend').onclick = openInviteSheet;
+$('btnFriend').onclick = startInviteRoom;
+
+$('btnInvCopy').onclick = copyInviteLink;
+$('btnInvShare').onclick = shareInviteLink;
+$('btnInvCancel').onclick = cancelInvite;
 
 $('btnCloseInvite').onclick = cancelInvite;
 $('btnCancelInvite').onclick = cancelInvite;
