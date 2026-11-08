@@ -2558,12 +2558,18 @@ async function handleTelegramWebhook(req, res) {
           '♟️ Қош келдіңіз!\n\n' +
           'Шашка ойынын бастаңыз және қарсыластарыңызды жеңіңіз! 🎮',
         reply_markup: {
-          inline_keyboard: [[{
-            text: '🎮 ОЙЫНДЫ БАСТАУ',
-            web_app: {
-              url: 'https://shashka-mini-app.onrender.com'
-            }
-          }]]
+          inline_keyboard: [
+            [{
+              text: '🎮 ОЙЫНДЫ БАСТАУ',
+              web_app: {
+                url: 'https://shashka-mini-app.onrender.com'
+              }
+            }],
+            [{
+              text: '👥 ГРУППАДА ОЙНАУ',
+              url: 'https://t.me/shashkaoyinibot?startgroup=true'
+            }]
+          ]
         }
       });
     }
