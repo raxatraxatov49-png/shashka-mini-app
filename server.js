@@ -920,6 +920,10 @@ function cleanupGroupRoom(code) {
     groupTokens.delete(token);
   }
 
+  if (room.sharedToken) {
+    groupTokens.delete(room.sharedToken);
+  }
+
   groupRooms.delete(code);
 }
 
@@ -1995,6 +1999,23 @@ function createGroupToken(room, player) {
   return token;
 }
 
+/* Топтағы батырма үшін ортақ токен (тек осы бөлменің 2 ойыншысы кіре алады) */
+function createSharedToken(room) {
+  if (room.sharedToken) return room.sharedToken;
+
+  const token = crypto.randomBytes(16).toString('hex');
+
+  room.sharedToken = token;
+
+  groupTokens.set(token, {
+    code: room.code,
+    userId: null,
+    shared: true
+  });
+
+  return token;
+}
+
 function roomText(room) {
   let text = '♟️ <b>ШАШКА ОЙЫНЫ</b>\n\n';
 
@@ -2014,11 +2035,9 @@ function roomText(room) {
       '⏳ Қарсылас табуға 2 минут беріледі.';
   } else if (!room.started) {
     text +=
-      '\n\n📩 Екі ойыншыға да ойынға кіру батырмасы жеке хабарлама арқылы жіберілді.';
-    text +=
-      '\n\n📱 Жеке хабарламаларыңызды тексеріңіздер!';
-    text +=
-      '\n⏳ Бірінші кірген ойыншыға 1 минут 30 секунд беріледі.';
+      '\n✅ Екі ойыншы табылды!\n' +
+      '👇 Ойынға кіру үшін төмендегі батырманы басыңыз.\n' +
+      '⏳ Бірінші кірген ойыншыға 1 минут 30 секунд беріледі.';
   } else {
     text += '\n\n🎮 <b>Ойын басталды!</b>\nСәттілік!';
   }
@@ -2032,6 +2051,15 @@ function roomKeyboard(room) {
       inline_keyboard: [[{
         text: '♟️ ОЙЫНҒА ҚОСЫЛУ',
         callback_data: 'gj:' + room.code
+      }]]
+    };
+  }
+
+  if (!room.started) {
+    return {
+      inline_keyboard: [[{
+        text: '🎮 ОЙЫНҒА КІРУ',
+        url: MINI_APP_LINK + 'group_' + createSharedToken(room)
       }]]
     };
   }
@@ -2111,64 +2139,32 @@ async function expireGroupSearch(code) {
   }
 }
 
-async function sendPlayerGroupLink(room, player) {
-  const userId = String(player.id);
-  const token = createGroupToken(room, player);
-
-  try {
-    await telegramApi('sendMessage', {
-      chat_id: userId,
-      text:
-        '♟️ <b>ШАШКА ОЙЫНЫ</b>\n\n' +
-        'Сіз топтық ойынға шақырылдыңыз!\n\n' +
-        'Ойынға кіру үшін төмендегі батырманы басыңыз.',
-      parse_mode: 'HTML',
-      reply_markup: {
-        inline_keyboard: [[{
-          text: '🎮 ОЙЫНҒА КІРУ',
-          url: MINI_APP_LINK + 'group_' + token
-        }]]
-      }
-    });
-
-    room.entered.add(userId);
-
-    return true;
-  } catch (error) {
-    console.error(
-      `Жеке хабарлама жіберілмеді (${userId}):`,
-      error.message
-    );
-
-    return false;
-  }
-}
-
-async function sendLinksToBothPlayers(room) {
+async function announceGroupGame(room) {
   if (room.players.length !== 2) return;
 
-  const results = await Promise.all(
-    room.players.map(
-      player => sendPlayerGroupLink(room, player)
-    )
-  );
+  const oldMessageId = room.messageId;
 
-  room.privateSent = results.filter(Boolean).length;
-
+  // Жаңа хабарлама: ойынға кіру батырмасымен (ескісін өзгертпей, жаңадан жібереміз)
   try {
-    await updateGroupRoom(room);
+    const sent = await telegramApi('sendMessage', {
+      chat_id: room.chatId,
+      text: roomText(room),
+      parse_mode: 'HTML',
+      reply_markup: roomKeyboard(room)
+    });
+
+    room.messageId = sent.result.message_id;
   } catch (error) {
-    console.error(error.message);
+    console.error('Топқа ойын хабарламасы жіберілмеді:', error.message);
+    return;
   }
 
-  if (room.privateSent < 2) {
+  // Ескі «Ойынға қосылу» хабарламасын өшіреміз
+  if (oldMessageId) {
     try {
-      await telegramApi('sendMessage', {
+      await telegramApi('deleteMessage', {
         chat_id: room.chatId,
-        text:
-          '⚠️ Кейбір ойыншыларға жеке хабарлама жіберілмеді.\n' +
-          'Ботқа жеке чатта /start командасын жіберіп, қайта тексеріңіздер.',
-        reply_to_message_id: room.messageId || undefined
+        message_id: oldMessageId
       });
     } catch (error) {
       console.error(error.message);
@@ -2264,7 +2260,7 @@ async function handleGroupCallback(query) {
     clearTimeout(room.searchTimer);
     room.searchTimer = null;
 
-    await sendLinksToBothPlayers(room);
+    await announceGroupGame(room);
   } else {
     try {
       await updateGroupRoom(room);
@@ -2724,6 +2720,7 @@ async function handleTelegramWebhook(req, res) {
         waitingTimer: null,
         waitingDeadline: null,
         firstConnectedId: null,
+        sharedToken: null,
         privateSent: 0
       };
 
@@ -3183,10 +3180,7 @@ function joinGroupGame(u, token) {
 
   const tokenInfo = groupTokens.get(token);
 
-  if (
-    !tokenInfo ||
-    tokenInfo.userId !== String(u.id)
-  ) {
+  if (!tokenInfo) {
     return send(u, {
       t: 'group_error',
       code: 'invalid'
@@ -3194,6 +3188,25 @@ function joinGroupGame(u, token) {
   }
 
   const room = groupRooms.get(tokenInfo.code);
+
+  if (tokenInfo.shared) {
+    // Ортақ токен: тек осы бөлменің 2 ойыншысы кіре алады
+    const isPlayer = room && room.players.some(
+      player => String(player.id) === String(u.id)
+    );
+
+    if (room && !isPlayer) {
+      return send(u, {
+        t: 'group_error',
+        code: 'full'
+      });
+    }
+  } else if (tokenInfo.userId !== String(u.id)) {
+    return send(u, {
+      t: 'group_error',
+      code: 'invalid'
+    });
+  }
 
   if (!room) {
     return send(u, {
