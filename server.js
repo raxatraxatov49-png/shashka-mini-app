@@ -22,9 +22,37 @@ if (!fs.existsSync(DATA_DIR)) {
   fs.mkdirSync(DATA_DIR, { recursive: true });
 }
 
+/*
+  ДЕРЕКТЕРДІ САҚТАУ
+  -----------------
+  Render-дің файлдық жүйесі уақытша: әр deploy/restart кезінде
+  groups.json, admins.json сияқты файлдар өшіп кетеді.
+  Сондықтан тұрақты сақтау қажет. Екі нұсқа бар:
+
+  1) Upstash Redis (тегін, диск қажет емес) — ұсынылады.
+     Render Environment-ке қосыңыз:
+       UPSTASH_REDIS_REST_URL
+       UPSTASH_REDIS_REST_TOKEN
+
+  2) Render Persistent Disk (ақылы) — Mount Path: /var/data,
+     Environment: DATA_DIR=/var/data
+
+  Екеуі де жоқ болса — файлға жазады, бірақ deploy кезінде өшеді.
+*/
+
+const REDIS_URL = (process.env.UPSTASH_REDIS_REST_URL || '').replace(/\/+$/, '');
+const REDIS_TOKEN = process.env.UPSTASH_REDIS_REST_TOKEN || '';
+const USE_REDIS = Boolean(REDIS_URL && REDIS_TOKEN);
+const REDIS_PREFIX = process.env.REDIS_PREFIX || 'shashka:';
+
 const GROUPS_FILE = path.join(DATA_DIR, 'groups.json');
 const ADMINS_FILE = path.join(DATA_DIR, 'admins.json');
 const BLOCKED_FILE = path.join(DATA_DIR, 'blocked-groups.json');
+const STATS_FILE = path.join(DATA_DIR, 'stats.json');
+
+const STORAGE_MODE = USE_REDIS
+  ? 'Upstash Redis'
+  : (process.env.DATA_DIR ? 'Persistent Disk (' + DATA_DIR + ')' : 'Файл (УАҚЫТША!)');
 
 /* ---------- JSON сақтау ---------- */
 
@@ -47,6 +75,91 @@ function writeJSON(file, data) {
   fs.renameSync(temp, file);
 }
 
+async function redisCommand(args) {
+  const response = await fetch(REDIS_URL, {
+    method: 'POST',
+    headers: {
+      Authorization: 'Bearer ' + REDIS_TOKEN,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(args)
+  });
+
+  const result = await response.json();
+
+  if (!response.ok || result.error) {
+    throw new Error(result.error || ('Redis HTTP ' + response.status));
+  }
+
+  return result.result;
+}
+
+/* Деректерді жүктеу: Redis -> файл (бұрынғы деректерді көшіру) -> fallback */
+async function storeLoad(name, file, fallback) {
+  if (USE_REDIS) {
+    const raw = await redisCommand(['GET', REDIS_PREFIX + name]);
+
+    if (raw !== null && raw !== undefined) {
+      return JSON.parse(raw);
+    }
+
+    // Redis-те жоқ: жергілікті файл болса, бір рет көшіреміз
+    const local = readJSON(file, undefined);
+
+    if (local !== undefined) {
+      await redisCommand(['SET', REDIS_PREFIX + name, JSON.stringify(local)]);
+      return local;
+    }
+
+    return fallback;
+  }
+
+  return readJSON(file, fallback);
+}
+
+const writeQueue = new Map();
+let flushPromise = null;
+
+async function flushWrites() {
+  while (writeQueue.size) {
+    const [name, json] = writeQueue.entries().next().value;
+
+    try {
+      await redisCommand(['SET', REDIS_PREFIX + name, json]);
+
+      if (writeQueue.get(name) === json) {
+        writeQueue.delete(name);
+      }
+    } catch (error) {
+      console.error('Redis жазу қатесі:', name, error.message);
+      await new Promise(r => setTimeout(r, 3000));
+    }
+  }
+}
+
+function flushStorage() {
+  if (!flushPromise) {
+    flushPromise = flushWrites().finally(() => {
+      flushPromise = null;
+    });
+  }
+
+  return flushPromise;
+}
+
+function storeSave(name, file, data) {
+  try {
+    writeJSON(file, data);
+  } catch (error) {
+    console.error('Файлға жазу қатесі:', file, error.message);
+  }
+
+  if (USE_REDIS) {
+    writeQueue.set(name, JSON.stringify(data));
+    flushStorage();
+  }
+}
+
 /* ---------- Рұқсаттар ---------- */
 
 const PERMISSIONS = {
@@ -64,9 +177,7 @@ const DEFAULT_PERMISSIONS = [
   'games'
 ];
 
-function loadAdmins() {
-  const data = readJSON(ADMINS_FILE, []);
-
+function parseAdmins(data) {
   const result = new Map();
 
   if (Array.isArray(data)) {
@@ -85,13 +196,10 @@ function loadAdmins() {
   return result;
 }
 
-const admins = loadAdmins();
+const admins = new Map();
 
 function saveAdmins() {
-  writeJSON(
-    ADMINS_FILE,
-    [...admins.values()]
-  );
+  storeSave('admins', ADMINS_FILE, [...admins.values()]);
 }
 
 function isOwner(id) {
@@ -123,44 +231,113 @@ function getAdminPermissions(id) {
 
 /* ---------- Топтарды жүктеу ---------- */
 
-function loadGroups() {
-  const data = readJSON(GROUPS_FILE, []);
-
-  if (!Array.isArray(data)) return new Map();
-
-  return new Map(
-    data.map(g => [String(g.id), g])
-  );
-}
-
-const savedGroups = loadGroups();
+const savedGroups = new Map();
 
 function saveGroups() {
-  writeJSON(
-    GROUPS_FILE,
-    [...savedGroups.values()]
-  );
+  storeSave('groups', GROUPS_FILE, [...savedGroups.values()]);
 }
 
 /* ---------- Блокталған топтар ---------- */
 
-function loadBlockedGroups() {
-  const data = readJSON(BLOCKED_FILE, []);
-
-  return new Set(
-    Array.isArray(data)
-      ? data.map(String)
-      : []
-  );
-}
-
-const blockedGroups = loadBlockedGroups();
+const blockedGroups = new Set();
 
 function saveBlockedGroups() {
-  writeJSON(
-    BLOCKED_FILE,
-    [...blockedGroups]
-  );
+  storeSave('blocked', BLOCKED_FILE, [...blockedGroups]);
+}
+
+/* ---------- Тұрақты статистика ---------- */
+
+const stats = {
+  totalGames: 0,
+  totalGroupGames: 0,
+  users: {}
+};
+
+function saveStats() {
+  storeSave('stats', STATS_FILE, stats);
+}
+
+function trackUser(id) {
+  id = String(id);
+
+  if (stats.users[id]) return;
+
+  stats.users[id] = Date.now();
+  saveStats();
+}
+
+async function initStorage() {
+  let lastError = null;
+
+  for (let attempt = 1; attempt <= 5; attempt++) {
+    try {
+      const adminData = await storeLoad('admins', ADMINS_FILE, []);
+      const groupData = await storeLoad('groups', GROUPS_FILE, []);
+      const blockedData = await storeLoad('blocked', BLOCKED_FILE, []);
+      const statsData = await storeLoad('stats', STATS_FILE, null);
+
+      admins.clear();
+      for (const [k, v] of parseAdmins(adminData)) admins.set(k, v);
+
+      savedGroups.clear();
+      if (Array.isArray(groupData)) {
+        for (const g of groupData) {
+          if (g && g.id) savedGroups.set(String(g.id), g);
+        }
+      }
+
+      blockedGroups.clear();
+      if (Array.isArray(blockedData)) {
+        for (const id of blockedData) blockedGroups.add(String(id));
+      }
+
+      const groupGamesSum = [...savedGroups.values()].reduce(
+        (sum, g) => sum + (Number(g.gameCount) || 0),
+        0
+      );
+
+      if (statsData && typeof statsData === 'object') {
+        stats.totalGames = Number(statsData.totalGames) || 0;
+        stats.totalGroupGames = Number(statsData.totalGroupGames) || 0;
+        stats.users = statsData.users && typeof statsData.users === 'object'
+          ? statsData.users
+          : {};
+      }
+
+      // Ескі деректерден көшіру: өткен топ ойындарын жоғалтпау
+      if (stats.totalGroupGames < groupGamesSum) {
+        stats.totalGroupGames = groupGamesSum;
+      }
+
+      if (stats.totalGames < stats.totalGroupGames) {
+        stats.totalGames = stats.totalGroupGames;
+      }
+
+      console.log('Сақтау режимі:', STORAGE_MODE);
+      console.log(
+        `Жүктелді: топ ${savedGroups.size}, админ ${admins.size}, ` +
+        `блок ${blockedGroups.size}, ойыншы ${Object.keys(stats.users).length}`
+      );
+
+      if (!USE_REDIS && !process.env.DATA_DIR && process.env.RENDER) {
+        console.warn(
+          '⚠️ ЕСКЕРТУ: Render-де тұрақты сақтау бапталмаған! ' +
+          'Әр deploy кезінде статистика өшеді. ' +
+          'UPSTASH_REDIS_REST_URL/TOKEN немесе DATA_DIR+Disk орнатыңыз.'
+        );
+      }
+
+      return;
+    } catch (error) {
+      lastError = error;
+      console.error(`Деректерді жүктеу қатесі (${attempt}/5):`, error.message);
+      await new Promise(r => setTimeout(r, 2000 * attempt));
+    }
+  }
+
+  // Бос деректермен іске қосып, барын үстіне жазып жібермеу үшін тоқтатамыз
+  console.error('Деректерді жүктеу мүмкін болмады. Сервер тоқтатылды:', lastError && lastError.message);
+  process.exit(1);
 }
 
 function isGroupBlocked(id) {
@@ -609,6 +786,9 @@ function startGame(a, b, groupInfo = null) {
 
   games.set(g.id, g);
 
+  stats.totalGames++;
+  saveStats();
+
   a.game = b.game = g.id;
 
   send(a, gameState(g, a.id));
@@ -959,13 +1139,22 @@ async function editAdminMessage(
   text,
   keyboard
 ) {
-  return telegramApi('editMessageText', {
-    chat_id: chatId,
-    message_id: messageId,
-    text,
-    parse_mode: 'HTML',
-    reply_markup: keyboard
-  });
+  try {
+    return await telegramApi('editMessageText', {
+      chat_id: chatId,
+      message_id: messageId,
+      text,
+      parse_mode: 'HTML',
+      reply_markup: keyboard
+    });
+  } catch (error) {
+    // «🔄 Жаңарту» басылғанда мәтін өзгермесе Telegram қате береді — елемейміз
+    if (String(error.message).includes('message is not modified')) {
+      return null;
+    }
+
+    throw error;
+  }
 }
 
 /* ---------- Админдер тізімі ---------- */
@@ -1062,6 +1251,32 @@ function groupManageKeyboard() {
 
 /* ---------- Админ callback ---------- */
 
+function requiredPermission(data) {
+  if (data === 'adm:stats') return 'stats';
+
+  if (
+    data.startsWith('adm:groups:') ||
+    data.startsWith('adm:group:')
+  ) return 'groups';
+
+  if (data === 'adm:games') return 'games';
+
+  if (data.startsWith('adm:broadcast')) return 'broadcast';
+
+  if (
+    data.startsWith('adm:block') ||
+    data.startsWith('adm:groupblock:') ||
+    data.startsWith('adm:groupunblock:')
+  ) return 'group_manage';
+
+  if (
+    data.startsWith('adm:admin') ||
+    data.startsWith('adm:perm:')
+  ) return 'admin_manage';
+
+  return null;
+}
+
 async function handleAdminCallback(query) {
   const data = String(query.data || '');
 
@@ -1097,31 +1312,16 @@ async function handleAdminCallback(query) {
   const chatId = query.message.chat.id;
   const messageId = query.message.message_id;
 
-  const permissionMap = [
-    ['adm:stats', 'stats'],
-    ['adm:groups:', 'groups'],
-    ['adm:games', 'games'],
-    ['adm:broadcast', 'broadcast'],
-    ['adm:block', 'group_manage'],
-    ['adm:admin:', 'admin_manage'],
-    ['adm:admins', 'admin_manage']
-  ];
+  const needed = requiredPermission(data);
 
-  for (const [prefix, permission] of permissionMap) {
-    if (
-      data === prefix ||
-      (prefix.endsWith(':') && data.startsWith(prefix))
-    ) {
-      if (!hasPermission(adminId, permission)) {
-        await answerCallback(
-          query.id,
-          '⛔ Бұл бөлімге рұқсатыңыз жоқ!',
-          true
-        );
+  if (needed && !hasPermission(adminId, needed)) {
+    await answerCallback(
+      query.id,
+      '⛔ Бұл бөлімге рұқсатыңыз жоқ!',
+      true
+    );
 
-        return true;
-      }
-    }
+    return true;
   }
 
   /* Хабар тарату */
@@ -1498,21 +1698,18 @@ async function handleAdminCallback(query) {
       g => g.type === 'private'
     ).length;
 
-    const totalGames = all.reduce(
-      (sum, group) =>
-        sum + (Number(group.gameCount) || 0),
-      0
-    );
-
     const text =
       '📊 <b>БОТ СТАТИСТИКАСЫ</b>\n\n' +
       `👥 Қосылған топтар: ${all.length}\n` +
       `🌐 Ашық топтар: ${publicCount}\n` +
       `🔒 Жабық топтар: ${privateCount}\n` +
       `🚫 Блокталған топтар: ${blockedGroups.size}\n\n` +
-      `🎮 Жами топ ойындары: ${totalGames}\n` +
-      `⚔️ Белсенді ойындар: ${games.size}\n` +
-      `👤 Танылған ойыншылар: ${users.size}`;
+      `🎮 Барлық ойындар: ${stats.totalGames}\n` +
+      `👥 Топтағы ойындар: ${stats.totalGroupGames}\n` +
+      `⚔️ Белсенді ойындар: ${games.size}\n\n` +
+      `👤 Барлық ойыншылар: ${Object.keys(stats.users).length}\n` +
+      `🟢 Қазір онлайн: ${[...users.values()].filter(u => u.ws).length}\n\n` +
+      `💾 Сақтау: ${escapeHtml(STORAGE_MODE)}`;
 
     await editAdminMessage(
       chatId,
@@ -1798,24 +1995,6 @@ function createGroupToken(room, player) {
   return token;
 }
 
-function createSharedGroupToken(room) {
-  let token = room.tokens.get('shared');
-
-  if (token) return token;
-
-  token = crypto.randomBytes(16).toString('hex');
-
-  room.tokens.set('shared', token);
-
-  groupTokens.set(token, {
-    code: room.code,
-    userId: null,
-    shared: true
-  });
-
-  return token;
-}
-
 function roomText(room) {
   let text = '♟️ <b>ШАШКА ОЙЫНЫ</b>\n\n';
 
@@ -1835,10 +2014,9 @@ function roomText(room) {
       '⏳ Қарсылас табуға 2 минут беріледі.';
   } else if (!room.started) {
     text +=
-      '\n\n🎮 Ойынға тек осы екі ойыншы кіре алады.\n' +
-      'Төмендегі «ОЙЫНҒА КІРУ» батырмасын басыңыздар.';
+      '\n\n📩 Екі ойыншыға да ойынға кіру батырмасы жеке хабарлама арқылы жіберілді.';
     text +=
-      '\n\n📩 Сілтеме екі ойыншыға жеке хабарлама арқылы да жіберілді.';
+      '\n\n📱 Жеке хабарламаларыңызды тексеріңіздер!';
     text +=
       '\n⏳ Бірінші кірген ойыншыға 1 минут 30 секунд беріледі.';
   } else {
@@ -1858,19 +2036,8 @@ function roomKeyboard(room) {
     };
   }
 
-  if (room.started) {
-    return {
-      inline_keyboard: []
-    };
-  }
-
   return {
-    inline_keyboard: [[{
-      text: '🎮 ОЙЫНҒА КІРУ',
-      url: MINI_APP_LINK +
-        'group_' +
-        createSharedGroupToken(room)
-    }]]
+    inline_keyboard: []
   };
 }
 
@@ -1980,20 +2147,33 @@ async function sendPlayerGroupLink(room, player) {
 async function sendLinksToBothPlayers(room) {
   if (room.players.length !== 2) return;
 
-  // Топтағы «ОЙЫНҒА КІРУ» батырмасы бірден шығады,
-  // жеке хабарламалар қатар жіберіледі
-  const [results] = await Promise.all([
-    Promise.all(
-      room.players.map(
-        player => sendPlayerGroupLink(room, player)
-      )
-    ),
-    updateGroupRoom(room).catch(
-      error => console.error(error.message)
+  const results = await Promise.all(
+    room.players.map(
+      player => sendPlayerGroupLink(room, player)
     )
-  ]);
+  );
 
   room.privateSent = results.filter(Boolean).length;
+
+  try {
+    await updateGroupRoom(room);
+  } catch (error) {
+    console.error(error.message);
+  }
+
+  if (room.privateSent < 2) {
+    try {
+      await telegramApi('sendMessage', {
+        chat_id: room.chatId,
+        text:
+          '⚠️ Кейбір ойыншыларға жеке хабарлама жіберілмеді.\n' +
+          'Ботқа жеке чатта /start командасын жіберіп, қайта тексеріңіздер.',
+        reply_to_message_id: room.messageId || undefined
+      });
+    } catch (error) {
+      console.error(error.message);
+    }
+  }
 }
 
 /* ---------- Топ callback ---------- */
@@ -2263,6 +2443,24 @@ async function handleTelegramWebhook(req, res) {
       const action = adminActions.get(adminId);
 
       if (action) {
+        const needPerm = {
+          add_admin: 'admin_manage',
+          block_group: 'group_manage',
+          unblock_group: 'group_manage'
+        }[action.action];
+
+        if (needPerm && !hasPermission(adminId, needPerm)) {
+          adminActions.delete(adminId);
+
+          await telegramApi('sendMessage', {
+            chat_id: message.chat.id,
+            text: '⛔ Бұл әрекетке рұқсатыңыз жоқ.'
+          });
+
+          res.writeHead(200);
+          return res.end('ok');
+        }
+
         if (input.startsWith('/')) {
           await telegramApi('sendMessage', {
             chat_id: message.chat.id,
@@ -2374,7 +2572,7 @@ async function handleTelegramWebhook(req, res) {
 
       const draft = adminBroadcastDrafts.get(adminId);
 
-      if (draft && draft.waiting) {
+      if (draft && draft.waiting && hasPermission(adminId, 'broadcast')) {
         if (!input) {
           await telegramApi('sendMessage', {
             chat_id: message.chat.id,
@@ -2944,6 +3142,10 @@ function startGroupMatch(room, g) {
 
   incrementGroupGameCount(room.chatId);
 
+  stats.totalGames++;
+  stats.totalGroupGames++;
+  saveStats();
+
   g.waitingForOpponent = false;
 
   clearGroupWaitingTimer(room);
@@ -2983,7 +3185,7 @@ function joinGroupGame(u, token) {
 
   if (
     !tokenInfo ||
-    (!tokenInfo.shared && tokenInfo.userId !== String(u.id))
+    tokenInfo.userId !== String(u.id)
   ) {
     return send(u, {
       t: 'group_error',
@@ -2997,18 +3199,6 @@ function joinGroupGame(u, token) {
     return send(u, {
       t: 'group_error',
       code: 'expired'
-    });
-  }
-
-  // Топтағы ортақ батырма: тек тіркелген 2 ойыншы кіре алады
-  if (
-    !room.players.some(
-      (player) => String(player.id) === String(u.id)
-    )
-  ) {
-    return send(u, {
-      t: 'group_error',
-      code: 'full'
     });
   }
 
@@ -3472,6 +3662,8 @@ function onAuth(ws, m) {
 
   info.id = String(info.id);
 
+  trackUser(info.id);
+
   let u = users.get(info.id);
 
   if (u && u.ws && u.ws !== ws) {
@@ -3707,28 +3899,37 @@ setInterval(() => {
 /* ---------- Серверді іске қосу ---------- */
 
 if (require.main === module) {
-  server.listen(PORT, () => {
-    console.log(
-      `Shashka сервері: http://localhost:${PORT}` +
-      `${DEV ? ' (DEV режимі)' : ''}`
-    );
+  const shutdown = async signal => {
+    console.log(signal + ': жабылар алдында деректер сақталуда...');
 
-    console.log(
-      'Негізгі админ:',
-      OWNER_ID
-    );
+    try {
+      await Promise.race([
+        flushStorage(),
+        new Promise(r => setTimeout(r, 8000))
+      ]);
+    } catch (error) {
+      console.error(error.message);
+    }
 
-    console.log(
-      'Қосымша админдер:',
-      admins.size
-    );
+    process.exit(0);
+  };
 
-    console.log(
-      'Блокталған топтар:',
-      blockedGroups.size
-    );
+  process.once('SIGTERM', () => shutdown('SIGTERM'));
+  process.once('SIGINT', () => shutdown('SIGINT'));
 
-    setupTelegramWebhook();
+  initStorage().then(() => {
+    server.listen(PORT, () => {
+      console.log(
+        `Shashka сервері: http://localhost:${PORT}` +
+        `${DEV ? ' (DEV режимі)' : ''}`
+      );
+
+      console.log('Негізгі админ:', OWNER_ID);
+      console.log('Қосымша админдер:', admins.size);
+      console.log('Блокталған топтар:', blockedGroups.size);
+
+      setupTelegramWebhook();
+    });
   });
 }
 
@@ -3740,5 +3941,7 @@ module.exports = {
   groupRooms,
   savedGroups,
   admins,
-  blockedGroups
+  blockedGroups,
+  stats,
+  initStorage
 };
