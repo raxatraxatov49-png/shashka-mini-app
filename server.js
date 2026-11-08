@@ -7,6 +7,7 @@ const crypto = require('crypto');
 const { WebSocketServer } = require('ws');
 const G = require('./lib/game');
 const { verifyInitData } = require('./lib/telegram');
+const { t: tx, normLang, detectLang, DEFAULT_LANG } = require('./lib/i18n');
 
 const PORT = Number(process.env.PORT) || 3000;
 const BOT_TOKEN = process.env.BOT_TOKEN || '';
@@ -266,6 +267,42 @@ function trackUser(id) {
   saveStats();
 }
 
+/* ---------- Тіл баптаулары (чат / топ бойынша) ---------- */
+
+const LANGS_FILE = path.join(DATA_DIR, 'langs.json');
+const chatLangs = new Map();
+
+function getLang(chatId) {
+  return normLang(chatLangs.get(String(chatId)));
+}
+
+function hasLang(chatId) {
+  return chatLangs.has(String(chatId));
+}
+
+function setLang(chatId, lang) {
+  chatLangs.set(String(chatId), normLang(lang));
+  storeSave('langs', LANGS_FILE, Object.fromEntries(chatLangs));
+}
+
+function tgLangFromInitData(initData) {
+  try {
+    const user = JSON.parse(new URLSearchParams(initData).get('user'));
+    return (user && user.language_code) || '';
+  } catch {
+    return '';
+  }
+}
+
+// Мини апп тілі: жеке чатта таңдалған тіл, болмаса Telegram тілі, болмаса қазақша
+function userLang(u) {
+  const id = String(u.id);
+
+  if (chatLangs.has(id)) return chatLangs.get(id);
+
+  return normLang(detectLang(u.tgLang));
+}
+
 async function initStorage() {
   let lastError = null;
 
@@ -275,6 +312,7 @@ async function initStorage() {
       const groupData = await storeLoad('groups', GROUPS_FILE, []);
       const blockedData = await storeLoad('blocked', BLOCKED_FILE, []);
       const statsData = await storeLoad('stats', STATS_FILE, null);
+      const langData = await storeLoad('langs', LANGS_FILE, {});
 
       admins.clear();
       for (const [k, v] of parseAdmins(adminData)) admins.set(k, v);
@@ -289,6 +327,13 @@ async function initStorage() {
       blockedGroups.clear();
       if (Array.isArray(blockedData)) {
         for (const id of blockedData) blockedGroups.add(String(id));
+      }
+
+      chatLangs.clear();
+      if (langData && typeof langData === 'object') {
+        for (const [id, l] of Object.entries(langData)) {
+          chatLangs.set(String(id), normLang(l));
+        }
       }
 
       const groupGamesSum = [...savedGroups.values()].reduce(
@@ -2017,7 +2062,9 @@ function createSharedToken(room) {
 }
 
 function roomText(room) {
-  let text = '♟️ <b>ШАШКА ОЙЫНЫ</b>\n\n';
+  const lang = getLang(room.chatId);
+
+  let text = tx(lang, 'roomTitle') + '\n\n';
 
   room.players.forEach((player, index) => {
     const id = String(player.id);
@@ -2029,27 +2076,23 @@ function roomText(room) {
   });
 
   if (room.players.length < 2) {
-    text +=
-      '\n🔎 Қарсылас ізделуде...\n' +
-      '♟️ Ойынға қосылу үшін төмендегі батырманы басыңыз.\n' +
-      '⏳ Қарсылас табуға 2 минут беріледі.';
+    text += tx(lang, 'roomSearching');
   } else if (!room.started) {
-    text +=
-      '\n✅ Екі ойыншы табылды!\n' +
-      '👇 Ойынға кіру үшін төмендегі батырманы басыңыз.\n' +
-      '⏳ Бірінші кірген ойыншыға 1 минут 30 секунд беріледі.';
+    text += tx(lang, 'roomFound');
   } else {
-    text += '\n\n🎮 <b>Ойын басталды!</b>\nСәттілік!';
+    text += tx(lang, 'roomStarted');
   }
 
   return text;
 }
 
 function roomKeyboard(room) {
+  const lang = getLang(room.chatId);
+
   if (room.players.length < 2) {
     return {
       inline_keyboard: [[{
-        text: '♟️ ОЙЫНҒА ҚОСЫЛУ',
+        text: tx(lang, 'btnJoin'),
         callback_data: 'gj:' + room.code
       }]]
     };
@@ -2058,7 +2101,7 @@ function roomKeyboard(room) {
   if (!room.started) {
     return {
       inline_keyboard: [[{
-        text: '🎮 ОЙЫНҒА КІРУ',
+        text: tx(lang, 'btnEnter'),
         url: MINI_APP_LINK + 'group_' + createSharedToken(room)
       }]]
     };
@@ -2095,12 +2138,14 @@ async function replaceGroupRoomMessage(room) {
     }
   }
 
+  const lang = getLang(room.chatId);
+
   const text =
-    '♟️ <b>ШАШКА ОЙЫНЫ</b>\n\n' +
+    tx(lang, 'roomTitle') + '\n\n' +
     room.players.map((player, index) =>
       `${index + 1}. ${playerLink(player)} ✅`
     ).join('\n') +
-    '\n\n🎮 <b>Ойын басталды!</b>\nСәттілік!';
+    tx(lang, 'roomStarted');
 
   const sent = await telegramApi('sendMessage', {
     chat_id: room.chatId,
@@ -2185,11 +2230,16 @@ async function handleGroupCallback(query) {
 
   const code = match[1];
   const room = groupRooms.get(code);
+  const lang = getLang(
+    query.message && query.message.chat
+      ? query.message.chat.id
+      : (room ? room.chatId : '')
+  );
 
   if (!room || room.started) {
     await answerCallback(
       query.id,
-      'Бұл ойынның уақыты аяқталған.',
+      tx(lang, 'roomExpired'),
       true
     );
 
@@ -2199,7 +2249,7 @@ async function handleGroupCallback(query) {
   if (isGroupBlocked(room.chatId)) {
     await answerCallback(
       query.id,
-      '🚫 Бұл топта бот бұғатталған.',
+      tx(lang, 'groupBlocked'),
       true
     );
 
@@ -2215,7 +2265,7 @@ async function handleGroupCallback(query) {
   if (already) {
     await answerCallback(
       query.id,
-      'Сіз ойынға қосылып қойғансыз.'
+      tx(lang, 'alreadyJoined')
     );
 
     return true;
@@ -2224,7 +2274,7 @@ async function handleGroupCallback(query) {
   if (room.players.length >= 2) {
     await answerCallback(
       query.id,
-      'Ойыншылар саны толды.',
+      tx(lang, 'roomFull'),
       true
     );
 
@@ -2234,7 +2284,7 @@ async function handleGroupCallback(query) {
   if (groupPlayerRooms.has(userId)) {
     await answerCallback(
       query.id,
-      'Сіз басқа топтық ойынға қосылғансыз.',
+      tx(lang, 'otherRoom'),
       true
     );
 
@@ -2253,7 +2303,7 @@ async function handleGroupCallback(query) {
 
   await answerCallback(
     query.id,
-    'Сіз ойынға қосылдыңыз!'
+    tx(lang, 'joined')
   );
 
   if (room.players.length === 2) {
@@ -2272,19 +2322,84 @@ async function handleGroupCallback(query) {
   return true;
 }
 
+/* ---------- /language ---------- */
+
+function languageKeyboard() {
+  return {
+    inline_keyboard: [[
+      { text: '🇺🇿 O‘zbekcha', callback_data: 'lang:uz' },
+      { text: '🇰🇿 Қазақша', callback_data: 'lang:kk' },
+      { text: '🇷🇺 Русский', callback_data: 'lang:ru' }
+    ]]
+  };
+}
+
+async function handleLangCallback(query) {
+  const match = String(query.data || '').match(/^lang:(uz|kk|ru)$/);
+
+  if (!match) return false;
+
+  const lang = match[1];
+  const chat = query.message && query.message.chat;
+
+  if (!chat) {
+    await answerCallback(query.id, '');
+    return true;
+  }
+
+  // Топта тілді тек топ админдері өзгерте алады
+  if (chat.type !== 'private') {
+    let allowed = false;
+
+    try {
+      const member = await telegramApi('getChatMember', {
+        chat_id: chat.id,
+        user_id: query.from.id
+      });
+
+      allowed = ['creator', 'administrator'].includes(
+        member.result && member.result.status
+      );
+    } catch (error) {
+      console.error('getChatMember қатесі:', error.message);
+    }
+
+    if (!allowed) {
+      await answerCallback(
+        query.id,
+        tx(getLang(chat.id), 'langAdminOnly'),
+        true
+      );
+
+      return true;
+    }
+  }
+
+  setLang(chat.id, lang);
+
+  await answerCallback(query.id, tx(lang, 'langSaved'));
+
+  try {
+    await telegramApi('editMessageText', {
+      chat_id: chat.id,
+      message_id: query.message.message_id,
+      text: tx(lang, 'langSaved')
+    });
+  } catch (error) {
+    if (!String(error.message).includes('message is not modified')) {
+      console.error(error.message);
+    }
+  }
+
+  return true;
+}
+
 /* ---------- Топқа қосылғандағы хабарлама ---------- */
 
 async function sendGroupWelcome(chatId) {
   if (isGroupBlocked(chatId)) return;
 
-  const text =
-    '♟️ <b>Сәлеметсіздер ме!</b>\n\n' +
-    'Мен — Шашка ойынының ботымын! 🎮\n\n' +
-    'Енді осы топта достарыңызбен шашка ойнай аласыздар.\n\n' +
-    '🎯 Ойынды бастау үшін:\n' +
-    '<b>/game</b> командасын жазыңыз.\n\n' +
-    '👥 Екі ойыншы қосылып, ойын басталады!\n\n' +
-    'Жеңіске жеткен ойыншыны анықтаймыз. Сәтті ойын! 🏆';
+  const text = tx(getLang(chatId), 'groupWelcome');
 
   await telegramApi('sendMessage', {
     chat_id: chatId,
@@ -2321,6 +2436,11 @@ async function handleTelegramWebhook(req, res) {
     /* Callback */
 
     if (update.callback_query) {
+      if (await handleLangCallback(update.callback_query)) {
+        res.writeHead(200);
+        return res.end('ok');
+      }
+
       if (
         await handleAdminCallback(
           update.callback_query
@@ -2686,8 +2806,7 @@ async function handleTelegramWebhook(req, res) {
               first_name: message.from.first_name || '',
               last_name: message.from.last_name || ''
             })}\n\n` +
-            'Сіз қазір шашка ойнап жатырсыз!\n' +
-            'Жаңа ойын ашу үшін алдымен қазіргі ойынды аяқтаңыз. ♟️',
+            tx(getLang(message.chat.id), 'alreadyPlaying'),
           parse_mode: 'HTML'
         });
 
@@ -2756,6 +2875,19 @@ async function handleTelegramWebhook(req, res) {
       }
     }
 
+    /* /language: жеке чатта да, топта да */
+
+    if (/^\/language(?:@\w+)?(?:\s|$)/.test(message.text)) {
+      await telegramApi('sendMessage', {
+        chat_id: message.chat.id,
+        text: tx(getLang(message.chat.id), 'chooseLang'),
+        reply_markup: languageKeyboard()
+      });
+
+      res.writeHead(200);
+      return res.end('ok');
+    }
+
     /* Start */
 
     if (
@@ -2764,21 +2896,29 @@ async function handleTelegramWebhook(req, res) {
       ) &&
       message.chat.type === 'private'
     ) {
+      // Тіл әлі таңдалмаған болса, Telegram тілін қолданамыз
+      if (!hasLang(message.chat.id)) {
+        setLang(
+          message.chat.id,
+          normLang(detectLang(message.from && message.from.language_code))
+        );
+      }
+
+      const lang = getLang(message.chat.id);
+
       await telegramApi('sendMessage', {
         chat_id: message.chat.id,
-        text:
-          '♟️ Қош келдіңіз!\n\n' +
-          'Шашка ойынын бастаңыз және қарсыластарыңызды жеңіңіз! 🎮',
+        text: tx(lang, 'startText'),
         reply_markup: {
           inline_keyboard: [
             [{
-              text: '🎮 ОЙЫНДЫ БАСТАУ',
+              text: tx(lang, 'btnStart'),
               web_app: {
-                url: 'https://shashka-mini-app.onrender.com'
+                url: 'https://shashka-mini-app.onrender.com/?lang=' + lang
               }
             }],
             [{
-              text: '👥 ГРУППАДА ОЙНАУ',
+              text: tx(lang, 'btnGroup'),
               url: 'https://t.me/shashkaoyinibot?startgroup=true'
             }]
           ]
@@ -2805,31 +2945,54 @@ async function setupTelegramWebhook() {
   if (!BOT_TOKEN || DEV) return;
 
   try {
-    await telegramApi('setMyCommands', {
-      commands: [{
-        command: 'game',
-        description: 'Шашка ойынын құру'
-      }],
-      scope: {
-        type: 'all_group_chats'
-      }
-    });
+    const commandLocales = [
+      { code: null, lang: 'kk' },
+      { code: 'kk', lang: 'kk' },
+      { code: 'uz', lang: 'uz' },
+      { code: 'ru', lang: 'ru' }
+    ];
 
-    await telegramApi('setMyCommands', {
-      commands: [
-        {
-          command: 'start',
-          description: 'Ботты іске қосу'
+    for (const { code, lang } of commandLocales) {
+      const extra = code ? { language_code: code } : {};
+
+      await telegramApi('setMyCommands', {
+        commands: [
+          {
+            command: 'game',
+            description: tx(lang, 'cmdGame')
+          },
+          {
+            command: 'language',
+            description: tx(lang, 'cmdLanguage')
+          }
+        ],
+        scope: {
+          type: 'all_group_chats'
         },
-        {
-          command: 'admin',
-          description: 'Админ панель'
-        }
-      ],
-      scope: {
-        type: 'all_private_chats'
-      }
-    });
+        ...extra
+      });
+
+      await telegramApi('setMyCommands', {
+        commands: [
+          {
+            command: 'start',
+            description: tx(lang, 'cmdStart')
+          },
+          {
+            command: 'language',
+            description: tx(lang, 'cmdLanguage')
+          },
+          {
+            command: 'admin',
+            description: tx(lang, 'cmdAdmin')
+          }
+        ],
+        scope: {
+          type: 'all_private_chats'
+        },
+        ...extra
+      });
+    }
 
     console.log('Telegram командалары орнатылды');
 
@@ -3036,11 +3199,13 @@ function finish(g, winner, reason) {
       ? users.get(winnerId)
       : null;
 
+    const lang = getLang(chatId);
+
     let resultText;
 
     if (winnerUser) {
       resultText =
-        `🏆 <b>ЖЕҢІМПАЗ:</b> ${playerLink({
+        `${tx(lang, 'winner')} ${playerLink({
           id: winnerId,
           username: winnerUser.username || '',
           first_name: winnerUser.username
@@ -3049,20 +3214,16 @@ function finish(g, winner, reason) {
         })}`;
 
       if (reason === 'timeout') {
-        resultText +=
-          '\n⏰ Қарсыласының жүріс уақыты аяқталды.';
+        resultText += '\n' + tx(lang, 'rTimeout');
       } else if (reason === 'opponent_timeout') {
-        resultText +=
-          '\n⏰ Қарсыласы 1 минут 30 секунд ішінде ойынға кірмеді.';
+        resultText += '\n' + tx(lang, 'rOppTimeout');
       } else if (reason === 'resign') {
-        resultText +=
-          '\n🏁 Қарсыласы ойынды аяқтады.';
+        resultText += '\n' + tx(lang, 'rResign');
       } else if (reason === 'left') {
-        resultText +=
-          '\n📴 Қарсыласының байланысы үзілді.';
+        resultText += '\n' + tx(lang, 'rLeft');
       }
     } else {
-      resultText = '🤝 Ойын тең аяқталды!';
+      resultText = tx(lang, 'drawText');
     }
 
     const oldMessageIds = room
@@ -3093,7 +3254,7 @@ function finish(g, winner, reason) {
         await telegramApi('sendMessage', {
           chat_id: chatId,
           text:
-            '♟️ <b>ШАШКА ОЙЫНЫ АЯҚТАЛДЫ!</b>\n\n' +
+            tx(getLang(chatId), 'gameOver') + '\n\n' +
             resultText,
           parse_mode: 'HTML'
         });
@@ -3223,6 +3384,12 @@ function joinGroupGame(u, token) {
       code: 'blocked'
     });
   }
+
+  // Топтағы ойын: мини апп топтың тілінде ашылады
+  send(u, {
+    t: 'lang',
+    lang: getLang(room.chatId)
+  });
 
   if (room.started) {
     const existingGame = room.pendingGame;
@@ -3662,6 +3829,8 @@ function onAuth(ws, m) {
       m.initData,
       BOT_TOKEN
     );
+
+    if (info) info.tgLang = tgLangFromInitData(m.initData);
   }
 
   if (!info) {
@@ -3704,7 +3873,8 @@ function onAuth(ws, m) {
 
   send(u, {
     t: 'hello',
-    me: pub(u)
+    me: pub(u),
+    lang: userLang(u)
   });
 
   const g = u.game && games.get(u.game);
