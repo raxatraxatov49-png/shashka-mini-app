@@ -14,27 +14,27 @@
 <main id="menu" class="screen active">
   <header class="who">
     <div class="ava" id="meAva"></div>
-    <div><b id="meName">…</b><small>Дойбы ойыншысы</small></div>
+    <div><b id="meName">…</b><small data-i18n="playerRole">Дойбы ойыншысы</small></div>
   </header>
 
-  <h1>Дойбы</h1>
+  <h1 data-i18n="menuTitle">Дойбы</h1>
 
   <section class="card brown">
-    <h2>Кездейсоқ қарсылас</h2>
-    <p>Қазір қарсылас іздеп жүрген ойыншымен ойнаңыз</p>
+    <h2 data-i18n="randomTitle">Кездейсоқ қарсылас</h2>
+    <p data-i18n="randomDesc">Қазір қарсылас іздеп жүрген ойыншымен ойнаңыз</p>
     <button id="btnBatl" class="batl">ОЙНАУ</button>
-    <button id="btnCancel" class="ghost hidden">Бас тарту</button>
+    <button id="btnCancel" class="ghost hidden" data-i18n="cancel">Бас тарту</button>
   </section>
 
   <section class="card brown friend-card">
-    <h2>Досыңмен ойнау</h2>
-    <p>Досыңа шақыру сілтемесін жіберіп, бірге дойбы ойна</p>
-    <button id="btnFriend" class="batl">ДОСЫҢМЕН ОЙНАУ</button>
+    <h2 data-i18n="friendTitle">Досыңмен ойнау</h2>
+    <p data-i18n="friendDesc">Досыңа шақыру сілтемесін жіберіп, бірге дойбы ойна</p>
+    <button id="btnFriend" class="batl" data-i18n="friendBtn">ДОСЫҢМЕН ОЙНАУ</button>
   </section>
 </main>
 
 <main id="game" class="screen">
-  <div class="gtitle">Классикалық тақта</div>
+  <div class="gtitle" data-i18n="boardTitle">Классикалық тақта</div>
 
   <div class="prow" id="rowOpp">
     <div class="ava ring" id="oppAva"></div>
@@ -60,15 +60,15 @@
   <div id="invitebar" class="invitebar">
     <p id="invStatus">Шақыру сілтемесі дайындалуда...</p>
     <div class="invbtns">
-      <button id="btnInvCopy" class="invbtn" disabled>Сілтемені көшіру</button>
-      <button id="btnInvShare" class="invbtn" disabled>Telegram арқылы жіберу</button>
+      <button id="btnInvCopy" class="invbtn" disabled data-i18n="copyLink">Сілтемені көшіру</button>
+      <button id="btnInvShare" class="invbtn" disabled data-i18n="shareTg">Telegram арқылы жіберу</button>
     </div>
-    <button id="btnInvCancel" class="invcancel">Бас тарту</button>
+    <button id="btnInvCancel" class="invcancel" data-i18n="cancel">Бас тарту</button>
   </div>
 
   <nav class="dock">
-    <button id="btnMenu"><svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></svg>Мәзір</button>
-    <button id="btnChat"><svg viewBox="0 0 24 24"><path d="M4 5h16v11H9l-5 4z"/></svg>Чат<span id="badge" class="badge hidden">0</span></button>
+    <button id="btnMenu"><svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></svg><span data-i18n="menu">Мәзір</span></button>
+    <button id="btnChat"><svg viewBox="0 0 24 24"><path d="M4 5h16v11H9l-5 4z"/></svg><span data-i18n="chat">Чат</span><span id="badge" class="badge hidden">0</span></button>
   </nav>
 
   <div id="away" class="away hidden"></div>
@@ -77,8 +77,8 @@
 <div id="sheetInvite" class="sheet hidden">
   <div class="panel">
     <div class="phead">
-      <b>Досыңды шақыру</b>
-      <button id="btnCloseInvite" class="x" aria-label="Жабу">×</button>
+      <b data-i18n="inviteFriend">Досыңды шақыру</b>
+      <button id="btnCloseInvite" class="x" aria-label="Жабу" data-i18n-aria="close">×</button>
     </div>
 
     <p id="inviteStatus">Шақыру сілтемесі дайындалуда...</p>
@@ -88,29 +88,30 @@
       type="text"
       readonly
       placeholder="Шақыру сілтемесі"
+      data-i18n-ph="inviteLinkPh"
       autocomplete="off"
     >
 
-    <button id="btnCopyInvite" class="batl" disabled>Сілтемені көшіру</button>
-    <button id="btnShareInvite" class="batl" disabled>Telegram арқылы жіберу</button>
-    <button id="btnCancelInvite" class="ghost">Шақырудан бас тарту</button>
+    <button id="btnCopyInvite" class="batl" disabled data-i18n="copyLink">Сілтемені көшіру</button>
+    <button id="btnShareInvite" class="batl" disabled data-i18n="shareTg">Telegram арқылы жіберу</button>
+    <button id="btnCancelInvite" class="ghost" data-i18n="cancelInvite">Шақырудан бас тарту</button>
   </div>
 </div>
 
 <div id="sheetMenu" class="sheet hidden">
   <div class="panel small">
-    <button id="btnResign" class="danger">Берілeмін</button>
-    <button id="btnCloseMenu" class="ghost">Жабу</button>
+    <button id="btnResign" class="danger" data-i18n="resign">Берілемін</button>
+    <button id="btnCloseMenu" class="ghost" data-i18n="close">Жабу</button>
   </div>
 </div>
 
 <div id="sheetChat" class="sheet hidden">
   <div class="panel">
-    <div class="phead"><b>Чат</b><button id="btnCloseChat" class="x" aria-label="Жабу">×</button></div>
+    <div class="phead"><b data-i18n="chat">Чат</b><button id="btnCloseChat" class="x" aria-label="Жабу" data-i18n-aria="close">×</button></div>
     <div id="msgs" class="msgs"></div>
     <div class="compose">
-      <input id="chatInput" maxlength="300" placeholder="Хабарлама жазыңыз…" autocomplete="off" enterkeyhint="send">
-      <button id="btnSend" aria-label="Жіберу"><svg viewBox="0 0 24 24"><path d="M3 11l18-8-8 18-2-8z"/></svg></button>
+      <input id="chatInput" maxlength="300" placeholder="Хабарлама жазыңыз…" data-i18n-ph="msgPh" autocomplete="off" enterkeyhint="send">
+      <button id="btnSend" aria-label="Жіберу" data-i18n-aria="send"><svg viewBox="0 0 24 24"><path d="M3 11l18-8-8 18-2-8z"/></svg></button>
     </div>
   </div>
 </div>
@@ -120,12 +121,12 @@
     <div id="resEmoji" class="emoji"></div>
     <h3 id="resTitle"></h3>
     <p id="resSub"></p>
-    <button id="btnAgain" class="batl">Қайта ойнау</button>
-    <button id="btnToMenu" class="ghost">Басты мәзір</button>
+    <button id="btnAgain" class="batl" data-i18n="again">Қайта ойнау</button>
+    <button id="btnToMenu" class="ghost" data-i18n="toMenu">Басты мәзір</button>
   </div>
 </div>
 
-<div id="conn" class="conn hidden">Байланыс үзілді. Қайта қосылуда…</div>
+<div id="conn" class="conn hidden" data-i18n="connLost">Байланыс үзілді. Қайта қосылуда…</div>
 <div id="fatal" class="modal hidden"><div class="dialog"><h3 id="fatalTitle"></h3><p id="fatalSub"></p></div></div>
 
 <script src="app.js"></script>
