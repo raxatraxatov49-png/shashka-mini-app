@@ -1,4 +1,3 @@
-
 'use strict';
 
 const http = require('http');
@@ -24,9 +23,12 @@ if (!fs.existsSync(DATA_DIR)) {
   fs.mkdirSync(DATA_DIR, { recursive: true });
 }
 
+/* ---------- Топтарды жүктеу ---------- */
+
 function loadGroups() {
   try {
     const data = JSON.parse(fs.readFileSync(GROUPS_FILE, 'utf8'));
+
     return new Map(
       data.map(g => [String(g.id), g])
     );
@@ -38,15 +40,21 @@ function loadGroups() {
 const savedGroups = loadGroups();
 
 function saveGroups() {
+  const tempFile = GROUPS_FILE + '.tmp';
+
   fs.writeFileSync(
-    GROUPS_FILE,
+    tempFile,
     JSON.stringify([...savedGroups.values()], null, 2)
   );
+
+  fs.renameSync(tempFile, GROUPS_FILE);
 }
 
 function isAdmin(id) {
   return ADMIN_IDS.has(String(id));
 }
+
+/* ---------- Баптаулар ---------- */
 
 const INVITE_TTL = 10 * 60 * 1000;
 const GROUP_TTL = 10 * 60 * 1000;
@@ -83,6 +91,8 @@ const MIME = {
   '.ico': 'image/x-icon'
 };
 
+/* ---------- Telegram API ---------- */
+
 async function telegramApi(method, data) {
   const response = await fetch(
     `https://api.telegram.org/bot${BOT_TOKEN}/${method}`,
@@ -96,7 +106,12 @@ async function telegramApi(method, data) {
   const result = await response.json();
 
   if (!result.ok) {
-    throw new Error(result.description || 'Telegram API қатесі');
+    const error = new Error(
+      result.description || 'Telegram API қатесі'
+    );
+
+    error.telegram = result;
+    throw error;
   }
 
   return result;
@@ -146,7 +161,9 @@ async function registerGroup(chat) {
     username: chat.username || null,
     type: chat.username ? 'public' : 'private',
     inviteLink: old?.inviteLink || null,
-    addedAt: old?.addedAt || Date.now()
+    addedAt: old?.addedAt || Date.now(),
+    gameCount: Number(old?.gameCount) || 0,
+    lastGameAt: old?.lastGameAt || null
   };
 
   if (group.username) {
@@ -180,6 +197,91 @@ function removeGroup(id) {
   }
 }
 
+/* ---------- Топтағы ойын санын есептеу ---------- */
+
+function incrementGroupGameCount(chatId) {
+  const group = savedGroups.get(String(chatId));
+
+  if (!group) return;
+
+  group.gameCount = (Number(group.gameCount) || 0) + 1;
+  group.lastGameAt = Date.now();
+
+  savedGroups.set(String(chatId), group);
+  saveGroups();
+}
+
+/* ---------- Админ хабарламалары ---------- */
+
+const adminBroadcastDrafts = new Map();
+
+function delay(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+async function runBroadcast(adminId, messageText) {
+  let success = 0;
+  let failed = 0;
+  let removed = 0;
+
+  const groups = [...savedGroups.values()];
+
+  for (const group of groups) {
+    try {
+      await telegramApi('sendMessage', {
+        chat_id: group.id,
+        text: messageText
+      });
+
+      success++;
+    } catch (error) {
+      failed++;
+
+      const description = error.message || '';
+
+      if (
+        description.includes('chat not found') ||
+        description.includes('bot was kicked') ||
+        description.includes('bot was blocked')
+      ) {
+        removeGroup(group.id);
+        removed++;
+      }
+
+      const retryAfter = Number(
+        error.telegram?.parameters?.retry_after || 0
+      );
+
+      if (retryAfter > 0) {
+        await delay((retryAfter + 1) * 1000);
+      }
+
+      console.error(
+        'Хабар жіберу қатесі:',
+        group.title,
+        error.message
+      );
+    }
+
+    await delay(60);
+  }
+
+  try {
+    await telegramApi('sendMessage', {
+      chat_id: adminId,
+      text:
+        '📢 <b>ХАБАР ТАРАТУ АЯҚТАЛДЫ</b>\n\n' +
+        `👥 Барлық топ: ${groups.length}\n` +
+        `✅ Жеткізілді: ${success}\n` +
+        `❌ Жеткізілмеді: ${failed}\n` +
+        `🗑 Тізімнен өшірілді: ${removed}`,
+      parse_mode: 'HTML'
+    });
+  } catch (error) {
+    console.error('Админге есеп жіберілмеді:', error.message);
+  }
+}
+
 /* ---------- Админ панель ---------- */
 
 function adminKeyboard() {
@@ -193,6 +295,9 @@ function adminKeyboard() {
       ],
       [
         { text: '🎮 Белсенді ойындар', callback_data: 'adm:games' }
+      ],
+      [
+        { text: '📢 Топтарға хабарлама', callback_data: 'adm:broadcast' }
       ],
       [
         { text: '🔄 Жаңарту', callback_data: 'adm:home' }
@@ -237,6 +342,107 @@ async function handleAdminCallback(query) {
 
   const chatId = query.message.chat.id;
   const messageId = query.message.message_id;
+  const adminId = String(query.from.id);
+
+  /* Хабарлама тарату */
+
+  if (data === 'adm:broadcast') {
+    adminBroadcastDrafts.set(adminId, {
+      waiting: true,
+      text: null
+    });
+
+    try {
+      await telegramApi('editMessageText', {
+        chat_id: chatId,
+        message_id: messageId,
+        text:
+          '📢 <b>ТОПТАРҒА ХАБАР ЖІБЕРУ</b>\n\n' +
+          'Енді маған жібергіңіз келген хабарламаны жазыңыз.\n\n' +
+          '✍️ Хабарламаны осы жеке чатқа жіберіңіз.\n\n' +
+          '❌ Болдырмау үшін /cancel жазыңыз.',
+        parse_mode: 'HTML',
+        reply_markup: {
+          inline_keyboard: [[
+            {
+              text: '❌ Болдырмау',
+              callback_data: 'adm:broadcast:cancel'
+            }
+          ]]
+        }
+      });
+    } catch (error) {
+      console.error(error.message);
+    }
+
+    await answerCallback(query.id, 'Хабарлама мәтінін күтемін.');
+    return true;
+  }
+
+  if (data === 'adm:broadcast:confirm') {
+    const draft = adminBroadcastDrafts.get(adminId);
+
+    if (!draft || !draft.text) {
+      await answerCallback(query.id, 'Хабарлама табылмады.', true);
+      return true;
+    }
+
+    const messageText = draft.text;
+
+    adminBroadcastDrafts.delete(adminId);
+
+    await answerCallback(query.id, 'Жіберу бошланди!');
+
+    try {
+      await telegramApi('editMessageText', {
+        chat_id: chatId,
+        message_id: messageId,
+        text:
+          '📢 <b>ХАБАР ТАРАТИЛМОҚДА...</b>\n\n' +
+          'Барча гуруҳларга хабар юбориш бошланди.\n' +
+          'Якунланганда натижа сизга юборилади.',
+        parse_mode: 'HTML',
+        reply_markup: {
+          inline_keyboard: [[
+            {
+              text: '🔙 Бош меню',
+              callback_data: 'adm:home'
+            }
+          ]]
+        }
+      });
+    } catch (error) {
+      console.error(error.message);
+    }
+
+    runBroadcast(chatId, messageText).catch(error => {
+      console.error('Broadcast қатесі:', error.message);
+    });
+
+    return true;
+  }
+
+  if (data === 'adm:broadcast:cancel') {
+    adminBroadcastDrafts.delete(adminId);
+
+    await answerCallback(query.id, 'Бекор қилинди.');
+
+    try {
+      await telegramApi('editMessageText', {
+        chat_id: chatId,
+        message_id: messageId,
+        text:
+          '🔐 <b>SHASHKA BOT ADMIN PANEL</b>\n\n' +
+          'Бошқару бөлімін таңдаңыз.',
+        parse_mode: 'HTML',
+        reply_markup: adminKeyboard()
+      });
+    } catch (error) {
+      console.error(error.message);
+    }
+
+    return true;
+  }
 
   let text = '';
   let keyboard = adminKeyboard();
@@ -258,17 +464,24 @@ async function handleAdminCallback(query) {
       g => g.type === 'private'
     ).length;
 
+    const totalGames = all.reduce(
+      (sum, group) => sum + (Number(group.gameCount) || 0),
+      0
+    );
+
     text =
       '📊 <b>БОТ СТАТИСТИКАСЫ</b>\n\n' +
       `👥 Қосылған топтар: ${all.length}\n` +
       `🌐 Ашық топтар: ${publicCount}\n` +
       `🔒 Жабық топтар: ${privateCount}\n\n` +
-      `🎮 Белсенді ойындар: ${games.size}\n` +
+      `🎮 Жами топ ўйинлари: ${totalGames}\n` +
+      `⚔️ Белсенді ойындар: ${games.size}\n` +
       `👤 Танылған ойыншылар: ${users.size}`;
   }
 
   else if (data.startsWith('adm:groups:')) {
     const requestedPage = Number(data.split(':')[2]);
+
     const page = Number.isInteger(requestedPage)
       ? Math.max(0, requestedPage)
       : 0;
@@ -278,6 +491,7 @@ async function handleAdminCallback(query) {
     );
 
     const perPage = 8;
+
     const totalPages = Math.max(
       1,
       Math.ceil(all.length / perPage)
@@ -339,6 +553,7 @@ async function handleAdminCallback(query) {
 
     if (!group) {
       text = '⚠️ Бұл топ тізімде жоқ.';
+
       keyboard = {
         inline_keyboard: [[
           {
@@ -356,7 +571,8 @@ async function handleAdminCallback(query) {
         '👥 <b>ТОП АҚПАРАТЫ</b>\n\n' +
         `📝 Атауы: ${escapeHtml(group.title)}\n` +
         `🆔 ID: <code>${escapeHtml(group.id)}</code>\n` +
-        `🌐 Түрі: ${group.type === 'public' ? 'Ашық топ' : 'Жабық топ'}` +
+        `🌐 Түрі: ${group.type === 'public' ? 'Ашық топ' : 'Жабық топ'}\n` +
+        `🎮 Өткізілген ойындар: ${Number(group.gameCount) || 0}` +
         link;
 
       keyboard = {
@@ -938,6 +1154,7 @@ async function handleTelegramWebhook(req, res) {
       /^\/admin(?:@\w+)?(?:\s|$)/.test(message.text || '')
     ) {
       if (isAdmin(message.from.id)) {
+        adminBroadcastDrafts.delete(String(message.from.id));
         await openAdmin(message.chat.id);
       } else {
         await telegramApi('sendMessage', {
@@ -948,6 +1165,94 @@ async function handleTelegramWebhook(req, res) {
 
       res.writeHead(200);
       return res.end('ok');
+    }
+
+    /* Админ хабарлама мәтінін қабылдау */
+
+    if (
+      message.chat.type === 'private' &&
+      message.from &&
+      isAdmin(message.from.id) &&
+      typeof message.text === 'string'
+    ) {
+      const adminId = String(message.from.id);
+      const draft = adminBroadcastDrafts.get(adminId);
+
+      if (draft && draft.waiting) {
+        const input = message.text.trim();
+
+        if (/^\/cancel(?:@\w+)?$/i.test(input)) {
+          adminBroadcastDrafts.delete(adminId);
+
+          await telegramApi('sendMessage', {
+            chat_id: message.chat.id,
+            text: '❌ Хабарлама тарату бекор қилинды.',
+            reply_markup: adminKeyboard()
+          });
+
+          res.writeHead(200);
+          return res.end('ok');
+        }
+
+        if (input.startsWith('/')) {
+          await telegramApi('sendMessage', {
+            chat_id: message.chat.id,
+            text: '⚠️ Хабарлама матнини юборинг ёки /cancel ёзинг.'
+          });
+
+          res.writeHead(200);
+          return res.end('ok');
+        }
+
+        if (!input) {
+          await telegramApi('sendMessage', {
+            chat_id: message.chat.id,
+            text: '⚠️ Хабарлама бўш бўлмаслиги керак.'
+          });
+
+          res.writeHead(200);
+          return res.end('ok');
+        }
+
+        if (input.length > 4000) {
+          await telegramApi('sendMessage', {
+            chat_id: message.chat.id,
+            text: '⚠️ Хабарлама 4000 белгидан ошмаслиги керак.'
+          });
+
+          res.writeHead(200);
+          return res.end('ok');
+        }
+
+        adminBroadcastDrafts.set(adminId, {
+          waiting: false,
+          text: input
+        });
+
+        await telegramApi('sendMessage', {
+          chat_id: message.chat.id,
+          text:
+            '📢 ХАБАРНИ ТЕКШИРИНГ\n\n' +
+            'Қуйидаги матн барча гуруҳларга юборилади:\n\n' +
+            input +
+            '\n\n⚠️ Юборишни тасдиқлайсизми?',
+          reply_markup: {
+            inline_keyboard: [
+              [{
+                text: '✅ БАРЧА ТОПЛАРГА ЮБОРИШ',
+                callback_data: 'adm:broadcast:confirm'
+              }],
+              [{
+                text: '❌ БЕКОР ҚИЛИШ',
+                callback_data: 'adm:broadcast:cancel'
+              }]
+            ]
+          }
+        });
+
+        res.writeHead(200);
+        return res.end('ok');
+      }
     }
 
     /* Топқа қосылғандағы сәлемдесу */
@@ -1556,6 +1861,10 @@ function startGroupMatch(room, g) {
   if (!bothConnected) return;
 
   room.started = true;
+
+  // Ойын тек екі ойыншы да кіріп, матч нақты басталғанда есептеледі.
+  incrementGroupGameCount(room.chatId);
+
   g.waitingForOpponent = false;
 
   clearGroupWaitingTimer(room);
