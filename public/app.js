@@ -126,7 +126,40 @@ const I18N = {
     "youReady": "Сіз дайынсыз",
     "friendAutoStart": "Дос сілтемемен кіргенде ойын өзі басталады",
     "awayMsg": "Қарсыласпен байланыс үзілді. {n} секунд ішінде оралмаса, жеңіс сізге беріледі.",
-    "confirmResign": "Шынымен берілгіңіз келе ме?"
+    "confirmResign": "Шынымен берілгіңіз келе ме?",
+    "shopTitle": "Магазин",
+    "tabBoards": "Тақталар",
+    "tabPieces": "Тастар",
+    "shopTile": "Магазин",
+    "shopTileSub": "Тақта мен тастар",
+    "friendsTile": "Достар",
+    "friendsTileSub": "+{n} койн / дос",
+    "shopInviteBtn": "Достарды шақырып койн жина",
+    "refTitle": "Достарды шақыр",
+    "refHead": "Әр дос = {n} койн",
+    "refDesc": "Досың сілтеме арқылы алғаш рет кіріп, Telegram арқылы расталса, саған {n} койн автоматты түрде қосылады.",
+    "invitedCount": "шақырылған дос",
+    "invitedEmpty": "Әзірге ешкім жоқ",
+    "refJoined": "🎉 {name} қосылды! +{n} койн",
+    "inUse": "✓ Қолданыста",
+    "choose": "Таңдау",
+    "bought": "Сатып алынды",
+    "selected": "Таңдалды",
+    "noCoins": "Койн жетпейді. Достарды шақыр!",
+    "item_b0": "Классикалық",
+    "item_b1": "Жасыл шалғын",
+    "item_b2": "Мұхит",
+    "item_b3": "Қара мәрмәр",
+    "item_b4": "Алтын сарай",
+    "item_p0": "Классикалық",
+    "item_p1": "Қызыл және көк",
+    "item_p2": "Алтын және күміс",
+    "item_p3": "Неон",
+    "item_p4": "Алмаз",
+    "rar0": "Қарапайым",
+    "rar1": "Сирек",
+    "rar2": "Эпик",
+    "rar3": "Аңызға айналған"
   },
   "uz": {
     "playerRole": "Shashka o‘yinchisi",
@@ -206,7 +239,40 @@ const I18N = {
     "youReady": "Siz tayyorsiz",
     "friendAutoStart": "Do‘st havola orqali kirganda o‘yin o‘zi boshlanadi",
     "awayMsg": "Raqib bilan aloqa uzildi. {n} soniya ichida qaytmasa, g‘alaba sizga beriladi.",
-    "confirmResign": "Haqiqatan taslim bo‘lmoqchimisiz?"
+    "confirmResign": "Haqiqatan taslim bo‘lmoqchimisiz?",
+    "shopTitle": "Do‘kon",
+    "tabBoards": "Taxtalar",
+    "tabPieces": "Toshlar",
+    "shopTile": "Do‘kon",
+    "shopTileSub": "Taxta va toshlar",
+    "friendsTile": "Do‘stlar",
+    "friendsTileSub": "+{n} koin / do‘st",
+    "shopInviteBtn": "Do‘stlarni taklif qilib koin yig‘",
+    "refTitle": "Do‘stlarni taklif qil",
+    "refHead": "Har bir do‘st = {n} koin",
+    "refDesc": "Do‘stingiz havola orqali birinchi marta kirib, Telegram orqali tasdiqlansa, sizga {n} koin avtomatik qo‘shiladi.",
+    "invitedCount": "taklif qilingan do‘st",
+    "invitedEmpty": "Hozircha hech kim yo‘q",
+    "refJoined": "🎉 {name} qo‘shildi! +{n} koin",
+    "inUse": "✓ Ishlatilmoqda",
+    "choose": "Tanlash",
+    "bought": "Sotib olindi",
+    "selected": "Tanlandi",
+    "noCoins": "Koin yetmaydi. Do‘stlarni taklif qil!",
+    "item_b0": "Klassik",
+    "item_b1": "Yashil o‘tloq",
+    "item_b2": "Okean",
+    "item_b3": "Qora marmar",
+    "item_b4": "Oltin saroy",
+    "item_p0": "Klassik",
+    "item_p1": "Qizil va ko‘k",
+    "item_p2": "Oltin va kumush",
+    "item_p3": "Neon",
+    "item_p4": "Olmos",
+    "rar0": "Oddiy",
+    "rar1": "Noyob",
+    "rar2": "Epik",
+    "rar3": "Afsonaviy"
   },
   "ru": {
     "playerRole": "Игрок в шашки",
@@ -286,7 +352,40 @@ const I18N = {
     "youReady": "Вы готовы",
     "friendAutoStart": "Игра начнётся, когда друг войдёт по ссылке",
     "awayMsg": "Связь с соперником потеряна. Если он не вернётся за {n} сек., победа достанется вам.",
-    "confirmResign": "Вы действительно хотите сдаться?"
+    "confirmResign": "Вы действительно хотите сдаться?",
+    "shopTitle": "Магазин",
+    "tabBoards": "Доски",
+    "tabPieces": "Шашки",
+    "shopTile": "Магазин",
+    "shopTileSub": "Доски и шашки",
+    "friendsTile": "Друзья",
+    "friendsTileSub": "+{n} коинов / друг",
+    "shopInviteBtn": "Пригласи друзей и копи коины",
+    "refTitle": "Пригласи друзей",
+    "refHead": "Каждый друг = {n} коинов",
+    "refDesc": "Когда друг впервые зайдёт по ссылке и вход подтвердится через Telegram, вам автоматически начислится {n} коинов.",
+    "invitedCount": "приглашённых друзей",
+    "invitedEmpty": "Пока никого нет",
+    "refJoined": "🎉 {name} присоединился! +{n} коинов",
+    "inUse": "✓ Используется",
+    "choose": "Выбрать",
+    "bought": "Куплено",
+    "selected": "Выбрано",
+    "noCoins": "Не хватает коинов. Пригласи друзей!",
+    "item_b0": "Классическая",
+    "item_b1": "Зелёный луг",
+    "item_b2": "Океан",
+    "item_b3": "Чёрный мрамор",
+    "item_b4": "Золотой дворец",
+    "item_p0": "Классические",
+    "item_p1": "Красные и синие",
+    "item_p2": "Золото и серебро",
+    "item_p3": "Неон",
+    "item_p4": "Алмаз",
+    "rar0": "Обычный",
+    "rar1": "Редкий",
+    "rar2": "Эпический",
+    "rar3": "Легендарный"
   }
 };
 
@@ -332,6 +431,7 @@ function setLang(l) {
 
   applyStatic();
   setSearching(S.searching);
+  if (S.shop) { renderShop(); renderRefs(); }
 
   if (S.g) {
     if (S.g.invite) {
@@ -374,7 +474,10 @@ const S = {
   groupJoinSent: false,
   groupWaiting: false,
   groupWaitDeadline: null,
-  fatal: false
+  fatal: false,
+  refSent: false,
+  shop: null,
+  shopTab: 'boards'
 };
 
 const CROWN = '<svg viewBox="0 0 24 24"><path d="M3 18l-1-11 5 4 5-7 5 7 5-4-1 11z"/></svg>';
@@ -765,15 +868,15 @@ function show(id) {
 
   if (tg) {
     try {
-      id === 'game'
-        ? (
-            tg.BackButton.show(),
-            tg.enableClosingConfirmation()
-          )
-        : (
-            tg.BackButton.hide(),
-            tg.disableClosingConfirmation()
-          );
+      if (id === 'game') {
+        tg.BackButton.show();
+        tg.enableClosingConfirmation();
+      } else {
+        id === 'shop' || id === 'refs'
+          ? tg.BackButton.show()
+          : tg.BackButton.hide();
+        tg.disableClosingConfirmation();
+      }
     } catch (e) {}
   }
 }
@@ -781,6 +884,14 @@ function show(id) {
 if (tg) {
   try {
     tg.BackButton.onClick(() => {
+      if (
+        $('shop').classList.contains('active') ||
+        $('refs').classList.contains('active')
+      ) {
+        show('menu');
+        return;
+      }
+
       if (S.inviteMode) {
         cancelInvite();
         return;
@@ -817,6 +928,13 @@ function onMsg(m) {
 
       setAva($('meAva'), m.me);
       $('meName').textContent = m.me.name;
+
+      const refCode = getRefCode();
+
+      if (refCode && !S.refSent) {
+        S.refSent = true;
+        send({ t: 'ref_claim', code: refCode });
+      }
 
       S.groupCode = getGroupCode();
 
@@ -905,6 +1023,10 @@ function onMsg(m) {
                 : tr('gErrJoin')
       );
 
+      break;
+
+    case 'shop':
+      onShop(m);
       break;
 
     case 'lang':
@@ -1679,6 +1801,339 @@ $('btnAgain').onclick = () => {
   setSearching(true);
   send({ t: 'find' });
 };
+
+/* ---------- ДҮКЕН ---------- */
+
+// Түстер тек осында. Ойын тақтасы мен дүкен суреті сол түстерді қолданады.
+// b0 / p0 — бұрынғы style.css дизайны, оны өзгертпейміз.
+const SKINS = {
+  boards: {
+    b0: { a: '#f0d9b5', b: '#b58863' },
+    b1: { a: '#eeeed2', b: '#6a9b4f' },
+    b2: { a: '#dbe9f4', b: '#4b7fb5' },
+    b3: { a: '#9a9a9a', b: '#2b2b2f' },
+    b4: { a: '#fff0b8', b: '#c58a12' }
+  },
+  pieces: {
+    p0: {
+      w: 'radial-gradient(circle at 35% 30%,#fff,#d9d2c4)',
+      k: 'radial-gradient(circle at 35% 30%,#666,#1b1b1b)'
+    },
+    p1: {
+      w: 'radial-gradient(circle at 35% 30%,#ff9a9a,#c42b2b)',
+      k: 'radial-gradient(circle at 35% 30%,#8fb7ff,#2b55c4)'
+    },
+    p2: {
+      w: 'radial-gradient(circle at 35% 30%,#fff1a8,#d9a017)',
+      k: 'radial-gradient(circle at 35% 30%,#fff,#a9b0b8)'
+    },
+    p3: {
+      w: 'radial-gradient(circle at 35% 30%,#b4fff0,#00d1a0)',
+      k: 'radial-gradient(circle at 35% 30%,#ffb4f4,#d100b0)'
+    },
+    p4: {
+      w: 'radial-gradient(circle at 35% 30%,#fff,#7fd8ff 60%,#3a9bd6)',
+      k: 'radial-gradient(circle at 35% 30%,#fff,#d3a6ff 60%,#8c4fd6)'
+    }
+  }
+};
+
+(function buildSkinCss() {
+  let css = '';
+
+  for (const [id, c] of Object.entries(SKINS.boards)) {
+    if (id === 'b0') continue;
+
+    css +=
+      `#field[data-board="${id}"] .sq:not(.last):not(.sel){background:${c.a}}` +
+      `#field[data-board="${id}"] .sq.d:not(.last):not(.sel){background:${c.b}}`;
+  }
+
+  for (const [id, c] of Object.entries(SKINS.pieces)) {
+    if (id === 'p0') continue;
+
+    css +=
+      `#field[data-pieces="${id}"] .pc.w>i{background:${c.w}}` +
+      `#field[data-pieces="${id}"] .pc.b>i{background:${c.k}}`;
+  }
+
+  const st = document.createElement('style');
+  st.textContent = css;
+  document.head.append(st);
+})();
+
+const fmt = (n) =>
+  String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+
+const rarity = (p) => (p === 0 ? 0 : p <= 1500 ? 1 : p <= 4000 ? 2 : 3);
+
+function toast(text) {
+  const el = document.createElement('div');
+
+  el.className = 'toast';
+  el.textContent = text;
+  document.body.append(el);
+
+  requestAnimationFrame(() => el.classList.add('show'));
+
+  setTimeout(() => {
+    el.classList.remove('show');
+    setTimeout(() => el.remove(), 300);
+  }, 2000);
+}
+
+function applySkin() {
+  if (!S.shop) return;
+
+  const f = $('field');
+
+  f.dataset.board = S.shop.use.boards;
+  f.dataset.pieces = S.shop.use.pieces;
+}
+
+function thumb(kind, id) {
+  if (kind === 'boards') {
+    const c = SKINS.boards[id];
+    let h = '';
+
+    for (let r = 0; r < 4; r++) {
+      for (let q = 0; q < 4; q++) {
+        h += `<i style="background:${(r + q) % 2 ? c.b : c.a}"></i>`;
+      }
+    }
+
+    return `<div class="tb">${h}</div>`;
+  }
+
+  const c = SKINS.pieces[id];
+
+  return (
+    '<div class="tp">' +
+    `<b style="background:${c.w}"></b>` +
+    `<b style="background:${c.k}"></b>` +
+    '</div>'
+  );
+}
+
+function renderShop() {
+  const m = S.shop;
+  if (!m) return;
+
+  const kind = S.shopTab;
+
+  $('tabBoards').classList.toggle('on', kind === 'boards');
+  $('tabPieces').classList.toggle('on', kind === 'pieces');
+
+  const html = Object.entries(m.prices[kind]).map(([id, price]) => {
+    const own = m.own[kind].includes(id);
+    const used = m.use[kind] === id;
+
+    let btn;
+
+    if (used) {
+      btn = `<button class="sbuy on" type="button" disabled>${tr('inUse')}</button>`;
+    } else if (own) {
+      btn = `<button class="sbuy use" type="button" data-act="use" data-kind="${kind}" data-id="${id}">${tr('choose')}</button>`;
+    } else {
+      btn =
+        `<button class="sbuy${m.coins < price ? ' no' : ''}" type="button" data-act="buy" data-kind="${kind}" data-id="${id}">` +
+        `<i class="coin"></i>${fmt(price)}</button>`;
+    }
+
+    return (
+      `<div class="sitem${used ? ' sel' : ''}">` +
+      `<div class="spv">${thumb(kind, id)}</div>` +
+      `<h3>${tr('item_' + id)}</h3>` +
+      `<div class="rar r${rarity(price)}">${tr('rar' + rarity(price))}</div>` +
+      btn +
+      '</div>'
+    );
+  });
+
+  $('shopGrid').innerHTML = html.join('');
+}
+
+function refLinkValue() {
+  return S.shop
+    ? `https://t.me/shashkaoyinibot?startapp=ref_${S.shop.ref}`
+    : '';
+}
+
+function renderRefs() {
+  const m = S.shop;
+  if (!m) return;
+
+  $('refLink').value = refLinkValue();
+  $('refHead').textContent = tr('refHead', { n: m.reward });
+  $('refDesc').textContent = tr('refDesc', { n: m.reward });
+  $('refCount').textContent = m.invitedCount;
+
+  const box = $('refList');
+  box.textContent = '';
+
+  if (!m.invited.length) {
+    const p = document.createElement('p');
+
+    p.className = 'empty';
+    p.textContent = tr('invitedEmpty');
+    box.append(p);
+
+    return;
+  }
+
+  m.invited.forEach((f) => {
+    const row = document.createElement('div');
+    const ava = document.createElement('div');
+    const name = document.createElement('b');
+    const rw = document.createElement('span');
+
+    row.className = 'rrow';
+    ava.className = 'ava';
+    rw.className = 'rw';
+
+    setAva(ava, { name: f.name || '?', avatar: null });
+
+    name.textContent = f.name || '—';
+    rw.textContent = '+' + m.reward;
+
+    row.append(ava, name, rw);
+    box.append(row);
+  });
+}
+
+function onShop(m) {
+  S.shop = m;
+
+  document.querySelectorAll('.cnum').forEach((e) => {
+    e.textContent = fmt(m.coins);
+  });
+
+  $('tileReward').textContent = tr('friendsTileSub', { n: m.reward });
+
+  applySkin();
+  renderShop();
+  renderRefs();
+
+  const ev = m.ev;
+  if (!ev) return;
+
+  if (ev.type === 'buy') {
+    if (ev.ok) {
+      toast(`${tr('bought')}: ${tr('item_' + ev.id)}`);
+      haptic('medium');
+    } else if (ev.code === 'no_coins') {
+      toast(tr('noCoins'));
+    }
+  } else if (ev.type === 'use') {
+    if (ev.ok) {
+      toast(`${tr('selected')}: ${tr('item_' + ev.id)}`);
+      haptic('light');
+    }
+  } else if (ev.type === 'ref') {
+    toast(tr('refJoined', { name: ev.name, n: ev.reward }));
+    haptic('heavy');
+  }
+}
+
+function getRefCode() {
+  const m = /^ref_([0-9a-zA-Z_]{1,30})$/.exec(getStartValue());
+
+  return m ? m[1] : '';
+}
+
+function openShop(tab) {
+  if (tab) S.shopTab = tab;
+
+  send({ t: 'shop_get' });
+  renderShop();
+  show('shop');
+}
+
+function openRefs() {
+  send({ t: 'shop_get' });
+  renderRefs();
+  show('refs');
+}
+
+async function copyRefLink() {
+  const link = refLinkValue();
+  if (!link) return;
+
+  try {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      await navigator.clipboard.writeText(link);
+    } else {
+      const ta = document.createElement('textarea');
+
+      ta.value = link;
+      ta.style.cssText = 'position:fixed;left:0;top:0;opacity:0';
+      document.body.append(ta);
+      ta.focus();
+      ta.select();
+
+      const ok = document.execCommand('copy');
+      ta.remove();
+
+      if (!ok) throw new Error('copy');
+    }
+
+    toast(tr('linkCopied'));
+    haptic('light');
+  } catch (e) {
+    toast(tr('copyFailed', { link }));
+  }
+}
+
+function shareRefLink() {
+  const link = refLinkValue();
+  if (!link) return;
+
+  const url =
+    'https://t.me/share/url?url=' + encodeURIComponent(link) +
+    '&text=' + encodeURIComponent(tr('inviteText'));
+
+  try {
+    if (tg && tg.openTelegramLink) tg.openTelegramLink(url);
+    else window.open(url, '_blank');
+  } catch (e) {
+    window.open(url, '_blank');
+  }
+}
+
+$('btnCoins').onclick = () => openShop();
+$('btnShop').onclick = () => openShop();
+$('btnRefs').onclick = openRefs;
+$('btnShopRefs').onclick = openRefs;
+
+document.querySelectorAll('[data-back]').forEach((b) => {
+  b.onclick = () => show('menu');
+});
+
+$('tabBoards').onclick = () => { S.shopTab = 'boards'; renderShop(); };
+$('tabPieces').onclick = () => { S.shopTab = 'pieces'; renderShop(); };
+
+$('shopGrid').addEventListener('click', (e) => {
+  const b = e.target.closest('button[data-id]');
+  if (!b || !S.shop) return;
+
+  const { act, kind, id } = b.dataset;
+
+  if (act === 'buy') {
+    if (S.shop.coins < S.shop.prices[kind][id]) {
+      toast(tr('noCoins'));
+      return;
+    }
+
+    send({ t: 'shop_buy', kind, id });
+  } else {
+    send({ t: 'shop_use', kind, id });
+  }
+
+  haptic('light');
+});
+
+$('btnRefCopy').onclick = copyRefLink;
+$('btnRefShare').onclick = shareRefLink;
 
 /* ---------- ІСКЕ ҚОСУ ---------- */
 
