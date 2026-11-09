@@ -619,6 +619,176 @@ function meMessage(chatId, from, inGroup) {
   return lines.join('\n');
 }
 
+/* ---------- Жалпы рейтинг (мини апп): кездейсоқ қарсылас ойындары ---------- */
+
+const GLOBAL_RATING_FILE = path.join(DATA_DIR, 'global-rating.json');
+const GR_WEEK_MS = 7 * 24 * 60 * 60 * 1000; // апта = іске қосқаннан бастап 7 күн
+const GR_TOP = 30;
+
+// Осы себептермен аяқталған ойынға ұпай берілмейді:
+// берілу, байланыс үзілу, қарсылас кірмеді, жүріс уақыты бітті.
+// Тек ойын ережесі бойынша толық аяқталса ғана ұпай беріледі.
+const GR_NO_POINTS = new Set([
+  'resign',
+  'left',
+  'opponent_timeout',
+  'timeout'
+]);
+
+// users[id] = { name, username, avatar, points, wins, games, wk, wp }
+// wk — апталық ұпай қай кезеңге жататыны, wp — сол кезеңдегі ұпай
+const globalRating = { periodStart: 0, users: {} };
+
+let grSaveTimer = null;
+
+function grSaveNow() {
+  clearTimeout(grSaveTimer);
+  grSaveTimer = null;
+
+  storeSave('global_rating', GLOBAL_RATING_FILE, {
+    periodStart: globalRating.periodStart,
+    users: globalRating.users
+  });
+}
+
+function grSaveSoon() {
+  if (grSaveTimer) return;
+
+  grSaveTimer = setTimeout(grSaveNow, 3000);
+
+  if (grSaveTimer.unref) grSaveTimer.unref();
+}
+
+// Апта біткен болса, жаңа 7 күндік кезең басталады (ұпай нөлден)
+function grRoll() {
+  const now = Date.now();
+
+  if (!globalRating.periodStart) {
+    globalRating.periodStart = now;
+    grSaveNow();
+    return;
+  }
+
+  const passed = Math.floor((now - globalRating.periodStart) / GR_WEEK_MS);
+
+  if (passed > 0) {
+    globalRating.periodStart += passed * GR_WEEK_MS;
+    grSaveNow();
+  }
+}
+
+function grWeekPoints(entry) {
+  return entry.wk === globalRating.periodStart ? (entry.wp || 0) : 0;
+}
+
+// Кездейсоқ қарсыласпен ойын біткенде шақырылады
+function grRecordGame(g, winnerSide, reason) {
+  if (!g.random || g.groupInfo) return;
+
+  // Толық ойналмаған ойын есептелмейді
+  if (GR_NO_POINTS.has(reason)) return;
+
+  grRoll();
+
+  const winnerId = winnerSide === 'w'
+    ? String(g.p.w)
+    : winnerSide === 'b'
+      ? String(g.p.b)
+      : null;
+
+  for (const rawId of [g.p.w, g.p.b]) {
+    const id = String(rawId);
+    const u = users.get(id);
+
+    const entry = globalRating.users[id] || {
+      name: '',
+      username: '',
+      avatar: null,
+      points: 0,
+      wins: 0,
+      games: 0,
+      wk: 0,
+      wp: 0
+    };
+
+    if (u) {
+      entry.name = String(u.name || u.username || entry.name || '').slice(0, 40);
+      entry.username = u.username || entry.username || '';
+      entry.avatar = u.avatar || entry.avatar || null;
+    }
+
+    if (entry.wk !== globalRating.periodStart) {
+      entry.wk = globalRating.periodStart;
+      entry.wp = 0;
+    }
+
+    entry.games++;
+
+    if (winnerId && id === winnerId) {
+      entry.wins++;
+      entry.points += WIN_POINTS;
+      entry.wp += WIN_POINTS;
+    }
+
+    globalRating.users[id] = entry;
+  }
+
+  grSaveSoon();
+}
+
+function grBoard(kind) {
+  grRoll();
+
+  const week = kind === 'week';
+
+  return Object.entries(globalRating.users)
+    .map(([id, e]) => ({
+      id,
+      e,
+      p: week ? grWeekPoints(e) : (e.points || 0)
+    }))
+    .filter(x => x.p > 0)
+    .sort((a, b) =>
+      (b.p - a.p) ||
+      ((b.e.wins || 0) - (a.e.wins || 0)) ||
+      ((a.e.games || 0) - (b.e.games || 0))
+    );
+}
+
+function grPayload(userId) {
+  grRoll();
+
+  const out = {
+    t: 'rating',
+    left: Math.max(
+      0,
+      globalRating.periodStart + GR_WEEK_MS - Date.now()
+    )
+  };
+
+  for (const kind of ['week', 'all']) {
+    const board = grBoard(kind);
+    const index = board.findIndex(x => x.id === String(userId));
+
+    out[kind] = {
+      list: board.slice(0, GR_TOP).map((x, i) => ({
+        rank: i + 1,
+        name: x.e.name || 'Ойыншы',
+        username: x.e.username || '',
+        avatar: x.e.avatar || null,
+        points: x.p,
+        icon: RANKS[rankIndex(x.e.points || 0)].icon
+      })),
+      me: {
+        rank: index >= 0 ? index + 1 : null,
+        points: index >= 0 ? board[index].p : 0
+      }
+    };
+  }
+
+  return out;
+}
+
 async function initStorage() {
   let lastError = null;
 
@@ -630,6 +800,7 @@ async function initStorage() {
       const statsData = await storeLoad('stats', STATS_FILE, null);
       const langData = await storeLoad('langs', LANGS_FILE, {});
       const ratingData = await storeLoad('ratings', RATINGS_FILE, {});
+      const grData = await storeLoad('global_rating', GLOBAL_RATING_FILE, null);
       const shopData = await storeLoad('shop', SHOP_FILE, {});
       const unreachableData = await storeLoad('unreachable', UNREACHABLE_FILE, []);
 
@@ -664,6 +835,21 @@ async function initStorage() {
           );
         }
       }
+
+      globalRating.periodStart = 0;
+      globalRating.users = {};
+
+      if (grData && typeof grData === 'object') {
+        globalRating.periodStart = Number(grData.periodStart) || 0;
+
+        globalRating.users =
+          grData.users && typeof grData.users === 'object'
+            ? grData.users
+            : {};
+      }
+
+      // Алғаш рет іске қосылғанда 7 күндік санақ қазірден басталады
+      grRoll();
 
       chatLangs.clear();
       if (langData && typeof langData === 'object') {
@@ -3954,6 +4140,9 @@ function finish(g, winner, reason) {
     }
   }
 
+  // Кездейсоқ қарсылас: тек толық ойнап жеңсе ұпай беріледі
+  grRecordGame(g, winner, reason);
+
   if (g.groupInfo) {
     const room = groupRooms.get(g.groupInfo.code);
     const chatId = g.groupInfo.chatId;
@@ -4449,7 +4638,11 @@ function handle(u, m) {
         const opp = users.get(oppId);
 
         if (opp && !opp.game) {
-          return startGame(opp, u);
+          const randomGame = startGame(opp, u);
+
+          if (randomGame) randomGame.random = true;
+
+          return randomGame;
         }
       }
 
@@ -4479,6 +4672,9 @@ function handle(u, m) {
       return send(u, {
         t: 'invite_cancelled'
       });
+
+    case 'rating_get':
+      return send(u, grPayload(u.id));
 
     case 'shop_get':
       return send(u, shopMsg(u.id));
@@ -4691,6 +4887,29 @@ function onAuth(ws, m) {
     );
 
     if (info) info.tgLang = tgLangFromInitData(m.initData);
+
+    // initData расталған, сондықтан username мен суретті сеніммен аламыз
+    if (info) {
+      try {
+        const rawUser = new URLSearchParams(
+          String(m.initData || '')
+        ).get('user');
+
+        const tgUser = rawUser ? JSON.parse(rawUser) : null;
+
+        if (tgUser) {
+          info.username = tgUser.username
+            ? String(tgUser.username)
+            : '';
+
+          if (!info.avatar && tgUser.photo_url) {
+            info.avatar = String(tgUser.photo_url);
+          }
+        }
+      } catch (error) {
+        // username болмаса да ойын жұмыс істей береді
+      }
+    }
   }
 
   if (!info) {
