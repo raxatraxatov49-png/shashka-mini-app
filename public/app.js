@@ -149,6 +149,9 @@ const I18N = {
     "ratingAllInfo": "Кездейсоқ қарсыласпен толық ойнап жеңсеңіз +10 ұпай",
     "ratingEmpty": "Әзірге ешкім жоқ. Бірінші болыңыз!",
     "ratingLoading": "Жүктелуде…",
+    "ratingPrizeTitle": "Апталық сыйлықтар",
+    "ratingPrizeRest": "орын",
+    "ratingPrizeNote": "Апта соңында койн автоматты түрде беріледі",
     "ratingYou": "Сіздің орныңыз",
     "ratingDH": "{d} күн {h} сағ",
     "ratingHM": "{h} сағ {m} мин",
@@ -275,6 +278,9 @@ const I18N = {
     "ratingAllInfo": "Tasodifiy raqib bilan to‘liq o‘ynab yutsangiz +10 ball",
     "ratingEmpty": "Hozircha hech kim yo‘q. Birinchi bo‘ling!",
     "ratingLoading": "Yuklanmoqda…",
+    "ratingPrizeTitle": "Haftalik sovg‘alar",
+    "ratingPrizeRest": "o‘rin",
+    "ratingPrizeNote": "Hafta oxirida koinlar avtomatik beriladi",
     "ratingYou": "Sizning o‘rningiz",
     "ratingDH": "{d} kun {h} soat",
     "ratingHM": "{h} soat {m} daq",
@@ -401,6 +407,9 @@ const I18N = {
     "ratingAllInfo": "+10 очков за полную победу над случайным соперником",
     "ratingEmpty": "Пока никого нет. Будьте первым!",
     "ratingLoading": "Загрузка…",
+    "ratingPrizeTitle": "Призы недели",
+    "ratingPrizeRest": "места",
+    "ratingPrizeNote": "Коины начисляются автоматически в конце недели",
     "ratingYou": "Ваше место",
     "ratingDH": "{d} д {h} ч",
     "ratingHM": "{h} ч {m} мин",
@@ -2247,15 +2256,58 @@ function ratingRow(p, own) {
   pt.className = 'rpt';
   pt.textContent = (p.points || 0) + ' ⭐';
 
-  if (p.icon) {
-    const ic = document.createElement('small');
-    ic.textContent = p.icon;
-    pt.append(ic);
-  }
-
   row.append(place, ava, nm, pt);
 
   return row;
+}
+
+function renderPrizes(m) {
+  const box = $('ratingPrize');
+
+  box.textContent = '';
+
+  if (S.ratingTab !== 'week') {
+    box.classList.add('hidden');
+    return;
+  }
+
+  const pz = (m && m.prizes) || { p1: 1000, p2: 500, p3: 250, rest: 100, top: 10 };
+
+  const title = document.createElement('div');
+  title.className = 'rp-title';
+  title.textContent = '🏆 ' + tr('ratingPrizeTitle');
+
+  const row = document.createElement('div');
+  row.className = 'rp-row';
+
+  [
+    ['🥇', pz.p1],
+    ['🥈', pz.p2],
+    ['🥉', pz.p3],
+    ['4–' + pz.top, pz.rest]
+  ].forEach(([lab, val]) => {
+    const chip = document.createElement('div');
+    chip.className = 'rp-chip';
+
+    const l = document.createElement('span');
+    l.className = 'lab';
+    l.textContent = lab;
+
+    const b = document.createElement('b');
+    const coin = document.createElement('i');
+    coin.className = 'coin';
+    b.append(coin, document.createTextNode(String(val)));
+
+    chip.append(l, b);
+    row.append(chip);
+  });
+
+  const note = document.createElement('div');
+  note.className = 'rp-note';
+  note.textContent = tr('ratingPrizeNote');
+
+  box.append(title, row, note);
+  box.classList.remove('hidden');
 }
 
 function renderRating() {
@@ -2266,6 +2318,8 @@ function renderRating() {
   const info = $('ratingInfo');
   const me = $('ratingMe');
   const m = S.rating;
+
+  renderPrizes(m);
 
   list.textContent = '';
   me.textContent = '';
