@@ -2734,32 +2734,23 @@ async function handleGroupCallback(query) {
   return true;
 }
 
-/* ---------- Жеке чаттағы тұрақты төменгі батырмалар ---------- */
+/* ---------- Жеке чаттағы /start батырмалары ---------- */
 
 const MINI_APP_URL = 'https://shashka-mini-app.onrender.com';
 
 function mainKeyboard(lang) {
   return {
-    keyboard: [
+    inline_keyboard: [
       [{
         text: tx(lang, 'btnStart'),
         web_app: { url: MINI_APP_URL + '/?lang=' + lang }
       }],
       [{
-        text: tx(lang, 'btnGroup')
+        text: tx(lang, 'btnGroup'),
+        url: 'https://t.me/shashkaoyinibot?startgroup=true'
       }]
-    ],
-    resize_keyboard: true,
-    is_persistent: true
+    ]
   };
-}
-
-function isGroupButtonText(text) {
-  const value = String(text || '').trim();
-
-  return ['uz', 'kk', 'ru'].some(
-    l => value === tx(l, 'btnGroup')
-  );
 }
 
 async function sendMainMenu(chatId, lang) {
@@ -3438,29 +3429,6 @@ async function handleTelegramWebhook(req, res) {
           ['group', 'supergroup'].includes(message.chat.type)
         ),
         parse_mode: 'HTML'
-      });
-
-      res.writeHead(200);
-      return res.end('ok');
-    }
-
-    /* «Группада ойнау» төменгі батырмасы */
-
-    if (
-      message.chat.type === 'private' &&
-      isGroupButtonText(message.text)
-    ) {
-      const lang = getLang(message.chat.id);
-
-      await telegramApi('sendMessage', {
-        chat_id: message.chat.id,
-        text: tx(lang, 'addGroupHint'),
-        reply_markup: {
-          inline_keyboard: [[{
-            text: tx(lang, 'btnAddGroup'),
-            url: 'https://t.me/shashkaoyinibot?startgroup=true'
-          }]]
-        }
       });
 
       res.writeHead(200);
