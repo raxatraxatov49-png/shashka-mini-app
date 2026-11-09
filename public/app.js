@@ -1955,7 +1955,7 @@ function renderShop() {
 
 function refLinkValue() {
   return S.shop
-    ? `https://t.me/shashkaoyinibot?startapp=ref_${S.shop.ref}`
+    ? `https://t.me/shashkaoyinibot?start=ref_${S.shop.ref}`
     : '';
 }
 
