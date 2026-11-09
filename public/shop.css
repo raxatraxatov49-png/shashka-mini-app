@@ -61,3 +61,19 @@
   transform:translate(-50%,30px);max-width:90%;padding:11px 18px;border-radius:14px;opacity:0;
   background:#efefef;color:#111;font-weight:700;text-align:center;pointer-events:none;transition:.25s}
 .toast.show{opacity:1;transform:translate(-50%,0)}
+
+/* ---- Экран ұзарғанда карточкалар қысылып, батырма мен "Бас тарту" кесіліп қалмауы үшін ---- */
+#menu.active,
+#shop.active,
+#refs.active{
+  display:flex;
+  flex-direction:column;
+  overflow-y:auto;
+  -webkit-overflow-scrolling:touch;
+  padding-bottom:calc(28px + env(safe-area-inset-bottom,0px));
+}
+#menu.active>*,
+#shop.active>*,
+#refs.active>*{flex:none}
+#menu .card,
+#refs .card{height:auto;min-height:0;flex:none}
