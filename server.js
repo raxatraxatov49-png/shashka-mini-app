@@ -3112,8 +3112,6 @@ function tnEnqueue(t, job) {
 }
 
 async function tnIsGroupAdmin(chatId, userId) {
-  if (isOwner(userId)) return true;
-
   try {
     const member = await telegramApi('getChatMember', {
       chat_id: chatId,
@@ -3192,6 +3190,7 @@ function tnScheduleRegUpdate(t) {
         message_id: t.messageId,
         text: tnRegText(t),
         parse_mode: 'HTML',
+        link_preview_options: { is_disabled: true },
         reply_markup: tnRegKeyboard(t)
       });
     } catch (error) {
@@ -3291,6 +3290,7 @@ async function handleTournamentCommand(message) {
       chat_id: chatId,
       text: tnRegText(t),
       parse_mode: 'HTML',
+      link_preview_options: { is_disabled: true },
       reply_markup: tnRegKeyboard(t)
     });
 
@@ -3304,6 +3304,98 @@ async function handleTournamentCommand(message) {
   t.regTimer = tnTimer(() => {
     tnRegExpired(t).catch(error => console.error(error.message));
   }, TOURNEY_REG_MS);
+}
+
+async function tnStop(t) {
+  if (t.status === 'cancelled' || t.status === 'finished') return;
+
+  // Алдымен күйді өзгертеміз: жүріп жатқан циклдар тоқтайды
+  t.status = 'cancelled';
+
+  clearTimeout(t.regTimer);
+  clearTimeout(t.regUpdateTimer);
+  t.regUpdateTimer = null;
+
+  const T = tnT(t.chatId);
+
+  tnEnqueue(t, async () => {
+    if (t.rounds) {
+      for (const round of t.rounds) {
+        for (const m of round) {
+          clearTimeout(m.timer);
+          m.timer = null;
+
+          const room = m.roomCode && groupRooms.get(m.roomCode);
+
+          if (room) {
+            const g = room.pendingGame;
+
+            if (g && games.has(g.id)) {
+              finish(g, null, 'stopped');
+            }
+
+            cleanupGroupRoom(m.roomCode);
+          }
+
+          await tnClearMatchMessages(t, m);
+        }
+      }
+    }
+
+    await tnDeleteMessage(t.chatId, t.bracketMessageId);
+    t.bracketMessageId = null;
+
+    await tnDeleteMessage(t.chatId, t.messageId);
+    t.messageId = null;
+
+    try {
+      await tgRetry('sendMessage', {
+        chat_id: t.chatId,
+        text: T.stopped
+      });
+    } catch (error) {
+      console.error(error.message);
+    }
+
+    tnDrop(t);
+  });
+}
+
+async function handleStopCommand(message) {
+  const chat = message.chat;
+  const chatId = chat.id;
+  const T = tnT(chatId);
+
+  const anonymousAdmin =
+    message.sender_chat &&
+    String(message.sender_chat.id) === String(chat.id);
+
+  const allowed =
+    anonymousAdmin ||
+    (message.from && await tnIsGroupAdmin(chatId, message.from.id));
+
+  if (!allowed) {
+    await telegramApi('sendMessage', {
+      chat_id: chatId,
+      text: T.adminOnlyStop
+    });
+
+    return;
+  }
+
+  const id = chatTournament.get(String(chatId));
+  const t = id && tournaments.get(id);
+
+  if (!t) {
+    await telegramApi('sendMessage', {
+      chat_id: chatId,
+      text: T.noTournament
+    });
+
+    return;
+  }
+
+  await tnStop(t);
 }
 
 async function tnRegExpired(t) {
@@ -3323,6 +3415,7 @@ async function tnRegExpired(t) {
       message_id: t.messageId,
       text: TN.fmt(T.cancelled, { min: TN.MIN_PLAYERS }),
       parse_mode: 'HTML',
+      link_preview_options: { is_disabled: true },
       reply_markup: { inline_keyboard: [] }
     });
   } catch (error) {
@@ -3425,6 +3518,7 @@ async function tnStart(t) {
         message_id: t.messageId,
         text: tnRegText(t),
         parse_mode: 'HTML',
+        link_preview_options: { is_disabled: true },
         reply_markup: { inline_keyboard: [] }
       });
     } catch (error) {
@@ -3465,7 +3559,8 @@ async function tnPostBracket(t, caption) {
       const sent = await tgRetry('sendMessage', {
         chat_id: t.chatId,
         text: caption + '\n\n' + TN.bracketText(t, lang),
-        parse_mode: 'HTML'
+        parse_mode: 'HTML',
+        link_preview_options: { is_disabled: true }
       });
 
       messageId = sent.result.message_id;
@@ -3582,6 +3677,7 @@ async function tnStartMatch(t, m) {
         tnMatchText(t, m, T, label) +
         (m.attempts > 0 ? '\n\n' + T.drawReplay : ''),
       parse_mode: 'HTML',
+      link_preview_options: { is_disabled: true },
       reply_markup: {
         inline_keyboard: [[{ text: T.enterBtn, url: link }]]
       }
@@ -3608,6 +3704,7 @@ async function tnStartMatch(t, m) {
           opp: tnLink(opponent, PT.player)
         }),
         parse_mode: 'HTML',
+        link_preview_options: { is_disabled: true },
         reply_markup: {
           inline_keyboard: [[{ text: PT.enterBtn, url: link }]]
         }
@@ -3667,6 +3764,7 @@ function tnMatchStarted(room) {
       message_id: m.messageId,
       text: tnMatchText(t, m, T, label) + '\n\n' + T.playing,
       parse_mode: 'HTML',
+      link_preview_options: { is_disabled: true },
       reply_markup: { inline_keyboard: [] }
     });
   });
@@ -3742,6 +3840,7 @@ function tnFinishMatch(t, m, winnerId, reason) {
         TN.fmt(T.matchDone, { name: tnLink(t.byId.get(m.winner), T.player) }) +
         (reasonText ? ' ' + escapeHtml(reasonText) : ''),
       parse_mode: 'HTML',
+      link_preview_options: { is_disabled: true },
       reply_markup: { inline_keyboard: [] }
     });
   });
@@ -4438,6 +4537,18 @@ async function handleTelegramWebhook(req, res) {
       return res.end('ok');
     }
 
+    /* /stop: турнирді тоқтату (тек топ админдері) */
+
+    if (
+      /^\/stop(?:@\w+)?(?:\s|$)/i.test(message.text) &&
+      ['group', 'supergroup'].includes(message.chat.type)
+    ) {
+      await handleStopCommand(message);
+
+      res.writeHead(200);
+      return res.end('ok');
+    }
+
     /* /rating: тек топта */
 
     if (/^\/rating(?:@\w+)?(?:\s|$)/i.test(message.text)) {
@@ -4549,6 +4660,10 @@ async function setupTelegramWebhook() {
           {
             command: 'turnir',
             description: TN.texts(lang).cmdTurnir
+          },
+          {
+            command: 'stop',
+            description: TN.texts(lang).cmdStop
           },
           {
             command: 'me',
