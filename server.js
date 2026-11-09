@@ -170,7 +170,8 @@ const PERMISSIONS = {
   games: '🎮 Белсенді ойындар',
   broadcast: '📢 Топтарға хабарлама',
   group_manage: '🚫 Топтарды басқару',
-  admin_manage: '👑 Админдерді басқару'
+  admin_manage: '👑 Админдерді басқару',
+  coins: '🪙 Койн беру'
 };
 
 const DEFAULT_PERMISSIONS = [
@@ -1488,6 +1489,13 @@ function adminKeyboard(adminId) {
     }]);
   }
 
+  if (hasPermission(adminId, 'coins')) {
+    rows.push([{
+      text: '🪙 Койн беру',
+      callback_data: 'adm:coins'
+    }]);
+  }
+
   if (hasPermission(adminId, 'group_manage')) {
     rows.push([{
       text: '🚫 Топтарды басқару',
@@ -1651,6 +1659,8 @@ function requiredPermission(data) {
   ) return 'groups';
 
   if (data === 'adm:games') return 'games';
+
+  if (data.startsWith('adm:coins')) return 'coins';
 
   if (
     data.startsWith('adm:broadcast') ||
@@ -1891,6 +1901,32 @@ async function handleAdminCallback(query) {
     );
 
     await answerCallback(query.id, 'Болдырылмады.');
+
+    return true;
+  }
+
+  /* Койн беру */
+
+  if (data === 'adm:coins') {
+    adminActions.set(adminId, {
+      action: 'coins_id'
+    });
+
+    await editAdminMessage(
+      chatId,
+      messageId,
+      '🪙 <b>КОЙН БЕРУ</b>\n\n' +
+      'Койн беретін адамның Telegram ID нөмірін жіберіңіз.\n\n' +
+      '❌ Болдырмау: /cancel',
+      {
+        inline_keyboard: [[{
+          text: '🔙 Басты мәзір',
+          callback_data: 'adm:home'
+        }]]
+      }
+    );
+
+    await answerCallback(query.id, 'Telegram ID күтілуде.');
 
     return true;
   }
@@ -2883,6 +2919,55 @@ async function sendGroupWelcome(chatId) {
   });
 }
 
+/* ---------- Реферал: /start ref_ID ---------- */
+
+const REF_TEXTS = {
+  kk: (name, n) => `🎉 ${name} сілтемең арқылы қосылды! +${n} койн`,
+  uz: (name, n) => `🎉 ${name} havolang orqali qo‘shildi! +${n} koin`,
+  ru: (name, n) => `🎉 ${name} присоединился по твоей ссылке! +${n} коинов`
+};
+
+async function handleStartReferral(message) {
+  const m = /^\/start(?:@\w+)?\s+ref_([0-9a-zA-Z_]{1,30})\s*$/.exec(message.text || '');
+
+  if (!m || !message.from || message.from.is_bot) return;
+
+  const inviterId = m[1];
+  const inviteeId = String(message.from.id);
+
+  const inviteeName =
+    [message.from.first_name, message.from.last_name].filter(Boolean).join(' ') ||
+    message.from.username ||
+    'Ойыншы';
+
+  // trackUser бұрын шақырылды: firstSeen-де осы адам жаңа болса ғана койн беріледі
+  const r = shop.claimReferral(inviteeId, inviteeName, inviterId, firstSeen);
+
+  if (!r.ok) return;
+
+  // Шақырушы мини аппта отырса, бірден көрсетеміз
+  send(users.get(inviterId), shopMsg(inviterId, {
+    type: 'ref',
+    ok: true,
+    name: inviteeName,
+    reward: r.reward
+  }));
+
+  // Боттан хабарлама
+  try {
+    const lang = getLang(inviterId);
+    const text = (REF_TEXTS[lang] || REF_TEXTS.kk)(escapeHtml(inviteeName), r.reward);
+
+    await telegramApi('sendMessage', {
+      chat_id: inviterId,
+      text,
+      parse_mode: 'HTML'
+    });
+  } catch (error) {
+    console.error('Реферал хабары жіберілмеді:', error.message);
+  }
+}
+
 /* ---------- Telegram webhook ---------- */
 
 async function handleTelegramWebhook(req, res) {
@@ -3116,7 +3201,9 @@ async function handleTelegramWebhook(req, res) {
         const needPerm = {
           add_admin: 'admin_manage',
           block_group: 'group_manage',
-          unblock_group: 'group_manage'
+          unblock_group: 'group_manage',
+          coins_id: 'coins',
+          coins_amount: 'coins'
         }[action.action];
 
         if (needPerm && !hasPermission(adminId, needPerm)) {
@@ -3146,6 +3233,104 @@ async function handleTelegramWebhook(req, res) {
             chat_id: message.chat.id,
             text: '⚠️ ID қате. Тек сан енгізіңіз.'
           });
+
+          res.writeHead(200);
+          return res.end('ok');
+        }
+
+        if (action.action === 'coins_id') {
+          if (!/^\d+$/.test(input)) {
+            await telegramApi('sendMessage', {
+              chat_id: message.chat.id,
+              text: '⚠️ ID қате. Тек оң сан енгізіңіз.'
+            });
+
+            res.writeHead(200);
+            return res.end('ok');
+          }
+
+          if (!hasOwn(stats.users, input)) {
+            await telegramApi('sendMessage', {
+              chat_id: message.chat.id,
+              text:
+                '⚠️ Бұл ID бойынша ойыншы табылмады.\n' +
+                'Ол ботқа немесе мини аппқа кіруі керек. Басқа ID жіберіңіз немесе /cancel.'
+            });
+
+            res.writeHead(200);
+            return res.end('ok');
+          }
+
+          adminActions.set(adminId, {
+            action: 'coins_amount',
+            target: input
+          });
+
+          await telegramApi('sendMessage', {
+            chat_id: message.chat.id,
+            text:
+              '🪙 <b>КОЙН САНЫ</b>\n\n' +
+              `🆔 ID: <code>${escapeHtml(input)}</code>\n` +
+              `💰 Қазіргі койн: <b>${shop.get(input).coins}</b>\n\n` +
+              'Қанша койн беру керек? Санды жіберіңіз (мысалы <code>500</code>).\n' +
+              'Азайту үшін минус қойыңыз (мысалы <code>-100</code>).\n\n' +
+              '❌ Болдырмау: /cancel',
+            parse_mode: 'HTML'
+          });
+
+          res.writeHead(200);
+          return res.end('ok');
+        }
+
+        if (action.action === 'coins_amount') {
+          const amount = Number(input);
+
+          const r = shop.addCoins(action.target, amount);
+
+          if (!r.ok) {
+            await telegramApi('sendMessage', {
+              chat_id: message.chat.id,
+              text: '⚠️ Сан қате (0 болмауы керек, ең көбі 1 000 000 000). Қайта жіберіңіз немесе /cancel.'
+            });
+
+            res.writeHead(200);
+            return res.end('ok');
+          }
+
+          adminActions.delete(adminId);
+
+          await telegramApi('sendMessage', {
+            chat_id: message.chat.id,
+            text:
+              '✅ <b>КОЙН БЕРІЛДІ</b>\n\n' +
+              `🆔 ID: <code>${escapeHtml(action.target)}</code>\n` +
+              `➕ Сома: <b>${amount > 0 ? '+' : ''}${Math.trunc(amount)}</b>\n` +
+              `💰 Жаңа баланс: <b>${r.coins}</b>`,
+            parse_mode: 'HTML',
+            reply_markup: adminKeyboard(adminId)
+          });
+
+          // Ойыншы мини аппта болса, балансы бірден жаңарады
+          send(users.get(action.target), shopMsg(action.target));
+
+          // Ойыншыға боттан хабар (тек койн қосқанда)
+          if (amount > 0) {
+            try {
+              const lang = getLang(action.target);
+              const texts = {
+                kk: `🎁 Саған ${Math.trunc(amount)} койн берілді!`,
+                uz: `🎁 Sizga ${Math.trunc(amount)} koin berildi!`,
+                ru: `🎁 Вам начислено ${Math.trunc(amount)} коинов!`
+              };
+
+              await telegramApi('sendMessage', {
+                chat_id: action.target,
+                text: texts[lang] || texts.kk
+              });
+            } catch (error) {
+              console.error('Койн хабары жіберілмеді:', error.message);
+            }
+          }
 
           res.writeHead(200);
           return res.end('ok');
@@ -3494,6 +3679,8 @@ async function handleTelegramWebhook(req, res) {
         message.chat.id,
         getLang(message.chat.id)
       );
+
+      await handleStartReferral(message);
     }
 
     res.writeHead(200);
