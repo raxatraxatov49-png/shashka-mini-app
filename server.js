@@ -303,6 +303,100 @@ function userLang(u) {
   return normLang(detectLang(u.tgLang));
 }
 
+/* ---------- Пайдаланушыларға хабар тарату ---------- */
+
+const UNREACHABLE_FILE = path.join(DATA_DIR, 'unreachable.json');
+const unreachableUsers = new Set();
+let userBroadcastRunning = false;
+
+function saveUnreachable() {
+  storeSave('unreachable', UNREACHABLE_FILE, [...unreachableUsers]);
+}
+
+// Ботты ашқан / мини аппқа кірген, бірақ ботты бұғаттамаған адамдар
+function reachableUserIds() {
+  return Object.keys(stats.users).filter(
+    id => !unreachableUsers.has(id)
+  );
+}
+
+async function runUserBroadcast(adminChatId, fromChatId, messageId) {
+  const ids = reachableUserIds();
+
+  let success = 0;
+  let failed = 0;
+  let unreachable = 0;
+
+  for (const id of ids) {
+    let attempts = 0;
+
+    while (attempts < 3) {
+      attempts++;
+
+      try {
+        await telegramApi('copyMessage', {
+          chat_id: id,
+          from_chat_id: fromChatId,
+          message_id: messageId
+        });
+
+        success++;
+        break;
+      } catch (error) {
+        const retryAfter = Number(
+          error.telegram?.parameters?.retry_after || 0
+        );
+
+        if (retryAfter > 0 && attempts < 3) {
+          await delay((retryAfter + 1) * 1000);
+          continue;
+        }
+
+        const description = String(error.message || '');
+
+        if (
+          /blocked|deactivated|chat not found|can't initiate|user not found|forbidden/i
+            .test(description)
+        ) {
+          unreachableUsers.add(id);
+          unreachable++;
+        } else {
+          failed++;
+        }
+
+        console.error(
+          'Пайдаланушыға хабар жіберілмеді:',
+          id,
+          description
+        );
+
+        break;
+      }
+    }
+
+    await delay(50);
+  }
+
+  if (unreachable) saveUnreachable();
+
+  try {
+    await telegramApi('sendMessage', {
+      chat_id: adminChatId,
+      text:
+        '📨 <b>ХАБАР ТАРАТУ АЯҚТАЛДЫ</b>\n\n' +
+        `👤 Барлық алушы: ${ids.length}\n` +
+        `✅ Жеткізілді: ${success}\n` +
+        `🚫 Ботты бұғаттаған / қолжетімсіз: ${unreachable}\n` +
+        `❌ Басқа қате: ${failed}`,
+      parse_mode: 'HTML'
+    });
+  } catch (error) {
+    console.error('Админге есеп жіберілмеді:', error.message);
+  }
+
+  userBroadcastRunning = false;
+}
+
 /* ---------- Рейтинг (топтағы ойын очколары) ---------- */
 
 const RATINGS_FILE = path.join(DATA_DIR, 'ratings.json');
@@ -512,6 +606,7 @@ async function initStorage() {
       const statsData = await storeLoad('stats', STATS_FILE, null);
       const langData = await storeLoad('langs', LANGS_FILE, {});
       const ratingData = await storeLoad('ratings', RATINGS_FILE, {});
+      const unreachableData = await storeLoad('unreachable', UNREACHABLE_FILE, []);
 
       admins.clear();
       for (const [k, v] of parseAdmins(adminData)) admins.set(k, v);
@@ -526,6 +621,11 @@ async function initStorage() {
       blockedGroups.clear();
       if (Array.isArray(blockedData)) {
         for (const id of blockedData) blockedGroups.add(String(id));
+      }
+
+      unreachableUsers.clear();
+      if (Array.isArray(unreachableData)) {
+        for (const id of unreachableData) unreachableUsers.add(String(id));
       }
 
       ratings.clear();
@@ -1355,6 +1455,13 @@ function adminKeyboard(adminId) {
     }]);
   }
 
+  if (hasPermission(adminId, 'broadcast')) {
+    rows.push([{
+      text: '📨 Пайдаланушыларға хабарлама',
+      callback_data: 'adm:ubc'
+    }]);
+  }
+
   if (hasPermission(adminId, 'group_manage')) {
     rows.push([{
       text: '🚫 Топтарды басқару',
@@ -1519,7 +1626,10 @@ function requiredPermission(data) {
 
   if (data === 'adm:games') return 'games';
 
-  if (data.startsWith('adm:broadcast')) return 'broadcast';
+  if (
+    data.startsWith('adm:broadcast') ||
+    data.startsWith('adm:ubc')
+  ) return 'broadcast';
 
   if (
     data.startsWith('adm:block') ||
@@ -1652,6 +1762,99 @@ async function handleAdminCallback(query) {
   }
 
   if (data === 'adm:broadcast:cancel') {
+    adminBroadcastDrafts.delete(adminId);
+
+    await editAdminMessage(
+      chatId,
+      messageId,
+      '❌ Хабарлама тарату тоқтатылды.',
+      adminKeyboard(adminId)
+    );
+
+    await answerCallback(query.id, 'Болдырылмады.');
+
+    return true;
+  }
+
+  /* Пайдаланушыларға хабар тарату */
+
+  if (data === 'adm:ubc') {
+    adminBroadcastDrafts.set(adminId, {
+      waiting: true,
+      target: 'users'
+    });
+
+    await editAdminMessage(
+      chatId,
+      messageId,
+      '📨 <b>ПАЙДАЛАНУШЫЛАРҒА ХАБАРЛАМА</b>\n\n' +
+      `👤 Алушылар саны: <b>${reachableUserIds().length}</b>\n\n` +
+      'Жібергіңіз келген хабарламаны осы чатқа жіберіңіз:\n' +
+      '• мәтін немесе сілтеме\n' +
+      '• фото (қаласаңыз, жазуымен бірге)\n\n' +
+      'Хабарлама дәл өзіңіз жібергендей болып барлығына жетеді.\n\n' +
+      '❌ Болдырмау үшін /cancel жазыңыз.',
+      {
+        inline_keyboard: [[{
+          text: '❌ Болдырмау',
+          callback_data: 'adm:ubc:cancel'
+        }]]
+      }
+    );
+
+    await answerCallback(query.id, 'Хабарлама күтілуде.');
+
+    return true;
+  }
+
+  if (data === 'adm:ubc:confirm') {
+    const draft = adminBroadcastDrafts.get(adminId);
+
+    if (!draft || draft.target !== 'users' || !draft.source) {
+      await answerCallback(query.id, 'Хабарлама табылмады.', true);
+      return true;
+    }
+
+    if (userBroadcastRunning) {
+      await answerCallback(
+        query.id,
+        'Алдыңғы тарату әлі аяқталған жоқ.',
+        true
+      );
+      return true;
+    }
+
+    userBroadcastRunning = true;
+    adminBroadcastDrafts.delete(adminId);
+
+    await answerCallback(query.id, 'Жіберу басталды!');
+
+    await editAdminMessage(
+      chatId,
+      messageId,
+      '📨 <b>ХАБАР ТАРАТЫЛУДА...</b>\n\n' +
+      'Аяқталған соң есеп жіберемін.',
+      {
+        inline_keyboard: [[{
+          text: '🔙 Басты мәзір',
+          callback_data: 'adm:home'
+        }]]
+      }
+    );
+
+    runUserBroadcast(
+      chatId,
+      draft.source.chatId,
+      draft.source.messageId
+    ).catch(error => {
+      userBroadcastRunning = false;
+      console.error(error.message);
+    });
+
+    return true;
+  }
+
+  if (data === 'adm:ubc:cancel') {
     adminBroadcastDrafts.delete(adminId);
 
     await editAdminMessage(
@@ -2756,6 +2959,21 @@ async function handleTelegramWebhook(req, res) {
       return res.end('ok');
     }
 
+    /* Ботқа жазған адамды хабар тарату тізіміне қосу */
+
+    if (
+      message.chat &&
+      message.chat.type === 'private' &&
+      message.from &&
+      !message.from.is_bot
+    ) {
+      trackUser(message.from.id);
+
+      if (unreachableUsers.delete(String(message.from.id))) {
+        saveUnreachable();
+      }
+    }
+
     /* Админ командасы */
 
     if (
@@ -2784,6 +3002,70 @@ async function handleTelegramWebhook(req, res) {
 
       res.writeHead(200);
       return res.end('ok');
+    }
+
+    /* Пайдаланушыларға тарататын хабарды қабылдау: мәтін, сілтеме, фото */
+
+    if (
+      message.chat.type === 'private' &&
+      message.from &&
+      isAdmin(message.from.id) &&
+      !/^\/[a-z_]+(?:@\w+)?(?:\s|$)/i.test(message.text || '')
+    ) {
+      const adminId = String(message.from.id);
+      const draft = adminBroadcastDrafts.get(adminId);
+
+      if (
+        draft &&
+        draft.waiting &&
+        draft.target === 'users' &&
+        hasPermission(adminId, 'broadcast')
+      ) {
+        adminBroadcastDrafts.set(adminId, {
+          waiting: false,
+          target: 'users',
+          source: {
+            chatId: message.chat.id,
+            messageId: message.message_id
+          }
+        });
+
+        // Админге қалай көрінетінін алдын ала көрсетеміз
+        try {
+          await telegramApi('copyMessage', {
+            chat_id: message.chat.id,
+            from_chat_id: message.chat.id,
+            message_id: message.message_id
+          });
+        } catch (error) {
+          console.error(error.message);
+        }
+
+        await telegramApi('sendMessage', {
+          chat_id: message.chat.id,
+          text:
+            '📨 <b>ХАБАРДЫ ТЕКСЕРІҢІЗ</b>\n\n' +
+            'Жоғарыдағы хабарлама ' +
+            `<b>${reachableUserIds().length}</b> пайдаланушыға жіберіледі.\n\n` +
+            '⚠️ Жіберуді растайсыз ба?',
+          parse_mode: 'HTML',
+          reply_markup: {
+            inline_keyboard: [
+              [{
+                text: '✅ БАРЛЫҒЫНА ЖІБЕРУ',
+                callback_data: 'adm:ubc:confirm'
+              }],
+              [{
+                text: '❌ БОЛДЫРМАУ',
+                callback_data: 'adm:ubc:cancel'
+              }]
+            ]
+          }
+        });
+
+        res.writeHead(200);
+        return res.end('ok');
+      }
     }
 
     /* Админнің ID енгізуі және хабарлама жіберуі */
