@@ -303,6 +303,204 @@ function userLang(u) {
   return normLang(detectLang(u.tgLang));
 }
 
+/* ---------- Рейтинг (топтағы ойын очколары) ---------- */
+
+const RATINGS_FILE = path.join(DATA_DIR, 'ratings.json');
+const WIN_POINTS = 10;
+
+// chatId -> Map(userId -> { name, points, games, wins })
+const ratings = new Map();
+
+const RANKS = [
+  { key: 'bronze', min: 0, icon: '🥉' },
+  { key: 'silver', min: 50, icon: '🥈' },
+  { key: 'gold', min: 150, icon: '🥇' },
+  { key: 'platinum', min: 300, icon: '💠' },
+  { key: 'diamond', min: 600, icon: '💎' },
+  { key: 'master', min: 1000, icon: '👑' }
+];
+
+function saveRatings() {
+  const data = {};
+
+  for (const [chatId, members] of ratings) {
+    data[chatId] = Object.fromEntries(members);
+  }
+
+  storeSave('ratings', RATINGS_FILE, data);
+}
+
+function rankIndex(points) {
+  let index = 0;
+
+  RANKS.forEach((rank, i) => {
+    if (points >= rank.min) index = i;
+  });
+
+  return index;
+}
+
+function rankLabel(lang, index) {
+  const rank = RANKS[index];
+
+  return rank.icon + ' ' + tx(lang, 'rank_' + rank.key);
+}
+
+// Ойыншының барлық топтардағы жалпы көрсеткіші
+function userTotals(userId) {
+  const id = String(userId);
+  const total = { points: 0, games: 0, wins: 0 };
+
+  for (const members of ratings.values()) {
+    const entry = members.get(id);
+
+    if (!entry) continue;
+
+    total.points += entry.points || 0;
+    total.games += entry.games || 0;
+    total.wins += entry.wins || 0;
+  }
+
+  return total;
+}
+
+// Топтың тізімі: очко, жеңіс, ойын саны бойынша
+function groupBoard(chatId) {
+  const members = ratings.get(String(chatId));
+
+  if (!members) return [];
+
+  return [...members.entries()].sort((a, b) =>
+    (b[1].points - a[1].points) ||
+    (b[1].wins - a[1].wins) ||
+    (a[1].games - b[1].games)
+  );
+}
+
+function ratingName(userId, fallback) {
+  const u = users.get(String(userId));
+
+  return (
+    (u && (u.name || u.username)) ||
+    fallback ||
+    'Ойыншы'
+  );
+}
+
+// Ойын біткенде екі ойыншыға да жазады. Қайтарады: id -> { before, after }
+function recordGroupGame(chatId, ids, winnerId) {
+  const key = String(chatId);
+
+  if (!ratings.has(key)) ratings.set(key, new Map());
+
+  const members = ratings.get(key);
+  const result = {};
+
+  for (const rawId of ids) {
+    const id = String(rawId);
+    const before = userTotals(id).points;
+
+    const entry = members.get(id) || {
+      name: '',
+      points: 0,
+      games: 0,
+      wins: 0
+    };
+
+    entry.name = ratingName(id, entry.name);
+    entry.games++;
+
+    if (winnerId && id === String(winnerId)) {
+      entry.wins++;
+      entry.points += WIN_POINTS;
+    }
+
+    members.set(id, entry);
+
+    result[id] = {
+      before,
+      after: userTotals(id).points
+    };
+  }
+
+  saveRatings();
+
+  return result;
+}
+
+function ratingMessage(chatId) {
+  const lang = getLang(chatId);
+  const board = groupBoard(chatId).slice(0, 10);
+
+  if (!board.length) {
+    return tx(lang, 'ratingEmpty');
+  }
+
+  const medals = ['🥇', '🥈', '🥉'];
+
+  const lines = board.map(([id, entry], index) => {
+    const place = medals[index] || `${index + 1}.`;
+    const rank = RANKS[rankIndex(userTotals(id).points)].icon;
+
+    return (
+      `${place} ${escapeHtml(entry.name || 'Ойыншы')} — ` +
+      `<b>${entry.points}</b> ⭐ ${rank}`
+    );
+  });
+
+  return (
+    tx(lang, 'ratingTitle') + '\n\n' +
+    lines.join('\n') + '\n\n' +
+    tx(lang, 'ratingFooter')
+  );
+}
+
+function meMessage(chatId, from, inGroup) {
+  const lang = getLang(chatId);
+  const totals = userTotals(from.id);
+  const index = rankIndex(totals.points);
+
+  const name =
+    [from.first_name, from.last_name].filter(Boolean).join(' ') ||
+    from.username ||
+    'Ойыншы';
+
+  const lines = [
+    `👤 <b>${escapeHtml(name)}</b>`,
+    '',
+    `${tx(lang, 'meRank')}: ${rankLabel(lang, index)}`,
+    `${tx(lang, 'mePoints')}: <b>${totals.points}</b>`,
+    `${tx(lang, 'meGames')}: ${totals.games}`,
+    `${tx(lang, 'meWins')}: ${totals.wins}`
+  ];
+
+  if (index < RANKS.length - 1) {
+    lines.push(
+      '',
+      tx(lang, 'meNext', {
+        rank: rankLabel(lang, index + 1),
+        left: RANKS[index + 1].min - totals.points
+      })
+    );
+  } else {
+    lines.push('', tx(lang, 'meMax'));
+  }
+
+  if (inGroup) {
+    const place = groupBoard(chatId).findIndex(
+      ([id]) => id === String(from.id)
+    );
+
+    if (place >= 0) {
+      lines.push(tx(lang, 'mePlace', { place: place + 1 }));
+    }
+  }
+
+  lines.push('', tx(lang, 'meNote'));
+
+  return lines.join('\n');
+}
+
 async function initStorage() {
   let lastError = null;
 
@@ -313,6 +511,7 @@ async function initStorage() {
       const blockedData = await storeLoad('blocked', BLOCKED_FILE, []);
       const statsData = await storeLoad('stats', STATS_FILE, null);
       const langData = await storeLoad('langs', LANGS_FILE, {});
+      const ratingData = await storeLoad('ratings', RATINGS_FILE, {});
 
       admins.clear();
       for (const [k, v] of parseAdmins(adminData)) admins.set(k, v);
@@ -327,6 +526,16 @@ async function initStorage() {
       blockedGroups.clear();
       if (Array.isArray(blockedData)) {
         for (const id of blockedData) blockedGroups.add(String(id));
+      }
+
+      ratings.clear();
+      if (ratingData && typeof ratingData === 'object') {
+        for (const [chatId, members] of Object.entries(ratingData)) {
+          ratings.set(
+            String(chatId),
+            new Map(Object.entries(members || {}))
+          );
+        }
       }
 
       chatLangs.clear();
@@ -2322,6 +2531,43 @@ async function handleGroupCallback(query) {
   return true;
 }
 
+/* ---------- Жеке чаттағы тұрақты төменгі батырмалар ---------- */
+
+const MINI_APP_URL = 'https://shashka-mini-app.onrender.com';
+
+function mainKeyboard(lang) {
+  return {
+    keyboard: [
+      [{
+        text: tx(lang, 'btnStart'),
+        web_app: { url: MINI_APP_URL + '/?lang=' + lang }
+      }],
+      [{
+        text: tx(lang, 'btnGroup')
+      }]
+    ],
+    resize_keyboard: true,
+    is_persistent: true
+  };
+}
+
+function isGroupButtonText(text) {
+  const value = String(text || '').trim();
+
+  return ['uz', 'kk', 'ru'].some(
+    l => value === tx(l, 'btnGroup')
+  );
+}
+
+async function sendMainMenu(chatId, lang) {
+  return telegramApi('sendMessage', {
+    chat_id: chatId,
+    text: tx(lang, 'startText'),
+    parse_mode: 'HTML',
+    reply_markup: mainKeyboard(lang)
+  });
+}
+
 /* ---------- /language ---------- */
 
 function languageKeyboard() {
@@ -2387,6 +2633,15 @@ async function handleLangCallback(query) {
     });
   } catch (error) {
     if (!String(error.message).includes('message is not modified')) {
+      console.error(error.message);
+    }
+  }
+
+  // Жеке чатта: жаңа тілдегі мәтін және жаңартылған төменгі батырмалар
+  if (chat.type === 'private') {
+    try {
+      await sendMainMenu(chat.id, lang);
+    } catch (error) {
       console.error(error.message);
     }
   }
@@ -2875,6 +3130,61 @@ async function handleTelegramWebhook(req, res) {
       }
     }
 
+    /* /rating: тек топта */
+
+    if (/^\/rating(?:@\w+)?(?:\s|$)/i.test(message.text)) {
+      if (['group', 'supergroup'].includes(message.chat.type)) {
+        await telegramApi('sendMessage', {
+          chat_id: message.chat.id,
+          text: ratingMessage(message.chat.id),
+          parse_mode: 'HTML'
+        });
+      }
+
+      res.writeHead(200);
+      return res.end('ok');
+    }
+
+    /* /me: жеке чатта да, топта да */
+
+    if (/^\/me(?:@\w+)?(?:\s|$)/i.test(message.text) && message.from) {
+      await telegramApi('sendMessage', {
+        chat_id: message.chat.id,
+        text: meMessage(
+          message.chat.id,
+          message.from,
+          ['group', 'supergroup'].includes(message.chat.type)
+        ),
+        parse_mode: 'HTML'
+      });
+
+      res.writeHead(200);
+      return res.end('ok');
+    }
+
+    /* «Группада ойнау» төменгі батырмасы */
+
+    if (
+      message.chat.type === 'private' &&
+      isGroupButtonText(message.text)
+    ) {
+      const lang = getLang(message.chat.id);
+
+      await telegramApi('sendMessage', {
+        chat_id: message.chat.id,
+        text: tx(lang, 'addGroupHint'),
+        reply_markup: {
+          inline_keyboard: [[{
+            text: tx(lang, 'btnAddGroup'),
+            url: 'https://t.me/shashkaoyinibot?startgroup=true'
+          }]]
+        }
+      });
+
+      res.writeHead(200);
+      return res.end('ok');
+    }
+
     /* /language: жеке чатта да, топта да */
 
     if (/^\/language(?:@\w+)?(?:\s|$)/.test(message.text)) {
@@ -2904,26 +3214,10 @@ async function handleTelegramWebhook(req, res) {
         );
       }
 
-      const lang = getLang(message.chat.id);
-
-      await telegramApi('sendMessage', {
-        chat_id: message.chat.id,
-        text: tx(lang, 'startText'),
-        reply_markup: {
-          inline_keyboard: [
-            [{
-              text: tx(lang, 'btnStart'),
-              web_app: {
-                url: 'https://shashka-mini-app.onrender.com/?lang=' + lang
-              }
-            }],
-            [{
-              text: tx(lang, 'btnGroup'),
-              url: 'https://t.me/shashkaoyinibot?startgroup=true'
-            }]
-          ]
-        }
-      });
+      await sendMainMenu(
+        message.chat.id,
+        getLang(message.chat.id)
+      );
     }
 
     res.writeHead(200);
@@ -2962,6 +3256,14 @@ async function setupTelegramWebhook() {
             description: tx(lang, 'cmdGame')
           },
           {
+            command: 'rating',
+            description: tx(lang, 'cmdRating')
+          },
+          {
+            command: 'me',
+            description: tx(lang, 'cmdMe')
+          },
+          {
             command: 'language',
             description: tx(lang, 'cmdLanguage')
           }
@@ -2981,6 +3283,10 @@ async function setupTelegramWebhook() {
           {
             command: 'language',
             description: tx(lang, 'cmdLanguage')
+          },
+          {
+            command: 'me',
+            description: tx(lang, 'cmdMe')
           },
           {
             command: 'admin',
@@ -3224,6 +3530,46 @@ function finish(g, winner, reason) {
       }
     } else {
       resultText = tx(lang, 'drawText');
+    }
+
+    // Очколар: жеңіс +10, жеңіліс 0 (ойын басталмаса есептелмейді)
+    if (reason !== 'opponent_timeout') {
+      const ids = [String(g.p.w), String(g.p.b)];
+
+      const recorded = recordGroupGame(
+        chatId,
+        ids,
+        winnerId ? String(winnerId) : null
+      );
+
+      if (winnerId) {
+        const loserId = ids.find(id => id !== String(winnerId));
+        const winnerName = escapeHtml(ratingName(winnerId));
+
+        resultText +=
+          '\n\n' +
+          tx(lang, 'resultPoints', {
+            name: winnerName,
+            points: WIN_POINTS
+          }) +
+          '\n' +
+          tx(lang, 'resultZero', {
+            name: escapeHtml(ratingName(loserId))
+          });
+
+        const win = recorded[String(winnerId)];
+        const oldRank = rankIndex(win.before);
+        const newRank = rankIndex(win.after);
+
+        if (newRank > oldRank) {
+          resultText +=
+            '\n\n' +
+            tx(lang, 'rankUp', {
+              name: winnerName,
+              rank: rankLabel(lang, newRank)
+            });
+        }
+      }
     }
 
     const oldMessageIds = room
