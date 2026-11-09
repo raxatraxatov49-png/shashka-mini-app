@@ -2997,10 +2997,60 @@ function tnTimer(fn, ms) {
 function tnLink(p, fallback) {
   if (!p) return escapeHtml(fallback || '');
 
+  // Аты басылғанда сол адамның аккаунты ашылады
+  const href = /^[A-Za-z0-9_]{4,32}$/.test(p.username || '')
+    ? `https://t.me/${p.username}`
+    : `tg://user?id=${encodeURIComponent(String(p.id))}`;
+
   return (
-    `<a href="tg://user?id=${encodeURIComponent(String(p.id))}">` +
+    `<a href="${href}">` +
     `${escapeHtml(p.name || p.username || fallback || '')}</a>`
   );
+}
+
+async function tnDeleteMessage(chatId, messageId) {
+  if (!messageId) return;
+
+  try {
+    await telegramApi('deleteMessage', {
+      chat_id: chatId,
+      message_id: messageId
+    });
+  } catch (error) {
+    // хабар бұрын өшкен болуы мүмкін
+  }
+}
+
+// Ойыншылардың жеке чатындағы «Ойынға кіру» хабарларын өшіреді
+async function tnClearDms(m) {
+  const list = m.dmMessages || [];
+
+  m.dmMessages = [];
+
+  for (const d of list) {
+    await tnDeleteMessage(d.chatId, d.messageId);
+    await delay(60);
+  }
+}
+
+// Матчтың топтағы және жеке чаттағы хабарларын өшіреді
+async function tnClearMatchMessages(t, m) {
+  const id = m.messageId;
+
+  m.messageId = null;
+
+  await tnDeleteMessage(t.chatId, id);
+  await tnClearDms(m);
+}
+
+// Бір кезеңнің барлық матч хабарларын өшіреді
+async function tnClearRoundMessages(t, r) {
+  if (!t.rounds || !t.rounds[r]) return;
+
+  for (const m of t.rounds[r]) {
+    await tnClearMatchMessages(t, m);
+    await delay(60);
+  }
 }
 
 // 429 болса күтіп, қайта жібереді
@@ -3381,13 +3431,15 @@ async function tnStart(t) {
       console.error('Тіркеу хабары жабылмады:', error.message);
     }
 
-    await tgRetry('sendMessage', {
-      chat_id: t.chatId,
-      text: TN.fmt(T.started, { n: t.players.length }),
-      parse_mode: 'HTML'
-    });
+    await tnRunRound(
+      t,
+      0,
+      TN.fmt(T.started, { n: t.players.length })
+    );
 
-    await tnRunRound(t, 0);
+    // Тіркеу хабары енді керек емес
+    await tnDeleteMessage(t.chatId, t.messageId);
+    t.messageId = null;
   });
 }
 
@@ -3424,16 +3476,6 @@ async function tnPostBracket(t, caption) {
 
   if (!messageId) return;
 
-  try {
-    await telegramApi('pinChatMessage', {
-      chat_id: t.chatId,
-      message_id: messageId,
-      disable_notification: true
-    });
-  } catch (error) {
-    // бот админ емес болса, бекітпейміз
-  }
-
   if (t.bracketMessageId) {
     try {
       await telegramApi('deleteMessage', {
@@ -3456,7 +3498,7 @@ function tnMatchText(t, m, T, label) {
   );
 }
 
-async function tnRunRound(t, r) {
+async function tnRunRound(t, r, intro) {
   if (t.status !== 'running') return;
 
   const lang = getLang(t.chatId);
@@ -3464,7 +3506,13 @@ async function tnRunRound(t, r) {
 
   t.currentRound = r;
 
-  await tnPostBracket(t, '🏆 <b>' + escapeHtml(label) + '</b>');
+  // Алдыңғы кезеңнің «Ойынға кіру» хабарлары өшеді
+  if (r > 0) await tnClearRoundMessages(t, r - 1);
+
+  await tnPostBracket(
+    t,
+    (intro ? intro + '\n\n' : '') + '🏆 <b>' + escapeHtml(label) + '</b>'
+  );
 
   for (const m of t.rounds[r]) {
     if (t.status !== 'running') return;
@@ -3487,19 +3535,9 @@ async function tnStartMatch(t, m) {
   const lang = getLang(t.chatId);
   const label = TN.roundLabel(lang, t.size, m.round);
 
-  // Тең шыққан ойынның ескі хабарын жабамыз
-  if (m.messageId && m.attempts > 0) {
-    try {
-      await tgRetry('editMessageText', {
-        chat_id: t.chatId,
-        message_id: m.messageId,
-        text: tnMatchText(t, m, T, label) + '\n\n' + T.drawReplay,
-        parse_mode: 'HTML',
-        reply_markup: { inline_keyboard: [] }
-      });
-    } catch (error) {
-      console.error(error.message);
-    }
+  // Тең шыққан ойынның ескі хабарларын өшіреміз
+  if (m.attempts > 0) {
+    await tnClearMatchMessages(t, m);
   }
 
   const code = crypto.randomBytes(6).toString('hex');
@@ -3540,7 +3578,9 @@ async function tnStartMatch(t, m) {
   try {
     const sent = await tgRetry('sendMessage', {
       chat_id: t.chatId,
-      text: tnMatchText(t, m, T, label),
+      text:
+        tnMatchText(t, m, T, label) +
+        (m.attempts > 0 ? '\n\n' + T.drawReplay : ''),
       parse_mode: 'HTML',
       reply_markup: {
         inline_keyboard: [[{ text: T.enterBtn, url: link }]]
@@ -3554,12 +3594,14 @@ async function tnStartMatch(t, m) {
   }
 
   // Әр ойыншыға жеке чатқа да сілтеме жіберіледі
+  m.dmMessages = [];
+
   for (const [player, opponent] of [[pa, pb], [pb, pa]]) {
     try {
       const pl = getLang(player.id);
       const PT = TN.texts(pl);
 
-      await telegramApi('sendMessage', {
+      const dmSent = await telegramApi('sendMessage', {
         chat_id: player.id,
         text: TN.fmt(PT.dm, {
           round: escapeHtml(TN.roundLabel(pl, t.size, m.round)),
@@ -3569,6 +3611,11 @@ async function tnStartMatch(t, m) {
         reply_markup: {
           inline_keyboard: [[{ text: PT.enterBtn, url: link }]]
         }
+      });
+
+      m.dmMessages.push({
+        chatId: player.id,
+        messageId: dmSent.result.message_id
       });
     } catch (error) {
       // ойыншы ботты ашпаған немесе бұғаттаған болуы мүмкін
@@ -3675,7 +3722,17 @@ function tnFinishMatch(t, m, winnerId, reason) {
   }[reason] || '';
 
   tnEnqueue(t, async () => {
+    // Жеке чаттағы «Ойынға кіру» хабарлары бірден өшеді
+    await tnClearDms(m);
+
     if (!m.messageId) return;
+
+    // Уақыт өтіп кетсе (ешкім кірмеді), хабар толық өшеді
+    if (reason === 'noshow') {
+      await tnDeleteMessage(t.chatId, m.messageId);
+      m.messageId = null;
+      return;
+    }
 
     await tgRetry('editMessageText', {
       chat_id: t.chatId,
@@ -3706,9 +3763,14 @@ function tnFinishTournament(t) {
 
   chatTournament.delete(String(t.chatId));
 
-  tnEnqueue(t, () =>
-    tnPostBracket(t, TN.fmt(T.champion, { name: tnLink(champion, T.player) }))
-  );
+  tnEnqueue(t, async () => {
+    await tnClearRoundMessages(t, t.rounds.length - 1);
+
+    await tnPostBracket(
+      t,
+      TN.fmt(T.champion, { name: tnLink(champion, T.player) })
+    );
+  });
 
   tnTimer(() => tnDrop(t), 5 * 60 * 1000);
 }
