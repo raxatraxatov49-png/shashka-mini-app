@@ -561,7 +561,7 @@ function ratingMessage(chatId) {
     const rank = RANKS[rankIndex(userTotals(id).points)].icon;
 
     return (
-      `${place} ${escapeHtml(entry.name || 'Ойыншы')} — ` +
+      `${place} <a href="tg://user?id=${encodeURIComponent(String(id))}">${escapeHtml(entry.name || 'Ойыншы')}</a> — ` +
       `<b>${entry.points}</b> ⭐ ${rank}`
     );
   });
