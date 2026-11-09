@@ -1,0 +1,102 @@
+/* Рейтинг: басты беттегі батырма және рейтинг беті */
+
+#menu { overflow-y: auto; -webkit-overflow-scrolling: touch; }
+
+/* Басқа батырмалармен бірдей .tile, бірақ бөлек қатарда, толық ені */
+.tiles.tiles-one {
+  display: grid;
+  grid-template-columns: 1fr;
+  margin-top: 12px;
+}
+
+.tiles.tiles-one .tile { width: 100%; }
+
+#rating .rinfo {
+  margin: 4px 2px 10px;
+  text-align: center;
+  font-size: 13px;
+  color: #a0a0a0;
+}
+
+#rating .rlist {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding-bottom: 8px;
+}
+
+#rating .rempty {
+  margin-top: 40px;
+  text-align: center;
+  color: #a0a0a0;
+  font-size: 15px;
+}
+
+.rrow {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 16px;
+  background: #202020;
+  color: #f2f2f2;
+  text-align: left;
+  flex: none;
+}
+
+button.rrow:active { background: #2a2a2a; }
+
+.rrow.first { background: linear-gradient(90deg, #3a2f10, #202020); }
+
+.rrow .rpl {
+  width: 30px;
+  flex: none;
+  text-align: center;
+  font-weight: 800;
+  font-size: 16px;
+  color: #a0a0a0;
+}
+
+.rrow .ava { width: 42px; height: 42px; font-size: 17px; }
+
+.rrow .rnm { min-width: 0; flex: 1; }
+
+.rrow .rnm b {
+  display: block;
+  font-size: 15px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.rrow .rnm small {
+  display: block;
+  font-size: 12.5px;
+  color: #6aa7ff;
+}
+
+.rrow.mine .rnm small { color: #a0a0a0; }
+
+.rrow .rpt {
+  flex: none;
+  text-align: right;
+  font-weight: 800;
+  font-size: 15px;
+}
+
+.rrow .rpt small { display: block; font-size: 13px; margin-top: 2px; }
+
+#rating .rmewrap {
+  flex: none;
+  padding-top: 8px;
+}
+
+#rating .rmewrap .rrow {
+  background: #2a2412;
+  box-shadow: inset 0 0 0 1px #f6c453;
+}
