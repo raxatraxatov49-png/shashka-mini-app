@@ -8,6 +8,7 @@
 <title>Дойбы</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="shop.css">
 </head>
 <body>
 
@@ -15,6 +16,7 @@
   <header class="who">
     <div class="ava" id="meAva"></div>
     <div><b id="meName">…</b><small data-i18n="playerRole">Дойбы ойыншысы</small></div>
+    <button id="btnCoins" class="coinbtn" type="button"><i class="coin"></i><span class="cnum">0</span></button>
   </header>
 
   <h1 data-i18n="menuTitle">Дойбы</h1>
@@ -31,6 +33,50 @@
     <p data-i18n="friendDesc">Досыңа шақыру сілтемесін жіберіп, бірге дойбы ойна</p>
     <button id="btnFriend" class="batl" data-i18n="friendBtn">ДОСЫҢМЕН ОЙНАУ</button>
   </section>
+
+  <div class="tiles">
+    <button id="btnShop" class="tile" type="button">
+      <span class="tic">🛍</span>
+      <span><b data-i18n="shopTile">Магазин</b><small data-i18n="shopTileSub">Тақта мен тастар</small></span>
+    </button>
+    <button id="btnRefs" class="tile" type="button">
+      <span class="tic">👥</span>
+      <span><b data-i18n="friendsTile">Достар</b><small class="rw" id="tileReward">+50</small></span>
+    </button>
+  </div>
+</main>
+
+<main id="shop" class="screen">
+  <div class="sbar">
+    <button class="sback" data-back type="button" aria-label="Back">‹</button>
+    <h1 data-i18n="shopTitle">Магазин</h1>
+    <div class="coinbtn"><i class="coin"></i><span class="cnum">0</span></div>
+  </div>
+  <div class="stabs">
+    <button id="tabBoards" type="button" data-i18n="tabBoards">Тақталар</button>
+    <button id="tabPieces" type="button" data-i18n="tabPieces">Тастар</button>
+  </div>
+  <div id="shopGrid" class="sgrid"></div>
+  <button id="btnShopRefs" class="batl gold" type="button" data-i18n="shopInviteBtn">Достарды шақырып койн жина</button>
+</main>
+
+<main id="refs" class="screen">
+  <div class="sbar">
+    <button class="sback" data-back type="button" aria-label="Back">‹</button>
+    <h1 data-i18n="refTitle">Достарды шақыр</h1>
+    <div class="coinbtn"><i class="coin"></i><span class="cnum">0</span></div>
+  </div>
+  <section class="card brown">
+    <h2 id="refHead">…</h2>
+    <p id="refDesc">…</p>
+    <input id="refLink" class="reflink" type="text" readonly autocomplete="off">
+    <div class="refbtns">
+      <button id="btnRefCopy" class="batl" type="button" data-i18n="copyLink">Сілтемені көшіру</button>
+      <button id="btnRefShare" class="batl" type="button" data-i18n="shareTg">Telegram арқылы жіберу</button>
+    </div>
+  </section>
+  <div class="refcount"><b id="refCount">0</b><span data-i18n="invitedCount">шақырылған дос</span></div>
+  <div id="refList" class="reflist"></div>
 </main>
 
 <main id="game" class="screen">
