@@ -140,6 +140,19 @@ const I18N = {
     "refDesc": "Досың сілтеме арқылы алғаш рет кіріп, Telegram арқылы расталса, саған {n} койн автоматты түрде қосылады.",
     "invitedCount": "шақырылған дос",
     "invitedEmpty": "Әзірге ешкім жоқ",
+    "ratingTile": "Рейтинг",
+    "ratingTileSub": "Үздік ойыншылар",
+    "ratingTitle": "Рейтинг",
+    "ratingWeek": "Осы апта",
+    "ratingAll": "Барлық уақыт",
+    "ratingWeekInfo": "7 күн сайын нөлден басталады · жаңаруға {t} қалды",
+    "ratingAllInfo": "Кездейсоқ қарсыласпен толық ойнап жеңсеңіз +10 ұпай",
+    "ratingEmpty": "Әзірге ешкім жоқ. Бірінші болыңыз!",
+    "ratingLoading": "Жүктелуде…",
+    "ratingYou": "Сіздің орныңыз",
+    "ratingDH": "{d} күн {h} сағ",
+    "ratingHM": "{h} сағ {m} мин",
+    "ratingMin": "{m} мин",
     "refJoined": "🎉 {name} қосылды! +{n} койн",
     "inUse": "✓ Қолданыста",
     "choose": "Таңдау",
@@ -253,6 +266,19 @@ const I18N = {
     "refDesc": "Do‘stingiz havola orqali birinchi marta kirib, Telegram orqali tasdiqlansa, sizga {n} koin avtomatik qo‘shiladi.",
     "invitedCount": "taklif qilingan do‘st",
     "invitedEmpty": "Hozircha hech kim yo‘q",
+    "ratingTile": "Reyting",
+    "ratingTileSub": "Eng yaxshi o‘yinchilar",
+    "ratingTitle": "Reyting",
+    "ratingWeek": "Shu hafta",
+    "ratingAll": "Barcha vaqt",
+    "ratingWeekInfo": "Har 7 kunda noldan boshlanadi · yangilanishiga {t} qoldi",
+    "ratingAllInfo": "Tasodifiy raqib bilan to‘liq o‘ynab yutsangiz +10 ball",
+    "ratingEmpty": "Hozircha hech kim yo‘q. Birinchi bo‘ling!",
+    "ratingLoading": "Yuklanmoqda…",
+    "ratingYou": "Sizning o‘rningiz",
+    "ratingDH": "{d} kun {h} soat",
+    "ratingHM": "{h} soat {m} daq",
+    "ratingMin": "{m} daq",
     "refJoined": "🎉 {name} qo‘shildi! +{n} koin",
     "inUse": "✓ Ishlatilmoqda",
     "choose": "Tanlash",
@@ -366,6 +392,19 @@ const I18N = {
     "refDesc": "Когда друг впервые зайдёт по ссылке и вход подтвердится через Telegram, вам автоматически начислится {n} коинов.",
     "invitedCount": "приглашённых друзей",
     "invitedEmpty": "Пока никого нет",
+    "ratingTile": "Рейтинг",
+    "ratingTileSub": "Лучшие игроки",
+    "ratingTitle": "Рейтинг",
+    "ratingWeek": "Эта неделя",
+    "ratingAll": "За всё время",
+    "ratingWeekInfo": "Обнуляется каждые 7 дней · до обновления {t}",
+    "ratingAllInfo": "+10 очков за полную победу над случайным соперником",
+    "ratingEmpty": "Пока никого нет. Будьте первым!",
+    "ratingLoading": "Загрузка…",
+    "ratingYou": "Ваше место",
+    "ratingDH": "{d} д {h} ч",
+    "ratingHM": "{h} ч {m} мин",
+    "ratingMin": "{m} мин",
     "refJoined": "🎉 {name} присоединился! +{n} коинов",
     "inUse": "✓ Используется",
     "choose": "Выбрать",
@@ -432,6 +471,7 @@ function setLang(l) {
   applyStatic();
   setSearching(S.searching);
   if (S.shop) { renderShop(); renderRefs(); }
+  if (S.rating) renderRating();
 
   if (S.g) {
     if (S.g.invite) {
@@ -477,7 +517,9 @@ const S = {
   fatal: false,
   refSent: false,
   shop: null,
-  shopTab: 'boards'
+  shopTab: 'boards',
+  rating: null,
+  ratingTab: 'week'
 };
 
 const CROWN = '<svg viewBox="0 0 24 24"><path d="M3 18l-1-11 5 4 5-7 5 7 5-4-1 11z"/></svg>';
@@ -872,7 +914,7 @@ function show(id) {
         tg.BackButton.show();
         tg.enableClosingConfirmation();
       } else {
-        id === 'shop' || id === 'refs'
+        id === 'shop' || id === 'refs' || id === 'rating'
           ? tg.BackButton.show()
           : tg.BackButton.hide();
         tg.disableClosingConfirmation();
@@ -886,7 +928,8 @@ if (tg) {
     tg.BackButton.onClick(() => {
       if (
         $('shop').classList.contains('active') ||
-        $('refs').classList.contains('active')
+        $('refs').classList.contains('active') ||
+        $('rating').classList.contains('active')
       ) {
         show('menu');
         return;
@@ -1027,6 +1070,10 @@ function onMsg(m) {
 
     case 'shop':
       onShop(m);
+      break;
+
+    case 'rating':
+      onRating(m);
       break;
 
     case 'lang':
@@ -2134,6 +2181,151 @@ $('shopGrid').addEventListener('click', (e) => {
 
 $('btnRefCopy').onclick = copyRefLink;
 $('btnRefShare').onclick = shareRefLink;
+
+/* ---------- РЕЙТИНГ ---------- */
+
+const RMEDAL = ['🥇', '🥈', '🥉'];
+
+function openRating() {
+  send({ t: 'rating_get' });
+  renderRating();
+  show('rating');
+}
+
+function onRating(m) {
+  m.at = Date.now();
+  S.rating = m;
+  renderRating();
+}
+
+function ratingLeft(ms) {
+  const mins = Math.floor(Math.max(0, ms) / 60000);
+  const d = Math.floor(mins / 1440);
+  const h = Math.floor((mins % 1440) / 60);
+
+  if (d > 0) return tr('ratingDH', { d, h });
+  if (h > 0) return tr('ratingHM', { h, m: mins % 60 });
+
+  return tr('ratingMin', { m: Math.max(1, mins) });
+}
+
+function ratingRow(p, own) {
+  const clickable = !own && p.username;
+  const row = document.createElement(clickable ? 'button' : 'div');
+
+  row.className = 'rrow' + (p.rank === 1 ? ' first' : '') + (own ? ' mine' : '');
+
+  if (clickable) {
+    row.type = 'button';
+    row.dataset.u = p.username;
+  }
+
+  const place = document.createElement('div');
+  place.className = 'rpl';
+  place.textContent = p.rank ? (RMEDAL[p.rank - 1] || p.rank) : '—';
+
+  const ava = document.createElement('div');
+  ava.className = 'ava';
+  setAva(ava, { name: String(p.name || '?'), avatar: p.avatar || null });
+
+  const nm = document.createElement('div');
+  nm.className = 'rnm';
+
+  const b = document.createElement('b');
+  b.textContent = p.name || '?';
+  nm.append(b);
+
+  const sub = own ? tr('ratingYou') : (p.username ? '@' + p.username : '');
+
+  if (sub) {
+    const small = document.createElement('small');
+    small.textContent = sub;
+    nm.append(small);
+  }
+
+  const pt = document.createElement('div');
+  pt.className = 'rpt';
+  pt.textContent = (p.points || 0) + ' ⭐';
+
+  if (p.icon) {
+    const ic = document.createElement('small');
+    ic.textContent = p.icon;
+    pt.append(ic);
+  }
+
+  row.append(place, ava, nm, pt);
+
+  return row;
+}
+
+function renderRating() {
+  $('tabWeek').classList.toggle('on', S.ratingTab === 'week');
+  $('tabAll').classList.toggle('on', S.ratingTab === 'all');
+
+  const list = $('ratingList');
+  const info = $('ratingInfo');
+  const me = $('ratingMe');
+  const m = S.rating;
+
+  list.textContent = '';
+  me.textContent = '';
+
+  if (!m) {
+    info.textContent = '';
+    me.classList.add('hidden');
+
+    const wait = document.createElement('div');
+    wait.className = 'rempty';
+    wait.textContent = tr('ratingLoading');
+    list.append(wait);
+
+    return;
+  }
+
+  const d = m[S.ratingTab] || { list: [], me: {} };
+
+  info.textContent = S.ratingTab === 'week'
+    ? tr('ratingWeekInfo', { t: ratingLeft(m.left - (Date.now() - m.at)) })
+    : tr('ratingAllInfo');
+
+  if (!d.list.length) {
+    const empty = document.createElement('div');
+    empty.className = 'rempty';
+    empty.textContent = tr('ratingEmpty');
+    list.append(empty);
+  } else {
+    d.list.forEach((p) => list.append(ratingRow(p, false)));
+  }
+
+  const mp = d.me || {};
+
+  me.append(ratingRow({
+    rank: mp.rank,
+    name: (S.me && S.me.name) || '?',
+    avatar: S.me && S.me.avatar,
+    points: mp.points || 0
+  }, true));
+
+  me.classList.remove('hidden');
+}
+
+$('btnRating').onclick = openRating;
+$('tabWeek').onclick = () => { S.ratingTab = 'week'; renderRating(); };
+$('tabAll').onclick = () => { S.ratingTab = 'all'; renderRating(); };
+
+$('ratingList').addEventListener('click', (e) => {
+  const b = e.target.closest('button[data-u]');
+  if (!b) return;
+
+  const url = 'https://t.me/' + encodeURIComponent(b.dataset.u);
+
+  try {
+    if (tg && tg.openTelegramLink) tg.openTelegramLink(url);
+    else window.open(url, '_blank');
+  } catch (err) {
+    window.open(url, '_blank');
+  }
+});
 
 /* ---------- ІСКЕ ҚОСУ ---------- */
 
