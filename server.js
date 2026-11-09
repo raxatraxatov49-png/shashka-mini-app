@@ -7,6 +7,7 @@ const crypto = require('crypto');
 const { WebSocketServer } = require('ws');
 const G = require('./lib/game');
 const { verifyInitData } = require('./lib/telegram');
+const { createShop } = require('./lib/shop');
 const { t: tx, normLang, detectLang, DEFAULT_LANG } = require('./lib/i18n');
 
 const PORT = Number(process.env.PORT) || 3000;
@@ -252,6 +253,28 @@ const stats = {
   totalGames: 0,
   totalGroupGames: 0,
   users: {}
+};
+
+/* ---------- Дүкен: койн, тақта/тас, дос шақыру ---------- */
+
+const SHOP_FILE = path.join(DATA_DIR, 'shop.json');
+
+const saveShop = data => storeSave('shop', SHOP_FILE, data);
+
+let shop = createShop({}, saveShop);
+
+const hasOwn = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
+
+// Ойыншы алғаш қашан кіргенін stats.users-тен аламыз
+const firstSeen = {
+  get: id => (hasOwn(stats.users, id) ? stats.users[id] : undefined),
+  has: id => hasOwn(stats.users, id)
+};
+
+const shopMsg = (id, ev) => {
+  const m = Object.assign({ t: 'shop' }, shop.view(id));
+  if (ev) m.ev = ev;
+  return m;
 };
 
 function saveStats() {
@@ -606,7 +629,10 @@ async function initStorage() {
       const statsData = await storeLoad('stats', STATS_FILE, null);
       const langData = await storeLoad('langs', LANGS_FILE, {});
       const ratingData = await storeLoad('ratings', RATINGS_FILE, {});
+      const shopData = await storeLoad('shop', SHOP_FILE, {});
       const unreachableData = await storeLoad('unreachable', UNREACHABLE_FILE, []);
+
+      shop = createShop(shopData, saveShop);
 
       admins.clear();
       for (const [k, v] of parseAdmins(adminData)) admins.set(k, v);
@@ -4267,6 +4293,57 @@ function handle(u, m) {
         t: 'invite_cancelled'
       });
 
+    case 'shop_get':
+      return send(u, shopMsg(u.id));
+
+    case 'shop_buy': {
+      const r = shop.buy(u.id, String(m.kind), String(m.id));
+
+      return send(u, shopMsg(u.id, {
+        type: 'buy',
+        ok: r.ok,
+        code: r.code || null,
+        id: String(m.id)
+      }));
+    }
+
+    case 'shop_use': {
+      const r = shop.use(u.id, String(m.kind), String(m.id));
+
+      return send(u, shopMsg(u.id, {
+        type: 'use',
+        ok: r.ok,
+        code: r.code || null,
+        id: String(m.id)
+      }));
+    }
+
+    case 'ref_claim': {
+      const inviterId = String(m.code || '')
+        .replace(/[^0-9a-zA-Z_]/g, '')
+        .slice(0, 30);
+
+      if (!inviterId) return;
+
+      const r = shop.claimReferral(
+        u.id,
+        u.name,
+        inviterId,
+        firstSeen
+      );
+
+      if (!r.ok) return;
+
+      send(u, shopMsg(u.id));
+
+      return send(users.get(inviterId), shopMsg(inviterId, {
+        type: 'ref',
+        ok: true,
+        name: u.name,
+        reward: r.reward
+      }));
+    }
+
     case 'move': {
       const g = games.get(u.game);
 
@@ -4472,6 +4549,8 @@ function onAuth(ws, m) {
     me: pub(u),
     lang: userLang(u)
   });
+
+  send(u, shopMsg(u.id));
 
   const g = u.game && games.get(u.game);
 
