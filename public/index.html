@@ -9,6 +9,7 @@
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <link rel="stylesheet" href="style.css">
 <link rel="stylesheet" href="shop.css">
+<link rel="stylesheet" href="rating.css">
 </head>
 <body>
 
@@ -44,6 +45,13 @@
       <span><b data-i18n="friendsTile">Достар</b><small class="rw" id="tileReward">+50</small></span>
     </button>
   </div>
+
+  <div class="tiles tiles-one">
+    <button id="btnRating" class="tile" type="button">
+      <span class="tic">🏆</span>
+      <span><b data-i18n="ratingTile">Рейтинг</b><small data-i18n="ratingTileSub">Үздік ойыншылар</small></span>
+    </button>
+  </div>
 </main>
 
 <main id="shop" class="screen">
@@ -77,6 +85,21 @@
   </section>
   <div class="refcount"><b id="refCount">0</b><span data-i18n="invitedCount">шақырылған дос</span></div>
   <div id="refList" class="reflist"></div>
+</main>
+
+<main id="rating" class="screen">
+  <div class="sbar">
+    <button class="sback" data-back type="button" aria-label="Back">‹</button>
+    <h1 data-i18n="ratingTitle">Рейтинг</h1>
+    <div class="coinbtn"><i class="coin"></i><span class="cnum">0</span></div>
+  </div>
+  <div class="stabs">
+    <button id="tabWeek" type="button" data-i18n="ratingWeek">Осы апта</button>
+    <button id="tabAll" type="button" data-i18n="ratingAll">Барлық уақыт</button>
+  </div>
+  <div id="ratingInfo" class="rinfo"></div>
+  <div id="ratingList" class="rlist"></div>
+  <div id="ratingMe" class="rmewrap hidden"></div>
 </main>
 
 <main id="game" class="screen">
