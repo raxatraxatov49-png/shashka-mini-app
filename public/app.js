@@ -1808,7 +1808,7 @@ $('btnAgain').onclick = () => {
 // b0 / p0 — бұрынғы style.css дизайны, оны өзгертпейміз.
 const SKINS = {
   boards: {
-    b0: { a: '#f0d9b5', b: '#b58863' },
+    b0: { a: '#d8cbb5', b: '#75583e' },
     b1: { a: '#eeeed2', b: '#6a9b4f' },
     b2: { a: '#dbe9f4', b: '#4b7fb5' },
     b3: { a: '#9a9a9a', b: '#2b2b2f' },
@@ -1816,8 +1816,8 @@ const SKINS = {
   },
   pieces: {
     p0: {
-      w: 'radial-gradient(circle at 35% 30%,#fff,#d9d2c4)',
-      k: 'radial-gradient(circle at 35% 30%,#666,#1b1b1b)'
+      w: 'radial-gradient(circle at 35% 30%,#fff,#e9e3d5 70%,#cfc6b3)',
+      k: 'radial-gradient(circle at 35% 30%,#5a5a5f,#26262a 65%,#121214)'
     },
     p1: {
       w: 'radial-gradient(circle at 35% 30%,#ff9a9a,#c42b2b)',
@@ -1845,8 +1845,8 @@ const SKINS = {
     if (id === 'b0') continue;
 
     css +=
-      `#field[data-board="${id}"] .sq:not(.last):not(.sel){background:${c.a}}` +
-      `#field[data-board="${id}"] .sq.d:not(.last):not(.sel){background:${c.b}}`;
+      `#field[data-board="${id}"] .sq{background:${c.a}}` +
+      `#field[data-board="${id}"] .sq.d{background:${c.b}}`;
   }
 
   for (const [id, c] of Object.entries(SKINS.pieces)) {
