@@ -625,6 +625,23 @@ const GLOBAL_RATING_FILE = path.join(DATA_DIR, 'global-rating.json');
 const GR_WEEK_MS = 7 * 24 * 60 * 60 * 1000; // апта = іске қосқаннан бастап 7 күн
 const GR_TOP = 30;
 
+// Апталық сыйлық (койн): 1-орын 1000, 2-орын 500, 3-орын 250, 4–10-орын 100
+const GR_PRIZE_TOP = 10;
+const GR_PRIZES = [1000, 500, 250];
+const GR_PRIZE_REST = 100;
+
+function grPrizeFor(rank) {
+  if (rank >= 1 && rank <= GR_PRIZES.length) return GR_PRIZES[rank - 1];
+  if (rank > GR_PRIZES.length && rank <= GR_PRIZE_TOP) return GR_PRIZE_REST;
+  return 0;
+}
+
+const GR_PRIZE_MSG = {
+  kk: (rank, c) => `🏆 Апталық рейтингте ${rank}-орын алдыңыз!\nСізге +${c} 🪙 койн берілді.`,
+  uz: (rank, c) => `🏆 Haftalik reytingda ${rank}-o‘rin!\nSizga +${c} 🪙 koin berildi.`,
+  ru: (rank, c) => `🏆 Вы заняли ${rank}-е место в рейтинге недели!\nВам начислено +${c} 🪙 коинов.`
+};
+
 // Осы себептермен аяқталған ойынға ұпай берілмейді:
 // берілу, байланыс үзілу, қарсылас кірмеді, жүріс уақыты бітті.
 // Тек ойын ережесі бойынша толық аяқталса ғана ұпай беріледі.
@@ -637,7 +654,7 @@ const GR_NO_POINTS = new Set([
 
 // users[id] = { name, username, avatar, points, wins, games, wk, wp }
 // wk — апталық ұпай қай кезеңге жататыны, wp — сол кезеңдегі ұпай
-const globalRating = { periodStart: 0, users: {} };
+const globalRating = { periodStart: 0, users: {}, rewarded: 0 };
 
 let grSaveTimer = null;
 
@@ -647,7 +664,8 @@ function grSaveNow() {
 
   storeSave('global_rating', GLOBAL_RATING_FILE, {
     periodStart: globalRating.periodStart,
-    users: globalRating.users
+    users: globalRating.users,
+    rewarded: globalRating.rewarded || 0
   });
 }
 
@@ -672,9 +690,87 @@ function grRoll() {
   const passed = Math.floor((now - globalRating.periodStart) / GR_WEEK_MS);
 
   if (passed > 0) {
+    const ended = globalRating.periodStart;
+
     globalRating.periodStart += passed * GR_WEEK_MS;
+
+    // Біткен аптаның жеңімпаздарына койн береміз (бір рет қана)
+    grPayWeek(ended);
+
     grSaveNow();
   }
+}
+
+// Біткен аптаның топ-10 ойыншысына койн береді
+function grPayWeek(ended) {
+  if (globalRating.rewarded === ended) return;
+
+  // Алдымен "берілді" деп сақтаймыз: қайта іске қосылса, екі рет бермеу үшін
+  globalRating.rewarded = ended;
+  grSaveNow();
+
+  const winners = Object.entries(globalRating.users)
+    .map(([id, e]) => ({
+      id,
+      e,
+      p: e.wk === ended ? (e.wp || 0) : 0
+    }))
+    .filter(x => x.p > 0)
+    .sort((a, b) =>
+      (b.p - a.p) ||
+      ((b.e.wins || 0) - (a.e.wins || 0)) ||
+      ((a.e.games || 0) - (b.e.games || 0))
+    )
+    .slice(0, GR_PRIZE_TOP);
+
+  const notices = [];
+
+  winners.forEach((x, i) => {
+    const rank = i + 1;
+    const prize = grPrizeFor(rank);
+
+    if (!prize) return;
+
+    try {
+      const r = shop.addCoins(x.id, prize);
+
+      if (!r || !r.ok) return;
+
+      const u = users.get(x.id);
+
+      if (u && u.ws) send(u, shopMsg(x.id));
+
+      notices.push({ id: x.id, rank, prize });
+    } catch (error) {
+      console.error('Апталық койн беру қатесі:', x.id, error.message);
+    }
+  });
+
+  console.log('Апталық рейтинг сыйлықтары берілді:', notices.length);
+
+  // Telegram-ға хабар (қате болса да ойынға әсер етпейді)
+  (async () => {
+    for (const n of notices) {
+      if (String(n.id).startsWith('dev')) continue;
+
+      let lang = 'kk';
+
+      try {
+        lang = getLang(n.id);
+      } catch (e) {}
+
+      const make = GR_PRIZE_MSG[lang] || GR_PRIZE_MSG.kk;
+
+      try {
+        await telegramApi('sendMessage', {
+          chat_id: n.id,
+          text: make(n.rank, n.prize)
+        });
+      } catch (error) {
+        console.error('Сыйлық хабары жіберілмеді:', n.id, error.message);
+      }
+    }
+  })();
 }
 
 function grWeekPoints(entry) {
@@ -763,7 +859,14 @@ function grPayload(userId) {
     left: Math.max(
       0,
       globalRating.periodStart + GR_WEEK_MS - Date.now()
-    )
+    ),
+    prizes: {
+      p1: GR_PRIZES[0],
+      p2: GR_PRIZES[1],
+      p3: GR_PRIZES[2],
+      rest: GR_PRIZE_REST,
+      top: GR_PRIZE_TOP
+    }
   };
 
   for (const kind of ['week', 'all']) {
@@ -838,9 +941,11 @@ async function initStorage() {
 
       globalRating.periodStart = 0;
       globalRating.users = {};
+      globalRating.rewarded = 0;
 
       if (grData && typeof grData === 'object') {
         globalRating.periodStart = Number(grData.periodStart) || 0;
+        globalRating.rewarded = Number(grData.rewarded) || 0;
 
         globalRating.users =
           grData.users && typeof grData.users === 'object'
@@ -5193,6 +5298,9 @@ if (require.main === module) {
       console.log('Блокталған топтар:', blockedGroups.size);
 
       setupTelegramWebhook();
+
+      // Ешкім кірмесе де апта соңында сыйлықтар берілуі үшін
+      setInterval(grRoll, 60 * 1000).unref();
     });
   });
 }
