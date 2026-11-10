@@ -1,0 +1,109 @@
+/* ============ ҚЫСҚЫ ТАҚЫРЫП — тек басты мәзір (#menu) ============
+   Басқа беттерге (#shop, #game, #rating ...) әсер етпейді.
+   Өшіру үшін index.html ішіндегі winter.css жолын алып тастаңыз. */
+
+/* Фон */
+#menu {
+  background:
+    radial-gradient(120% 40% at 50% -5%, rgba(143, 211, 255, .28), transparent 70%),
+    linear-gradient(180deg, #081428 0%, #0f2547 55%, #1b3a68 100%);
+}
+
+/* Жауып тұрған қар: екі қабат (жақын үлкен + алыс кішкентай) */
+#menu::before,
+#menu::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 5;
+}
+
+#menu::before {
+  background-image:
+    radial-gradient(3px 3px at 20px 30px, #fff, rgba(255, 255, 255, 0)),
+    radial-gradient(2.5px 2.5px at 90px 150px, #fff, rgba(255, 255, 255, 0)),
+    radial-gradient(3px 3px at 170px 70px, #fff, rgba(255, 255, 255, 0)),
+    radial-gradient(2px 2px at 220px 200px, #fff, rgba(255, 255, 255, 0)),
+    radial-gradient(3.5px 3.5px at 130px 240px, #fff, rgba(255, 255, 255, 0)),
+    radial-gradient(2px 2px at 50px 110px, #fff, rgba(255, 255, 255, 0));
+  background-size: 260px 260px;
+  animation: snowA 8s linear infinite;
+}
+
+#menu::after {
+  background-image:
+    radial-gradient(2px 2px at 30px 20px, rgba(255, 255, 255, .8), rgba(255, 255, 255, 0)),
+    radial-gradient(1.5px 1.5px at 110px 60px, rgba(255, 255, 255, .8), rgba(255, 255, 255, 0)),
+    radial-gradient(2px 2px at 70px 130px, rgba(255, 255, 255, .8), rgba(255, 255, 255, 0)),
+    radial-gradient(1.5px 1.5px at 150px 160px, rgba(255, 255, 255, .8), rgba(255, 255, 255, 0)),
+    radial-gradient(2px 2px at 10px 100px, rgba(255, 255, 255, .8), rgba(255, 255, 255, 0));
+  background-size: 180px 180px;
+  animation: snowB 14s linear infinite;
+}
+
+@keyframes snowA { from { background-position: 0 0; } to { background-position: 0 260px; } }
+@keyframes snowB { from { background-position: 0 0; } to { background-position: -180px 180px; } }
+
+@media (prefers-reduced-motion: reduce) {
+  #menu::before, #menu::after { animation: none !important; }
+}
+
+/* Тақырып */
+#menu h1 { color: #fff; text-shadow: 0 2px 14px rgba(143, 211, 255, .35); }
+
+/* Карточкалар: мұзды әйнек + үстінде қар */
+#menu .card.brown {
+  background: linear-gradient(160deg, rgba(255, 255, 255, .13), rgba(255, 255, 255, .05)) !important;
+  border: 1px solid rgba(190, 225, 255, .22);
+  box-shadow: 0 18px 40px rgba(0, 0, 0, .35), inset 0 1px 0 rgba(255, 255, 255, .12);
+}
+
+#menu .card::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 26px;
+  right: 26px;
+  height: 7px;
+  border-radius: 0 0 10px 10px;
+  background: linear-gradient(#fff, #d9efff);
+  z-index: 2;
+  pointer-events: none;
+}
+
+/* Төменгі плиткалар (Магазин, Достар, Рейтинг, Ойыншылар) */
+#menu .tile {
+  position: relative;
+  background: rgba(255, 255, 255, .08) !important;
+  border: 1px solid rgba(190, 225, 255, .2) !important;
+}
+
+#menu .tile::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 18px;
+  right: 18px;
+  height: 5px;
+  border-radius: 0 0 8px 8px;
+  background: #e8f5ff;
+  pointer-events: none;
+}
+
+/* Профиль аватарындағы жаңа жылдық колпак */
+#menu .who .ava { overflow: visible; }
+#menu .who .ava img { border-radius: 50%; }
+
+#menu .who .ava::before {
+  content: "";
+  position: absolute;
+  top: -22px;
+  left: -8px;
+  width: 58px;
+  height: 44px;
+  transform: rotate(-8deg);
+  pointer-events: none;
+  z-index: 2;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 60 46'%3E%3Cpath d='M9 36C10 17 26 5 44 11C41 20 47 29 54 35Z' fill='%23e5383b'/%3E%3Crect x='5' y='31' width='50' height='11' rx='5.5' fill='%23fff'/%3E%3Ccircle cx='46' cy='10' r='6.5' fill='%23fff'/%3E%3C/svg%3E") center / contain no-repeat;
+}
