@@ -906,6 +906,7 @@ async function initStorage() {
       const grData = await storeLoad('global_rating', GLOBAL_RATING_FILE, null);
       const shopData = await storeLoad('shop', SHOP_FILE, {});
       const unreachableData = await storeLoad('unreachable', UNREACHABLE_FILE, []);
+      const profileData = await storeLoad('profiles', PROFILES_FILE, {});
 
       shop = createShop(shopData, saveShop);
 
@@ -955,6 +956,29 @@ async function initStorage() {
 
       // Алғаш рет іске қосылғанда 7 күндік санақ қазірден басталады
       grRoll();
+
+      // Ойыншылар бөлімі: сақталған профильдер + рейтингтегі бұрынғы ойыншылар
+      profiles.clear();
+      if (profileData && typeof profileData === 'object') {
+        for (const [id, p] of Object.entries(profileData)) {
+          if (!p || typeof p !== 'object') continue;
+          profiles.set(String(id), {
+            name: String(p.name || '').slice(0, 40),
+            username: String(p.username || ''),
+            avatar: p.avatar || null,
+            seen: Number(p.seen) || 0
+          });
+        }
+      }
+      for (const [id, e] of Object.entries(globalRating.users)) {
+        if (profiles.has(id) || !e || !(e.name || e.username)) continue;
+        profiles.set(id, {
+          name: String(e.name || ''),
+          username: String(e.username || ''),
+          avatar: e.avatar || null,
+          seen: 0
+        });
+      }
 
       chatLangs.clear();
       if (langData && typeof langData === 'object') {
@@ -1434,6 +1458,9 @@ function startGame(a, b, groupInfo = null) {
 
   removeUserInvite(a.id);
   removeUserInvite(b.id);
+
+  clearPInvitesOf(a.id);
+  clearPInvitesOf(b.id);
 
   const [w, bl] = Math.random() < 0.5
     ? [a, b]
@@ -3362,6 +3389,15 @@ async function handleTelegramWebhook(req, res) {
     ) {
       trackUser(message.from.id);
 
+      touchProfile(message.from.id, {
+        name:
+          [message.from.first_name, message.from.last_name]
+            .filter(Boolean).join(' ') ||
+          message.from.username || '',
+        username: message.from.username || '',
+        seen: Date.now()
+      });
+
       if (unreachableUsers.delete(String(message.from.id))) {
         saveUnreachable();
       }
@@ -4705,6 +4741,232 @@ function joinInvite(u, code) {
   startGame(owner, u);
 }
 
+/* ---------- Ойыншылар бөлімі: профильдер және ойынға шақыру ---------- */
+
+const PROFILES_FILE = path.join(DATA_DIR, 'profiles.json');
+const PINVITE_TTL = 30 * 1000;
+const PLAYERS_LIMIT = 300;
+
+// id -> { name, username, avatar, seen }
+const profiles = new Map();
+// 'fromId>toId' -> { from, to, timer }
+const pinvites = new Map();
+
+let profilesTimer = null;
+
+function saveProfilesSoon() {
+  if (profilesTimer) return;
+
+  profilesTimer = setTimeout(() => {
+    profilesTimer = null;
+    storeSave('profiles', PROFILES_FILE, Object.fromEntries(profiles));
+  }, 5000);
+
+  if (profilesTimer.unref) profilesTimer.unref();
+}
+
+function touchProfile(id, data) {
+  id = String(id);
+
+  if (id.startsWith('dev')) return;
+
+  const p = profiles.get(id) || {
+    name: '',
+    username: '',
+    avatar: null,
+    seen: 0
+  };
+
+  if (data.name) p.name = String(data.name).slice(0, 40);
+  if (data.username) p.username = String(data.username);
+  if (data.avatar) p.avatar = String(data.avatar);
+  if (data.seen) p.seen = data.seen;
+
+  profiles.set(id, p);
+  saveProfilesSoon();
+}
+
+const isOnline = u =>
+  Boolean(u && u.ws && u.ws.readyState === 1);
+
+const isBusy = u =>
+  Boolean(u && u.game && games.has(u.game));
+
+function playersPayload(viewerId) {
+  const me = String(viewerId);
+  const now = Date.now();
+  const list = [];
+
+  for (const [id, p] of profiles) {
+    if (id === me || !(p.name || p.username)) continue;
+
+    const u = users.get(id);
+    const online = isOnline(u);
+
+    list.push({
+      id,
+      name: p.name || p.username,
+      username: p.username || '',
+      avatar: p.avatar || null,
+      status: online ? (isBusy(u) ? 'game' : 'online') : 'offline',
+      seen: online ? now : (p.seen || 0),
+      sent: pinvites.has(me + '>' + id)
+    });
+  }
+
+  const order = { online: 0, game: 1, offline: 2 };
+
+  list.sort((a, b) =>
+    (order[a.status] - order[b.status]) ||
+    (b.seen - a.seen)
+  );
+
+  return {
+    t: 'players',
+    list: list.slice(0, PLAYERS_LIMIT),
+    total: list.length,
+    onlineCount: list.filter(x => x.status !== 'offline').length,
+    ttl: PINVITE_TTL / 1000
+  };
+}
+
+// notify: 'to' | 'from' | 'both' | 'none'
+function endPInvite(key, reason, notify) {
+  const inv = pinvites.get(key);
+
+  if (!inv) return;
+
+  clearTimeout(inv.timer);
+  pinvites.delete(key);
+
+  if (notify === 'to' || notify === 'both') {
+    send(users.get(inv.to), {
+      t: 'pinvite_end',
+      from: inv.from,
+      reason
+    });
+  }
+
+  if (notify === 'from' || notify === 'both') {
+    send(users.get(inv.from), {
+      t: 'pinvite_end',
+      to: inv.to,
+      reason
+    });
+  }
+}
+
+function clearPInvitesOf(id) {
+  id = String(id);
+
+  for (const [key, inv] of pinvites) {
+    if (inv.from === id || inv.to === id) {
+      endPInvite(key, 'unavailable', 'both');
+    }
+  }
+}
+
+function sendPInvite(u, toId) {
+  toId = String(toId || '');
+
+  const target = users.get(toId);
+
+  if (!toId || toId === u.id) {
+    return send(u, { t: 'error', code: 'pinvite_invalid' });
+  }
+
+  if (isBusy(u)) {
+    return send(u, { t: 'error', code: 'busy' });
+  }
+
+  if (!isOnline(target)) {
+    return send(u, { t: 'error', code: 'pinvite_offline' });
+  }
+
+  if (isBusy(target)) {
+    return send(u, { t: 'error', code: 'pinvite_busy' });
+  }
+
+  const key = u.id + '>' + toId;
+
+  if (pinvites.has(key)) {
+    return send(u, { t: 'pinvite_sent', to: toId });
+  }
+
+  // Бір уақытта тек бір шығыс заявка
+  for (const [k, inv] of pinvites) {
+    if (inv.from === u.id) endPInvite(k, 'cancelled', 'to');
+  }
+
+  dequeue(u.id);
+
+  const inv = { from: u.id, to: toId, timer: null };
+
+  inv.timer = setTimeout(
+    () => endPInvite(key, 'expired', 'both'),
+    PINVITE_TTL
+  );
+
+  if (inv.timer.unref) inv.timer.unref();
+
+  pinvites.set(key, inv);
+
+  send(u, { t: 'pinvite_sent', to: toId });
+
+  send(target, {
+    t: 'pinvite_in',
+    from: {
+      id: u.id,
+      name: u.name,
+      username: u.username || '',
+      avatar: u.avatar || null
+    },
+    ttl: PINVITE_TTL / 1000
+  });
+}
+
+function cancelPInvite(u, toId) {
+  toId = String(toId || '');
+
+  endPInvite(u.id + '>' + toId, 'cancelled', 'to');
+
+  send(u, { t: 'pinvite_end', to: toId, reason: 'cancelled' });
+}
+
+function answerPInvite(u, fromId, accept) {
+  fromId = String(fromId || '');
+
+  const key = fromId + '>' + u.id;
+  const inv = pinvites.get(key);
+
+  if (!inv) {
+    return send(u, {
+      t: 'pinvite_end',
+      from: fromId,
+      reason: 'expired'
+    });
+  }
+
+  if (!accept) {
+    return endPInvite(key, 'declined', 'from');
+  }
+
+  const from = users.get(inv.from);
+
+  if (!isOnline(from) || isBusy(from) || isBusy(u)) {
+    endPInvite(key, 'unavailable', 'both');
+
+    return send(u, { t: 'error', code: 'pinvite_busy' });
+  }
+
+  endPInvite(key, 'started', 'none');
+
+  clearPInvitesOf(u.id);
+  clearPInvitesOf(from.id);
+
+  startGame(from, u);
+}
+
 /* ---------- WebSocket хабарламалары ---------- */
 
 function handle(u, m) {
@@ -4777,6 +5039,18 @@ function handle(u, m) {
       return send(u, {
         t: 'invite_cancelled'
       });
+
+    case 'players_get':
+      return send(u, playersPayload(u.id));
+
+    case 'pinvite_send':
+      return sendPInvite(u, m.to);
+
+    case 'pinvite_cancel':
+      return cancelPInvite(u, m.to);
+
+    case 'pinvite_answer':
+      return answerPInvite(u, m.from, Boolean(m.accept));
 
     case 'rating_get':
       return send(u, grPayload(u.id));
@@ -5030,6 +5304,13 @@ function onAuth(ws, m) {
 
   trackUser(info.id);
 
+  touchProfile(info.id, {
+    name: info.name,
+    username: info.username,
+    avatar: info.avatar,
+    seen: Date.now()
+  });
+
   let u = users.get(info.id);
 
   if (u && u.ws && u.ws !== ws) {
@@ -5205,6 +5486,9 @@ wss.on('connection', ws => {
 
     dequeue(u.id);
     removeUserInvite(u.id);
+    clearPInvitesOf(u.id);
+
+    touchProfile(u.id, { seen: Date.now() });
 
     const roomCode = groupPlayerRooms.get(
       String(u.id)
