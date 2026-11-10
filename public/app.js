@@ -167,6 +167,10 @@ const I18N = {
     "pOffline": "Ойыншы қазір офлайн",
     "pBusy": "Ойыншы қазір ойында",
     "micDenied": "Микрофонға рұқсат берілмеді",
+    "payFail": "Төлем өтпеді",
+    "adminTag": "АДМИН",
+    "packsTitle": "Койн сатып алу",
+    "coinsAdded": "+{n} койн қосылды!",
     "micBtn": "Микрофон",
     "sndBtn": "Дыбыс",
     "ratingTitle": "Рейтинг",
@@ -323,6 +327,10 @@ const I18N = {
     "pOffline": "O‘yinchi hozir oflayn",
     "pBusy": "O‘yinchi hozir o‘yinda",
     "micDenied": "Mikrofonga ruxsat berilmadi",
+    "payFail": "To‘lov o‘tmadi",
+    "adminTag": "ADMIN",
+    "packsTitle": "Koin sotib olish",
+    "coinsAdded": "+{n} koin qo‘shildi!",
     "micBtn": "Mikrofon",
     "sndBtn": "Ovoz",
     "ratingTitle": "Reyting",
@@ -479,6 +487,10 @@ const I18N = {
     "pOffline": "Игрок сейчас офлайн",
     "pBusy": "Игрок сейчас в игре",
     "micDenied": "Нет доступа к микрофону",
+    "payFail": "Оплата не прошла",
+    "adminTag": "АДМИН",
+    "packsTitle": "Купить коины",
+    "coinsAdded": "+{n} коинов зачислено!",
     "micBtn": "Микрофон",
     "sndBtn": "Звук",
     "ratingTitle": "Рейтинг",
@@ -563,6 +575,7 @@ function setLang(l) {
   if (S.shop) { renderShop(); renderRefs(); }
   if (S.rating) renderRating();
   if (S.players) { renderPlayers(); updatePlayersTile(); }
+  if (S.shop) renderPacks();
 
   if (S.g) {
     if (S.g.invite) {
@@ -1014,7 +1027,7 @@ function show(id) {
         tg.BackButton.show();
         tg.enableClosingConfirmation();
       } else {
-        id === 'shop' || id === 'refs' || id === 'rating' || id === 'players'
+        id === 'shop' || id === 'refs' || id === 'rating' || id === 'players' || id === 'coins'
           ? tg.BackButton.show()
           : tg.BackButton.hide();
         tg.disableClosingConfirmation();
@@ -1026,6 +1039,11 @@ function show(id) {
 if (tg) {
   try {
     tg.BackButton.onClick(() => {
+      if ($('coins').classList.contains('active')) {
+        show('shop');
+        return;
+      }
+
       if (
         $('shop').classList.contains('active') ||
         $('refs').classList.contains('active') ||
@@ -1155,6 +1173,14 @@ function onMsg(m) {
 
     case 'players':
       onPlayers(m);
+      break;
+
+    case 'invoice':
+      openInvoice(m.url);
+      break;
+
+    case 'pay_error':
+      ptoast(tr('payFail'));
       break;
 
     case 'rtc':
@@ -1386,8 +1412,18 @@ function startGame(m) {
   setAva($('oppAva'), opp);
   setAva($('myAva'), me);
 
-  $('oppName').textContent = opp.name;
-  $('myName').textContent = me.name;
+  setGameName($('oppName'), opp);
+  setGameName($('myName'), me);
+
+  $('oppAva').classList.toggle('admf', Boolean(opp.admin));
+  $('myAva').classList.toggle('admf', Boolean(me.admin));
+
+  const adm = m.players.w.admin
+    ? m.players.w
+    : (m.players.b.admin ? m.players.b : null);
+
+  S.g.skin = adm && adm.skin ? adm.skin : null;
+  applySkin();
 
   $('oppDot').className = 'pdot ' + (m.you === 'w' ? 'b' : 'w');
   $('myDot').className = 'pdot ' + m.you;
@@ -2066,9 +2102,21 @@ function toast(text) {
 }
 
 function applySkin() {
-  if (!S.shop) return;
-
   const f = $('field');
+  const sk = S.g && S.g.skin;
+
+  // Админмен ойнағанда екеуі де админнің тақтасы мен тастарын көреді
+  if (
+    sk &&
+    SKINS.boards[sk.boards] &&
+    SKINS.pieces[sk.pieces]
+  ) {
+    f.dataset.board = sk.boards;
+    f.dataset.pieces = sk.pieces;
+    return;
+  }
+
+  if (!S.shop) return;
 
   f.dataset.board = S.shop.use.boards;
   f.dataset.pieces = S.shop.use.pieces;
@@ -2186,6 +2234,14 @@ function renderRefs() {
 
 function onShop(m) {
   S.shop = m;
+
+
+  if (m.ev && m.ev.type === 'coins' && m.ev.ok) {
+    ptoast(tr('coinsAdded', { n: fmt(m.ev.n) }));
+    haptic('heavy');
+  }
+
+  renderPacks();
 
   document.querySelectorAll('.cnum').forEach((e) => {
     e.textContent = fmt(m.coins);
@@ -2945,6 +3001,84 @@ $('btnSnd').onclick = () => {
   haptic('light');
   updateRtcUi();
 };
+
+/* ---------- АДМИН БЕЛГІСІ ---------- */
+
+function setGameName(el, p) {
+  el.textContent = p.name;
+
+  if (p.admin) {
+    const tag = document.createElement('span');
+
+    tag.className = 'admtag';
+    tag.textContent = tr('adminTag');
+
+    el.append(tag);
+  }
+}
+
+/* ---------- ТӨЛЕМ ---------- */
+
+function openInvoice(url) {
+  try {
+    if (tg && tg.openInvoice) {
+      tg.openInvoice(url, (status) => {
+        if (status === 'failed') ptoast(tr('payFail'));
+        if (status === 'paid') send({ t: 'shop_get' });
+      });
+      return;
+    }
+  } catch (e) {}
+
+  try {
+    if (tg && tg.openTelegramLink) tg.openTelegramLink(url);
+    else window.open(url, '_blank');
+  } catch (e) {
+    window.open(url, '_blank');
+  }
+}
+
+/* ---------- КОЙН ПАКЕТТЕРІ ---------- */
+
+function renderPacks() {
+  const box = $('packGrid');
+  const list = (S.shop && S.shop.packs) || [];
+
+  box.textContent = '';
+
+  list.forEach((p, i) => {
+    const b = document.createElement('button');
+    const c = document.createElement('div');
+    const s = document.createElement('div');
+    const coin = document.createElement('i');
+
+    b.type = 'button';
+    b.className = 'pack' + (i === list.length - 1 ? ' best' : '');
+
+    c.className = 'pc';
+    coin.className = 'coin';
+    c.append(coin, fmt(p.coins));
+
+    s.className = 'ps';
+    s.textContent = p.stars + ' ⭐';
+
+    b.append(c, s);
+    b.onclick = () => {
+      haptic('light');
+      send({ t: 'coin_buy', pack: i });
+    };
+
+    box.append(b);
+  });
+}
+
+$('btnCoinsBuy').onclick = () => {
+  send({ t: 'shop_get' });
+  renderPacks();
+  show('coins');
+};
+
+$('btnCoinsBack').onclick = () => show('shop');
 
 /* ---------- ІСКЕ ҚОСУ ---------- */
 
