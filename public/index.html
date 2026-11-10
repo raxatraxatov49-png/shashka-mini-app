@@ -57,10 +57,14 @@
     </button>
   </div>
 
-  <div class="tiles tiles-one">
+  <div class="tiles tiles-two">
     <button id="btnRating" class="tile" type="button">
       <span class="tic">🏆</span>
       <span><b data-i18n="ratingTile">Рейтинг</b><small data-i18n="ratingTileSub">Үздік ойыншылар</small></span>
+    </button>
+    <button id="btnPlayers" class="tile" type="button">
+      <span class="tic">🎮</span>
+      <span><b data-i18n="playersTile">Ойыншылар</b><small class="pcnt" id="tilePlayersSub" data-i18n="playersTileSub">Бот ойыншылары</small></span>
     </button>
   </div>
 </main>
@@ -112,6 +116,15 @@
   <div id="ratingPrize" class="rprize hidden"></div>
   <div id="ratingList" class="rlist"></div>
   <div id="ratingMe" class="rmewrap hidden"></div>
+</main>
+
+<main id="players" class="screen">
+  <div class="sbar">
+    <button class="sback" data-back type="button" aria-label="Back">‹</button>
+    <h1 data-i18n="playersTitle">Ойыншылар</h1>
+    <div class="coinbtn"><i class="coin"></i><span class="cnum">0</span></div>
+  </div>
+  <div id="plList" class="plscroll"></div>
 </main>
 
 <main id="game" class="screen">
@@ -206,6 +219,18 @@
     <button id="btnToMenu" class="ghost" data-i18n="toMenu">Басты мәзір</button>
   </div>
 </div>
+
+<div id="sheetPIn" class="sheet hidden">
+  <div class="panel pin">
+    <div id="pinAva" class="ava"></div>
+    <h3 id="pinName"></h3>
+    <p data-i18n="pIncomingSub">сені дойбы ойынына шақырды</p>
+    <button id="btnPinYes" class="batl" type="button" data-i18n="pAccept">Қабылдау</button>
+    <button id="btnPinNo" class="ghost" type="button" data-i18n="pDecline">Қабылдамау</button>
+  </div>
+</div>
+
+<div id="ptoast" class="ptoast hidden"></div>
 
 <div id="conn" class="conn hidden" data-i18n="connLost">Байланыс үзілді. Қайта қосылуда…</div>
 <div id="fatal" class="modal hidden"><div class="dialog"><h3 id="fatalTitle"></h3><p id="fatalSub"></p></div></div>
