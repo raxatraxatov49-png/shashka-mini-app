@@ -290,6 +290,11 @@ function trackUser(id) {
 
   stats.users[id] = Date.now();
   saveStats();
+
+  if (!id.startsWith('dev') && typeof profiles !== 'undefined' && !profiles.has(id)) {
+    profiles.set(id, { name: '', username: '', avatar: null, seen: Date.now() });
+    saveProfilesSoon();
+  }
 }
 
 /* ---------- Тіл баптаулары (чат / топ бойынша) ---------- */
@@ -984,6 +989,17 @@ async function initStorage() {
           username: String(e.username || ''),
           avatar: e.avatar || null,
           seen: 0
+        });
+      }
+
+      // Админ панельдегі барлық пайдаланушыларды (stats.users) қосамыз
+      for (const id of Object.keys(stats.users || {})) {
+        if (id.startsWith('dev') || profiles.has(id)) continue;
+        profiles.set(id, {
+          name: '',
+          username: '',
+          avatar: null,
+          seen: Number(stats.users[id]) || 0
         });
       }
 
@@ -4919,7 +4935,7 @@ function handleSuccessfulPayment(message) {
 
 const PROFILES_FILE = path.join(DATA_DIR, 'profiles.json');
 const PINVITE_TTL = 30 * 1000;
-const PLAYERS_LIMIT = 300;
+const PLAYERS_LIMIT = 5000;
 
 // id -> { name, username, avatar, seen }
 const profiles = new Map();
@@ -4972,14 +4988,14 @@ function playersPayload(viewerId) {
   const list = [];
 
   for (const [id, p] of profiles) {
-    if (id === me || !(p.name || p.username)) continue;
+    if (id === me) continue;
 
     const u = users.get(id);
     const online = isOnline(u);
 
     list.push({
       id,
-      name: p.name || p.username,
+      name: p.name || p.username || ('Ойыншы ' + String(id).slice(-4)),
       username: p.username || '',
       avatar: p.avatar || null,
       status: online ? (isBusy(u) ? 'game' : 'online') : 'offline',
