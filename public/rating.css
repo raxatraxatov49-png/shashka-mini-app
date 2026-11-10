@@ -203,3 +203,84 @@ button.rrow:active { background: #2a2a2a; }
 #btnMic.on { color: #34c759; }
 #btnSnd.off { color: #a0a0a0; }
 #btnMic.hidden, #btnSnd.hidden { display: none; }
+
+/* Койн пакеттері */
+
+.pgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+.pack {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 14px 8px;
+  border: 0;
+  border-radius: 18px;
+  background: #202020;
+  color: #f2f2f2;
+}
+
+.pack:active { background: #2a2a2a; }
+.pack .pc { font-size: 20px; font-weight: 800; color: #f6c453; display: flex; align-items: center; gap: 6px; }
+.pack .ps { font-size: 14px; font-weight: 800; background: #2a2a2a; border-radius: 12px; padding: 5px 12px; }
+.pack.best { outline: 2px solid #f6c453; }
+
+.coinopen {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px;
+  margin: 0 0 12px;
+  border: 0;
+  border-radius: 18px;
+  background: #202020;
+  color: #f6c453;
+  font-size: 17px;
+  font-weight: 800;
+  text-align: left;
+}
+
+.coinopen:active { background: #2a2a2a; }
+.coinopen b { font-size: 24px; color: #a0a0a0; }
+.coinopen .coin { vertical-align: -2px; }
+
+
+/* Админ: тәж, жарқыраған шеті және АДМИН белгісі */
+
+.ava.admf {
+  position: relative;
+  overflow: visible !important;
+  border-radius: 50%;
+  box-shadow:
+    0 0 0 2px #ffd45e,
+    0 0 10px 2px rgba(255, 212, 94, .85),
+    0 0 26px 6px rgba(255, 190, 40, .55);
+}
+
+.ava.admf img { border-radius: 50%; }
+
+.ava.admf::after {
+  content: '👑';
+  position: absolute;
+  top: -22px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 20px;
+  line-height: 1;
+  pointer-events: none;
+  filter: drop-shadow(0 0 5px rgba(255, 212, 94, .9));
+}
+
+.admtag {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 3px 9px;
+  border-radius: 8px;
+  background: linear-gradient(90deg, #d9aa3c, #f6c453);
+  color: #2a1f00;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 1.5px;
+  vertical-align: 2px;
+}
