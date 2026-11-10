@@ -3050,16 +3050,16 @@ function renderPacks() {
     const b = document.createElement('button');
     const c = document.createElement('div');
     const s = document.createElement('div');
-    const coin = document.createElement('i');
+    const coin = document.createElement('span');
 
     b.type = 'button';
     b.className = 'pack' + (i === list.length - 1 ? ' best' : '');
 
-    c.className = 'pc';
-    coin.className = 'coin';
+    c.className = 'pkc';
+    coin.className = 'cdot';
     c.append(coin, fmt(p.coins));
 
-    s.className = 'ps';
+    s.className = 'pks';
     s.textContent = p.stars + ' ⭐';
 
     b.append(c, s);
