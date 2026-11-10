@@ -5181,26 +5181,33 @@ function handle(u, m) {
         });
       }
 
-      queue = queue.filter(id => {
+      // Тек шын тірі (ws ашық) және бос ойыншыларды қалдырамыз
+      const alive = id => {
         const user = users.get(id);
 
-        return user &&
+        return Boolean(
+          user &&
+          id !== u.id &&
           user.ws &&
-          !user.game;
-      });
+          user.ws.readyState === 1 &&
+          !(user.game && games.has(user.game))
+        );
+      };
 
-      const oppId = queue.shift();
+      queue = queue.filter(alive);
 
-      if (oppId) {
+      // Кезектегі бірінші жарамды қарсыласпен бірден ойын бастаймыз
+      while (queue.length) {
+        const oppId = queue.shift();
+
+        if (!alive(oppId)) continue;
+
         const opp = users.get(oppId);
+        const randomGame = startGame(opp, u);
 
-        if (opp && !opp.game) {
-          const randomGame = startGame(opp, u);
+        if (randomGame) randomGame.random = true;
 
-          if (randomGame) randomGame.random = true;
-
-          return randomGame;
-        }
+        return randomGame;
       }
 
       queue.push(u.id);
