@@ -274,6 +274,7 @@ const firstSeen = {
 
 const shopMsg = (id, ev) => {
   const m = Object.assign({ t: 'shop' }, shop.view(id));
+  m.packs = COIN_PACKS;
   if (ev) m.ev = ev;
   return m;
 };
@@ -907,6 +908,7 @@ async function initStorage() {
       const shopData = await storeLoad('shop', SHOP_FILE, {});
       const unreachableData = await storeLoad('unreachable', UNREACHABLE_FILE, []);
       const profileData = await storeLoad('profiles', PROFILES_FILE, {});
+      const payRaw = await storeLoad('payments', PAY_FILE, null);
 
       shop = createShop(shopData, saveShop);
 
@@ -956,6 +958,11 @@ async function initStorage() {
 
       // Алғаш рет іске қосылғанда 7 күндік санақ қазірден басталады
       grRoll();
+
+      payData.charges = [];
+      if (payRaw && Array.isArray(payRaw.charges)) {
+        payData.charges = payRaw.charges.slice(-500);
+      }
 
       // Ойыншылар бөлімі: сақталған профильдер + рейтингтегі бұрынғы ойыншылар
       profiles.clear();
@@ -1230,10 +1237,29 @@ function send(u, msg) {
   }
 }
 
-const pub = u => ({
-  name: u ? u.name : 'Ойыншы',
-  avatar: u ? u.avatar : null
-});
+// Админнің таңдаған тақтасы мен тастары (тек админ үшін)
+function adminSkin(id) {
+  try {
+    const v = shop.view(id);
+
+    return v && v.use
+      ? { boards: v.use.boards, pieces: v.use.pieces }
+      : null;
+  } catch (e) {
+    return null;
+  }
+}
+
+const pub = u => {
+  const admin = u ? isAdmin(u.id) : false;
+
+  return {
+    name: u ? u.name : 'Ойыншы',
+    avatar: u ? u.avatar : null,
+    admin,
+    skin: admin ? adminSkin(u.id) : null
+  };
+};
 
 const sideOfUser = (g, id) =>
   g.p.w === String(id) ? 'w' : 'b';
@@ -3311,6 +3337,20 @@ async function handleTelegramWebhook(req, res) {
 
     const update = JSON.parse(body);
 
+    /* Telegram Stars төлемі */
+
+    if (update.pre_checkout_query) {
+      await handlePreCheckout(update.pre_checkout_query);
+      res.writeHead(200);
+      return res.end('ok');
+    }
+
+    if (update.message && update.message.successful_payment) {
+      handleSuccessfulPayment(update.message);
+      res.writeHead(200);
+      return res.end('ok');
+    }
+
     /* Callback */
 
     if (update.callback_query) {
@@ -4098,7 +4138,8 @@ async function setupTelegramWebhook() {
       allowed_updates: [
         'message',
         'callback_query',
-        'my_chat_member'
+        'my_chat_member',
+        'pre_checkout_query'
       ]
     });
 
@@ -4741,6 +4782,139 @@ function joinInvite(u, code) {
   startGame(owner, u);
 }
 
+/* ---------- Telegram Stars төлемдері ---------- */
+
+const PAY_FILE = path.join(DATA_DIR, 'payments.json');
+
+// charges: қайталанған төлемнен қорғау
+const payData = { charges: [] };
+
+function savePay() {
+  storeSave('payments', PAY_FILE, payData);
+}
+
+// Койн пакеттері: [койн, жұлдыз]
+const COIN_PACKS = [
+  { coins: 1000, stars: 15 },
+  { coins: 2000, stars: 25 },
+  { coins: 3000, stars: 35 },
+  { coins: 4000, stars: 45 },
+  { coins: 5000, stars: 55 },
+  { coins: 10000, stars: 100 }
+];
+
+const COIN_PAID_TEXT = {
+  kk: (n, c) => `✅ Төлем сәтті өтті!\n💰 Балансқа <b>${n}</b> койн қосылды.\nҚазіргі койн: <b>${c}</b>`,
+  uz: (n, c) => `✅ To‘lov muvaffaqiyatli o‘tdi!\n💰 Balansga <b>${n}</b> koin qo‘shildi.\nHozirgi koin: <b>${c}</b>`,
+  ru: (n, c) => `✅ Оплата прошла успешно!\n💰 На баланс зачислено <b>${n}</b> коинов.\nСейчас коинов: <b>${c}</b>`
+};
+
+async function createCoinInvoice(u, idx) {
+  const pack = COIN_PACKS[Number(idx)];
+
+  if (!pack) return send(u, { t: 'pay_error' });
+
+  try {
+    const r = await telegramApi('createInvoiceLink', {
+      title: `${pack.coins} койн`,
+      description: `Shashka: ${pack.coins} койн`,
+      payload: `coins:${u.id}:${Number(idx)}`,
+      currency: 'XTR',
+      prices: [{ label: `${pack.coins} койн`, amount: pack.stars }]
+    });
+
+    send(u, { t: 'invoice', url: r.result });
+  } catch (e) {
+    console.error('Койн invoice қатесі:', e.message);
+    send(u, { t: 'pay_error' });
+  }
+}
+
+function parseOrder(payload) {
+  const m = /^coins:(.+):(\d+)$/.exec(payload || '');
+
+  if (m && COIN_PACKS[Number(m[2])]) {
+    const pack = COIN_PACKS[Number(m[2])];
+
+    return { kind: 'coins', id: m[1], amount: pack.stars, pack };
+  }
+
+  return null;
+}
+
+async function handlePreCheckout(q) {
+  const o = parseOrder(q.invoice_payload);
+
+  const ok =
+    Boolean(o) &&
+    o.id === String(q.from && q.from.id) &&
+    q.currency === 'XTR' &&
+    q.total_amount === o.amount;
+
+  await telegramApi(
+    'answerPreCheckoutQuery',
+    ok
+      ? { pre_checkout_query_id: q.id, ok: true }
+      : {
+          pre_checkout_query_id: q.id,
+          ok: false,
+          error_message: 'Invalid order'
+        }
+  );
+}
+
+function handleSuccessfulPayment(message) {
+  const p = message.successful_payment;
+  const o = parseOrder(p && p.invoice_payload);
+
+  if (
+    !o ||
+    !message.from ||
+    o.id !== String(message.from.id) ||
+    p.currency !== 'XTR' ||
+    p.total_amount !== o.amount
+  ) {
+    return;
+  }
+
+  const id = String(message.from.id);
+
+  // Койн пакеті: бір төлем бір рет қана есептеледі
+  const chargeId = p.telegram_payment_charge_id;
+
+  if (chargeId) {
+    if (payData.charges.includes(chargeId)) return;
+
+    payData.charges.push(chargeId);
+
+    if (payData.charges.length > 500) payData.charges.shift();
+
+    savePay();
+  }
+
+  const r = shop.addCoins(id, o.pack.coins);
+
+  if (!r || !r.ok) {
+    console.error('Койн қосылмады:', id, o.pack.coins);
+    return;
+  }
+
+  send(users.get(id), shopMsg(id, {
+    type: 'coins',
+    ok: true,
+    n: o.pack.coins
+  }));
+
+  // Боттан жеке хабарлама
+  const fmt = COIN_PAID_TEXT[getLang(id)] || COIN_PAID_TEXT.kk;
+
+  telegramApi('sendMessage', {
+    chat_id: id,
+    parse_mode: 'HTML',
+    text: fmt(o.pack.coins, shop.get(id).coins)
+  }).catch((e) => console.error('Койн хабарлама қатесі:', e.message));
+}
+
 /* ---------- Ойыншылар бөлімі: профильдер және ойынға шақыру ---------- */
 
 const PROFILES_FILE = path.join(DATA_DIR, 'profiles.json');
@@ -5068,6 +5242,9 @@ function handle(u, m) {
         id: String(m.id)
       }));
     }
+
+    case 'coin_buy':
+      return createCoinInvoice(u, m.pack);
 
     case 'shop_use': {
       const r = shop.use(u.id, String(m.kind), String(m.id));
