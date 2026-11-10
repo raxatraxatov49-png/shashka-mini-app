@@ -5200,6 +5200,23 @@ function handle(u, m) {
       return;
     }
 
+    case 'rtc': {
+      // Дауыстық байланыс: WebRTC сигналын қарсыласқа жібереміз
+      const g = games.get(u.game);
+
+      if (!g || g.waitingForOpponent || !m.d || typeof m.d !== 'object') {
+        return;
+      }
+
+      if (JSON.stringify(m.d).length > 8000) return;
+
+      const oppId = g.p.w === u.id ? g.p.b : g.p.w;
+
+      send(users.get(oppId), { t: 'rtc', d: m.d });
+
+      return;
+    }
+
     case 'chat': {
       const g = games.get(u.game);
 
