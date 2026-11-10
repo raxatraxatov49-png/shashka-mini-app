@@ -166,6 +166,9 @@ const I18N = {
     "pExpired": "Шақыру уақыты бітті",
     "pOffline": "Ойыншы қазір офлайн",
     "pBusy": "Ойыншы қазір ойында",
+    "micDenied": "Микрофонға рұқсат берілмеді",
+    "micBtn": "Микрофон",
+    "sndBtn": "Дыбыс",
     "ratingTitle": "Рейтинг",
     "ratingWeek": "Осы апта",
     "ratingAll": "Барлық уақыт",
@@ -319,6 +322,9 @@ const I18N = {
     "pExpired": "Taklif muddati tugadi",
     "pOffline": "O‘yinchi hozir oflayn",
     "pBusy": "O‘yinchi hozir o‘yinda",
+    "micDenied": "Mikrofonga ruxsat berilmadi",
+    "micBtn": "Mikrofon",
+    "sndBtn": "Ovoz",
     "ratingTitle": "Reyting",
     "ratingWeek": "Shu hafta",
     "ratingAll": "Barcha vaqt",
@@ -472,6 +478,9 @@ const I18N = {
     "pExpired": "Время приглашения истекло",
     "pOffline": "Игрок сейчас офлайн",
     "pBusy": "Игрок сейчас в игре",
+    "micDenied": "Нет доступа к микрофону",
+    "micBtn": "Микрофон",
+    "sndBtn": "Звук",
     "ratingTitle": "Рейтинг",
     "ratingWeek": "Эта неделя",
     "ratingAll": "За всё время",
@@ -997,6 +1006,7 @@ function show(id) {
   });
 
   if (id !== 'players') stopPlayersPoll();
+  if (id !== 'game') closeRtc();
 
   if (tg) {
     try {
@@ -1145,6 +1155,10 @@ function onMsg(m) {
 
     case 'players':
       onPlayers(m);
+      break;
+
+    case 'rtc':
+      onRtc(m.d);
       break;
 
     case 'pinvite_sent':
@@ -1326,6 +1340,8 @@ function startGame(m) {
 
   hideIncoming();
   S.sentTo = null;
+
+  openRtc(m);
 
   S.inviteMode = false;
   $('game').classList.remove('inviting');
@@ -2712,6 +2728,222 @@ $('btnPinYes').onclick = () => {
 $('btnPinNo').onclick = () => {
   if (S.pinIn) send({ t: 'pinvite_answer', from: S.pinIn.id, accept: false });
   hideIncoming();
+};
+
+/* ---------- ДАУЫСТЫҚ БАЙЛАНЫС (WebRTC) ---------- */
+
+const RTC_CFG = {
+  iceServers: [
+    { urls: 'stun:stun.l.google.com:19302' },
+    { urls: 'stun:stun1.l.google.com:19302' }
+  ]
+};
+
+S.rtc = null;
+S.rtcIn = [];
+
+function rtcSend(d) {
+  if (S.rtc) send({ t: 'rtc', d: Object.assign({ gid: S.rtc.gid }, d) });
+}
+
+function updateRtcUi() {
+  const r = S.rtc;
+
+  $('btnMic').classList.toggle('hidden', !r);
+  $('btnSnd').classList.toggle('hidden', !r);
+  $('btnMic').classList.toggle('on', Boolean(r && r.micOn));
+  $('btnSnd').classList.toggle('off', Boolean(r && !r.sndOn));
+}
+
+function openRtc(m) {
+  if (!window.RTCPeerConnection) return;
+  if (S.rtc && S.rtc.gid === m.id) return;
+
+  closeRtc();
+
+  const pc = new RTCPeerConnection(RTC_CFG);
+  const audio = new Audio();
+
+  audio.autoplay = true;
+  audio.setAttribute('playsinline', '');
+  audio.style.display = 'none';
+  document.body.append(audio);
+
+  const r = S.rtc = {
+    gid: m.id,
+    pc,
+    audio,
+    tr: null,
+    local: null,
+    micOn: false,
+    sndOn: true,
+    ice: [],
+    caller: m.you === 'w'
+  };
+
+  pc.ontrack = (e) => {
+    audio.srcObject = (e.streams && e.streams[0]) || new MediaStream([e.track]);
+    audio.muted = !r.sndOn;
+    audio.play().catch(() => {});
+  };
+
+  pc.onicecandidate = (e) => {
+    if (e.candidate) rtcSend({ c: e.candidate.toJSON() });
+  };
+
+  pc.onconnectionstatechange = () => {
+    if (S.rtc === r && r.caller && pc.connectionState === 'failed') {
+      pc.createOffer({ iceRestart: true })
+        .then((o) => pc.setLocalDescription(o))
+        .then(() => rtcSend({ sdp: pc.localDescription }))
+        .catch(() => {});
+    }
+  };
+
+  updateRtcUi();
+
+  // Микрофон өшірулі күйде басталады: трек кейін replaceTrack арқылы қосылады
+  if (r.caller) {
+    r.tr = pc.addTransceiver('audio', { direction: 'sendrecv' });
+
+    pc.createOffer()
+      .then((o) => pc.setLocalDescription(o))
+      .then(() => rtcSend({ sdp: pc.localDescription }))
+      .catch(() => {});
+  }
+
+  const pending = S.rtcIn.filter((d) => d.gid === r.gid);
+  S.rtcIn = [];
+  pending.forEach(onRtcData);
+}
+
+function closeRtc() {
+  const r = S.rtc;
+
+  S.rtcIn = [];
+
+  if (!r) return;
+
+  S.rtc = null;
+
+  try { if (r.local) r.local.getTracks().forEach((t) => t.stop()); } catch (e) {}
+  try { r.pc.close(); } catch (e) {}
+  try { r.audio.pause(); r.audio.srcObject = null; r.audio.remove(); } catch (e) {}
+
+  updateRtcUi();
+}
+
+function onRtc(d) {
+  if (!d || typeof d !== 'object') return;
+
+  if (!S.rtc || d.gid !== S.rtc.gid) {
+    if (d.gid && S.rtcIn.length < 50) S.rtcIn.push(d);
+    return;
+  }
+
+  onRtcData(d);
+}
+
+async function onRtcData(d) {
+  const r = S.rtc;
+
+  if (!r || d.gid !== r.gid) return;
+
+  try {
+    if (d.sdp) {
+      await r.pc.setRemoteDescription(d.sdp);
+
+      for (const c of r.ice.splice(0)) {
+        await r.pc.addIceCandidate(c).catch(() => {});
+      }
+
+      if (d.sdp.type === 'offer') {
+        if (!r.tr) {
+          r.tr = r.pc.getTransceivers()[0] || null;
+          if (r.tr) r.tr.direction = 'sendrecv';
+        }
+
+        const ans = await r.pc.createAnswer();
+        await r.pc.setLocalDescription(ans);
+        rtcSend({ sdp: r.pc.localDescription });
+
+        applyMic();
+      }
+    } else if (d.c) {
+      if (r.pc.remoteDescription) await r.pc.addIceCandidate(d.c).catch(() => {});
+      else r.ice.push(d.c);
+    }
+  } catch (e) {}
+}
+
+function applyMic() {
+  const r = S.rtc;
+
+  if (!r || !r.tr) return;
+
+  const track = r.local ? r.local.getAudioTracks()[0] : null;
+
+  r.tr.sender.replaceTrack(track || null).catch(() => {});
+}
+
+async function setMic(on) {
+  const r = S.rtc;
+
+  if (!r) return;
+
+  if (on) {
+    try {
+      const st = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true
+        }
+      });
+
+      if (S.rtc !== r) {
+        st.getTracks().forEach((t) => t.stop());
+        return;
+      }
+
+      r.local = st;
+      r.micOn = true;
+    } catch (e) {
+      ptoast(tr('micDenied'));
+      return;
+    }
+  } else {
+    r.micOn = false;
+
+    if (r.local) {
+      r.local.getTracks().forEach((t) => t.stop());
+      r.local = null;
+    }
+  }
+
+  applyMic();
+  updateRtcUi();
+}
+
+$('btnMic').onclick = () => {
+  if (!S.rtc) return;
+
+  haptic('light');
+  setMic(!S.rtc.micOn);
+  S.rtc.audio.play().catch(() => {});
+};
+
+$('btnSnd').onclick = () => {
+  const r = S.rtc;
+
+  if (!r) return;
+
+  r.sndOn = !r.sndOn;
+  r.audio.muted = !r.sndOn;
+  r.audio.play().catch(() => {});
+
+  haptic('light');
+  updateRtcUi();
 };
 
 /* ---------- ІСКЕ ҚОСУ ---------- */
