@@ -142,6 +142,30 @@ const I18N = {
     "invitedEmpty": "Әзірге ешкім жоқ",
     "ratingTile": "Рейтинг",
     "ratingTileSub": "Үздік ойыншылар",
+    "playersTile": "Ойыншылар",
+    "playersTileSub": "Бот ойыншылары",
+    "playersOnlineN": "● {n} онлайн",
+    "playersTitle": "Ойыншылар",
+    "playersOnline": "Онлайн",
+    "playersOffline": "Офлайн",
+    "playersEmpty": "Әзірге ойыншы жоқ",
+    "playerOnlineLbl": "онлайн",
+    "playerInGame": "ойында",
+    "playerSeen": "соңғы кіру: {t}",
+    "playerSeenUnknown": "баяғыда",
+    "agoNow": "жаңа ғана",
+    "agoMin": "{n} мин бұрын",
+    "agoHour": "{n} сағ бұрын",
+    "agoDay": "{n} күн бұрын",
+    "pInvite": "Шақыру",
+    "pInviteWait": "Күтуде… ✕",
+    "pIncomingSub": "сені дойбы ойынына шақырды",
+    "pAccept": "Қабылдау",
+    "pDecline": "Қабылдамау",
+    "pDeclined": "{name} шақыруды қабылдамады",
+    "pExpired": "Шақыру уақыты бітті",
+    "pOffline": "Ойыншы қазір офлайн",
+    "pBusy": "Ойыншы қазір ойында",
     "ratingTitle": "Рейтинг",
     "ratingWeek": "Осы апта",
     "ratingAll": "Барлық уақыт",
@@ -271,6 +295,30 @@ const I18N = {
     "invitedEmpty": "Hozircha hech kim yo‘q",
     "ratingTile": "Reyting",
     "ratingTileSub": "Eng yaxshi o‘yinchilar",
+    "playersTile": "O‘yinchilar",
+    "playersTileSub": "Bot o‘yinchilari",
+    "playersOnlineN": "● {n} onlayn",
+    "playersTitle": "O‘yinchilar",
+    "playersOnline": "Onlayn",
+    "playersOffline": "Oflayn",
+    "playersEmpty": "Hozircha o‘yinchi yo‘q",
+    "playerOnlineLbl": "onlayn",
+    "playerInGame": "o‘yinda",
+    "playerSeen": "oxirgi kirish: {t}",
+    "playerSeenUnknown": "ancha oldin",
+    "agoNow": "hozirgina",
+    "agoMin": "{n} daq oldin",
+    "agoHour": "{n} soat oldin",
+    "agoDay": "{n} kun oldin",
+    "pInvite": "Taklif qilish",
+    "pInviteWait": "Kutilmoqda… ✕",
+    "pIncomingSub": "sizni shashka o‘yiniga taklif qildi",
+    "pAccept": "Qabul qilish",
+    "pDecline": "Rad etish",
+    "pDeclined": "{name} taklifni rad etdi",
+    "pExpired": "Taklif muddati tugadi",
+    "pOffline": "O‘yinchi hozir oflayn",
+    "pBusy": "O‘yinchi hozir o‘yinda",
     "ratingTitle": "Reyting",
     "ratingWeek": "Shu hafta",
     "ratingAll": "Barcha vaqt",
@@ -400,6 +448,30 @@ const I18N = {
     "invitedEmpty": "Пока никого нет",
     "ratingTile": "Рейтинг",
     "ratingTileSub": "Лучшие игроки",
+    "playersTile": "Игроки",
+    "playersTileSub": "Игроки бота",
+    "playersOnlineN": "● {n} онлайн",
+    "playersTitle": "Игроки",
+    "playersOnline": "Онлайн",
+    "playersOffline": "Офлайн",
+    "playersEmpty": "Пока нет игроков",
+    "playerOnlineLbl": "онлайн",
+    "playerInGame": "в игре",
+    "playerSeen": "был(а): {t}",
+    "playerSeenUnknown": "давно",
+    "agoNow": "только что",
+    "agoMin": "{n} мин назад",
+    "agoHour": "{n} ч назад",
+    "agoDay": "{n} дн назад",
+    "pInvite": "Позвать",
+    "pInviteWait": "Ждём… ✕",
+    "pIncomingSub": "приглашает вас сыграть в шашки",
+    "pAccept": "Принять",
+    "pDecline": "Отклонить",
+    "pDeclined": "{name} отклонил(а) приглашение",
+    "pExpired": "Время приглашения истекло",
+    "pOffline": "Игрок сейчас офлайн",
+    "pBusy": "Игрок сейчас в игре",
     "ratingTitle": "Рейтинг",
     "ratingWeek": "Эта неделя",
     "ratingAll": "За всё время",
@@ -481,6 +553,7 @@ function setLang(l) {
   setSearching(S.searching);
   if (S.shop) { renderShop(); renderRefs(); }
   if (S.rating) renderRating();
+  if (S.players) { renderPlayers(); updatePlayersTile(); }
 
   if (S.g) {
     if (S.g.invite) {
@@ -528,7 +601,13 @@ const S = {
   shop: null,
   shopTab: 'boards',
   rating: null,
-  ratingTab: 'week'
+  ratingTab: 'week',
+  players: null,
+  sentTo: null,
+  pinIn: null,
+  playersPoll: null,
+  pinTimer: null,
+  ptTimer: null
 };
 
 const CROWN = '<svg viewBox="0 0 24 24"><path d="M3 18l-1-11 5 4 5-7 5 7 5-4-1 11z"/></svg>';
@@ -917,13 +996,15 @@ function show(id) {
     s.classList.toggle('active', s.id === id);
   });
 
+  if (id !== 'players') stopPlayersPoll();
+
   if (tg) {
     try {
       if (id === 'game') {
         tg.BackButton.show();
         tg.enableClosingConfirmation();
       } else {
-        id === 'shop' || id === 'refs' || id === 'rating'
+        id === 'shop' || id === 'refs' || id === 'rating' || id === 'players'
           ? tg.BackButton.show()
           : tg.BackButton.hide();
         tg.disableClosingConfirmation();
@@ -938,7 +1019,8 @@ if (tg) {
       if (
         $('shop').classList.contains('active') ||
         $('refs').classList.contains('active') ||
-        $('rating').classList.contains('active')
+        $('rating').classList.contains('active') ||
+        $('players').classList.contains('active')
       ) {
         show('menu');
         return;
@@ -979,6 +1061,7 @@ function onMsg(m) {
       if (m.lang) setLang(m.lang);
 
       setAva($('meAva'), m.me);
+      send({ t: 'players_get' });
       $('meName').textContent = m.me.name;
 
       const refCode = getRefCode();
@@ -1058,6 +1141,23 @@ function onMsg(m) {
 
       $('sheetInvite').classList.add('hidden');
       haptic('heavy');
+      break;
+
+    case 'players':
+      onPlayers(m);
+      break;
+
+    case 'pinvite_sent':
+      S.sentTo = m.to;
+      renderPlayers();
+      break;
+
+    case 'pinvite_in':
+      showIncoming(m);
+      break;
+
+    case 'pinvite_end':
+      onPInviteEnd(m);
       break;
 
     case 'group_error':
@@ -1183,6 +1283,14 @@ function onMsg(m) {
         showInviteStatus(tr('inviteSelf'));
       } else if (m.code === 'busy') {
         showInviteStatus(tr('playerBusy'));
+      } else if (m.code === 'pinvite_offline') {
+        S.sentTo = null;
+        ptoast(tr('pOffline'));
+        send({ t: 'players_get' });
+      } else if (m.code === 'pinvite_busy') {
+        S.sentTo = null;
+        ptoast(tr('pBusy'));
+        send({ t: 'players_get' });
       }
       break;
   }
@@ -1215,6 +1323,9 @@ function startGame(m) {
   S.sel = null;
   S.unread = 0;
   S.joinCode = null;
+
+  hideIncoming();
+  S.sentTo = null;
 
   S.inviteMode = false;
   $('game').classList.remove('inviting');
@@ -2380,6 +2491,228 @@ $('ratingList').addEventListener('click', (e) => {
     window.open(url, '_blank');
   }
 });
+
+/* ---------- ОЙЫНШЫЛАР ---------- */
+
+function ptoast(text) {
+  const el = $('ptoast');
+
+  el.textContent = text;
+  el.classList.remove('hidden');
+
+  clearTimeout(S.ptTimer);
+  S.ptTimer = setTimeout(() => el.classList.add('hidden'), 2800);
+}
+
+function stopPlayersPoll() {
+  if (S.playersPoll) {
+    clearInterval(S.playersPoll);
+    S.playersPoll = null;
+  }
+}
+
+function openPlayers() {
+  send({ t: 'players_get' });
+  renderPlayers();
+  show('players');
+
+  stopPlayersPoll();
+  S.playersPoll = setInterval(() => send({ t: 'players_get' }), 8000);
+}
+
+function onPlayers(m) {
+  S.players = m;
+
+  const sent = m.list.find((p) => p.sent);
+  S.sentTo = sent ? sent.id : null;
+
+  updatePlayersTile();
+  renderPlayers();
+}
+
+function updatePlayersTile() {
+  if (!S.players) return;
+
+  $('tilePlayersSub').textContent =
+    tr('playersOnlineN', { n: S.players.onlineCount });
+}
+
+function agoText(ts) {
+  if (!ts) return tr('playerSeenUnknown');
+
+  const min = Math.floor((Date.now() - ts) / 60000);
+
+  if (min < 2) return tr('agoNow');
+  if (min < 60) return tr('agoMin', { n: min });
+
+  const h = Math.floor(min / 60);
+
+  if (h < 24) return tr('agoHour', { n: h });
+
+  return tr('agoDay', { n: Math.floor(h / 24) });
+}
+
+function playerRow(p) {
+  const row = document.createElement('div');
+  row.className = 'plrow' + (p.status === 'offline' ? ' off' : '');
+
+  const wrap = document.createElement('div');
+  wrap.className = 'pwrap';
+
+  const ava = document.createElement('div');
+  ava.className = 'ava';
+  setAva(ava, p);
+  wrap.append(ava);
+
+  if (p.status !== 'offline') {
+    const dot = document.createElement('i');
+    dot.className = 'pdot2' + (p.status === 'game' ? ' game' : '');
+    wrap.append(dot);
+  }
+
+  const nm = document.createElement('div');
+  nm.className = 'rnm';
+
+  const b = document.createElement('b');
+  b.textContent = p.name;
+
+  const small = document.createElement('small');
+
+  if (p.status === 'online') {
+    small.className = 'on';
+    small.textContent =
+      tr('playerOnlineLbl') + (p.username ? ' · @' + p.username : '');
+  } else if (p.status === 'game') {
+    small.className = 'game';
+    small.textContent = tr('playerInGame');
+  } else {
+    small.textContent = tr('playerSeen', { t: agoText(p.seen) });
+  }
+
+  nm.append(b, small);
+
+  const btn = document.createElement('button');
+  btn.type = 'button';
+
+  if (p.status === 'online' && S.sentTo === p.id) {
+    btn.className = 'plact wait';
+    btn.textContent = tr('pInviteWait');
+    btn.onclick = () => {
+      S.sentTo = null;
+      send({ t: 'pinvite_cancel', to: p.id });
+      renderPlayers();
+    };
+  } else if (p.status === 'online') {
+    btn.className = 'plact';
+    btn.textContent = tr('pInvite');
+    btn.onclick = () => {
+      S.sentTo = p.id;
+      send({ t: 'pinvite_send', to: p.id });
+      renderPlayers();
+      haptic('light');
+    };
+  } else {
+    btn.className = 'plact dis';
+    btn.disabled = true;
+    btn.textContent =
+      p.status === 'game' ? tr('playerInGame') : tr('playersOffline');
+  }
+
+  row.append(wrap, nm, btn);
+
+  return row;
+}
+
+function renderPlayers() {
+  const box = $('plList');
+
+  box.textContent = '';
+
+  const list = (S.players && S.players.list) || [];
+
+  if (!list.length) {
+    const e = document.createElement('div');
+    e.className = 'plempty';
+    e.textContent = tr(S.players ? 'playersEmpty' : 'ratingLoading');
+    box.append(e);
+    return;
+  }
+
+  const on = list.filter((p) => p.status !== 'offline');
+  const off = list.filter((p) => p.status === 'offline');
+
+  const head = (key, n) => {
+    const h = document.createElement('div');
+    h.className = 'plhead';
+    h.textContent = tr(key) + ' · ' + n;
+    box.append(h);
+  };
+
+  if (on.length) {
+    head('playersOnline', on.length);
+    on.forEach((p) => box.append(playerRow(p)));
+  }
+
+  if (off.length) {
+    head('playersOffline', off.length);
+    off.forEach((p) => box.append(playerRow(p)));
+  }
+}
+
+function showIncoming(m) {
+  S.pinIn = m.from;
+
+  $('pinName').textContent = m.from.name;
+  setAva($('pinAva'), m.from);
+  $('sheetPIn').classList.remove('hidden');
+
+  haptic('heavy');
+
+  clearTimeout(S.pinTimer);
+  S.pinTimer = setTimeout(hideIncoming, (m.ttl || 30) * 1000);
+}
+
+function hideIncoming() {
+  clearTimeout(S.pinTimer);
+  S.pinIn = null;
+  $('sheetPIn').classList.add('hidden');
+}
+
+function onPInviteEnd(m) {
+  if (m.from) {
+    if (S.pinIn && S.pinIn.id === m.from) hideIncoming();
+    return;
+  }
+
+  if (!m.to) return;
+
+  if (S.sentTo === m.to) S.sentTo = null;
+
+  const p = S.players && S.players.list.find((x) => x.id === m.to);
+
+  if (m.reason === 'declined') {
+    ptoast(tr('pDeclined', { name: p ? p.name : '' }));
+  } else if (m.reason === 'expired') {
+    ptoast(tr('pExpired'));
+  } else if (m.reason === 'unavailable') {
+    ptoast(tr('pOffline'));
+  }
+
+  renderPlayers();
+  send({ t: 'players_get' });
+}
+
+$('btnPlayers').onclick = openPlayers;
+
+$('btnPinYes').onclick = () => {
+  if (S.pinIn) send({ t: 'pinvite_answer', from: S.pinIn.id, accept: true });
+  hideIncoming();
+};
+
+$('btnPinNo').onclick = () => {
+  if (S.pinIn) send({ t: 'pinvite_answer', from: S.pinIn.id, accept: false });
+  hideIncoming();
+};
 
 /* ---------- ІСКЕ ҚОСУ ---------- */
 
