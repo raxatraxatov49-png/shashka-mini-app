@@ -195,3 +195,11 @@ button.rrow:active { background: #2a2a2a; }
 }
 
 .ptoast.hidden { display: none; }
+
+/* Дауыстық байланыс */
+
+#btnMic .sl, #btnSnd .sl { display: none; }
+#btnMic:not(.on) .sl, #btnSnd.off .sl { display: block; }
+#btnMic.on { color: #34c759; }
+#btnSnd.off { color: #a0a0a0; }
+#btnMic.hidden, #btnSnd.hidden { display: none; }
