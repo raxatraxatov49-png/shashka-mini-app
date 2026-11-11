@@ -833,3 +833,98 @@ body::before {
 #game .dock {
   transform: translateY(14px);
 }
+
+
+/* ---------- VIP ---------- */
+.titlerow { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.titlerow h1 { margin-right: 0; }
+
+.vipbtn {
+  flex: none;
+  height: 42px;
+  padding: 0 16px;
+  border-radius: 21px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 800;
+  font-size: 15px;
+  color: #2a1d00;
+  background: linear-gradient(180deg, #f7d46a, #e2ab30);
+  box-shadow: 0 0 16px rgba(244, 197, 66, .5);
+}
+.vipbtn:active { transform: scale(.97); }
+
+.viptag {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 7px;
+  border-radius: 8px;
+  font-size: 11px;
+  font-weight: 800;
+  color: #2a1d00;
+  background: linear-gradient(180deg, #f7d46a, #e2ab30);
+  vertical-align: middle;
+}
+
+/* VIP профиль: тәж, алтын жиек, жарқыл (ойын жолы мен басты экран) */
+.ava.vipf {
+  overflow: visible;
+  outline: 3px solid #f4c542;
+  outline-offset: 2px;
+  filter: drop-shadow(0 0 8px rgba(244, 197, 66, .75));
+}
+.ava.vipf img { border-radius: 50%; }
+.ava.vipf::before {
+  content: "";
+  position: absolute;
+  top: -17px;
+  left: 50%;
+  width: 24px;
+  height: 24px;
+  transform: translateX(-50%);
+  z-index: 2;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M3 18h18l1-11-5 4-5-8-5 8-5-4z' fill='%23f4c542'/%3E%3C/svg%3E") center/contain no-repeat;
+}
+
+/* VIP экраны */
+.vipcard {
+  margin-top: 16px;
+  padding: 22px;
+  border: 1px solid #6b5520;
+  border-radius: 28px;
+  background: linear-gradient(160deg, #241d0c, #141414);
+  box-shadow: 0 0 34px rgba(244, 197, 66, .18);
+  color: #f2f2f2;
+}
+.viphead { display: flex; align-items: center; gap: 10px; color: #f4c542; }
+.viphead b { font-size: 26px; }
+.vipnew { background: #f4c542; color: #2a1d00; font-weight: 800; font-size: 12px; border-radius: 12px; padding: 4px 10px; }
+.vipsub { color: #b59a4a; font-size: 15px; margin: 10px 0 18px; }
+.viplist { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 14px; }
+.viplist li { display: flex; align-items: center; gap: 14px; font-size: 17px; font-weight: 600; }
+.viplist li::before {
+  content: "✓";
+  width: 30px;
+  height: 30px;
+  flex: none;
+  border-radius: 50%;
+  background: #3a2f12;
+  color: #f4c542;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+}
+.vipbuy {
+  width: 100%;
+  margin-top: 22px;
+  height: 62px;
+  border-radius: 31px;
+  font-size: 22px;
+  font-weight: 800;
+  color: #2a1d00;
+  background: linear-gradient(180deg, #f7d46a, #e2ab30);
+}
+.vipbuy:active { transform: scale(.98); }
+.vipnote { text-align: center; color: #8a8a8a; font-size: 13px; margin-top: 12px; }
