@@ -32,7 +32,10 @@
     <button id="btnCoins" class="coinbtn" type="button"><i class="coin"></i><span class="cnum">0</span></button>
   </header>
 
-  <h1 data-i18n="menuTitle">Дойбы</h1>
+  <div class="titlerow">
+    <h1 data-i18n="menuTitle">Дойбы</h1>
+    <button id="btnVip" class="vipbtn" type="button"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M3 18h18l1-11-5 4-5-8-5 8-5-4z" fill="currentColor"/></svg><span id="vipBtnTxt" data-i18n="vipBtn">VIP сатып алу</span></button>
+  </div>
 
   <section class="card brown">
     <h2 data-i18n="randomTitle">Кездейсоқ қарсылас</h2>
@@ -97,6 +100,27 @@
     <div class="coinbtn"><i class="coin"></i><span class="cnum">0</span></div>
   </div>
   <div id="packGrid" class="pgrid"></div>
+</main>
+
+<main id="vip" class="screen">
+  <div class="sbar">
+    <button class="sback" data-back type="button" aria-label="Back">‹</button>
+    <h1 data-i18n="vipTitle">Shashka VIP</h1>
+    <div class="coinbtn"><i class="coin"></i><span class="cnum">0</span></div>
+  </div>
+  <section class="vipcard">
+    <div class="viphead"><svg viewBox="0 0 24 24" width="30" height="30" aria-hidden="true"><path d="M3 18h18l1-11-5 4-5-8-5 8-5-4z" fill="currentColor"/></svg><b data-i18n="vipTitle">Shashka VIP</b><span class="vipnew" data-i18n="vipNew">ЖАҢА</span></div>
+    <p id="vipStatus" class="vipsub" data-i18n="vipSub">1 ай бойы барлық мүмкіндік ашық</p>
+    <ul class="viplist">
+      <li data-i18n="vipP1">Ойынды қарағанда чатқа жазу</li>
+      <li data-i18n="vipP2">Барлық тақта түрлері</li>
+      <li data-i18n="vipP3">Барлық тас түрлері</li>
+      <li data-i18n="vipP4">Профильде VIP жазуы мен тәжі</li>
+      <li data-i18n="vipP5">Мерзімі: 30 күн</li>
+    </ul>
+    <button id="btnVipBuy" class="vipbuy" type="button">★ <span id="vipPrice">100 Stars / ай</span></button>
+    <div class="vipnote" data-i18n="vipNote">Төлем Telegram Stars арқылы жасалады</div>
+  </section>
 </main>
 
 <main id="refs" class="screen">
