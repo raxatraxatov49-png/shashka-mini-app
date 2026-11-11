@@ -821,16 +821,14 @@ body::before {
 .invcancel { height: 38px; background: transparent; color: #a0a0a0; font-weight: 600; font-size: 15px; }
 
 
-/* ---------- Төменгі ойыншы жолы мен мәзірді төмен түсіру ---------- */
-#game { padding-bottom: calc(var(--safe-b) + 6px); }
-
-#game #rowMe {
+/* ---------- Төменгі ойыншы жолы: тек көрермен баннері бар кезде ғана төмен түседі ---------- */
+#game:has(#away.spec-banner) #rowMe {
   position: relative;
   z-index: 1;
   transform: translateY(26px);
 }
 
-#game .dock {
+#game:has(#away.spec-banner) .dock {
   transform: translateY(14px);
 }
 
