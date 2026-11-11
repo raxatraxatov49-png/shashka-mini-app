@@ -3544,6 +3544,7 @@ function closeRtc() {
   try { if (r.local) r.local.getTracks().forEach((t) => t.stop()); } catch (e) {}
   try { r.pc.close(); } catch (e) {}
   try { r.audio.pause(); r.audio.srcObject = null; r.audio.remove(); } catch (e) {}
+  setAudioSession('playback');
 
   updateRtcUi();
 }
@@ -3616,12 +3617,22 @@ async function getMic(constraints) {
   }
 }
 
+// iPhone: аудио сессиясы 'playback' болса, микрофон ашылмайды (InvalidStateError).
+// Микрофон қосулы кезде 'play-and-record', өшкенде қайта 'playback'.
+function setAudioSession(type) {
+  try {
+    if (navigator.audioSession) navigator.audioSession.type = type;
+  } catch (e) {}
+}
+
 async function setMic(on) {
   const r = S.rtc;
 
   if (!r) return;
 
   if (on) {
+    setAudioSession('play-and-record');
+
     try {
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
         const err = new Error('no mediaDevices');
@@ -3655,6 +3666,7 @@ async function setMic(on) {
       r.micOn = true;
     } catch (e) {
       // Қатенің атын да көрсетеміз, себебін анықтау үшін
+      setAudioSession('playback');
       ptoast(tr('micDenied') + (e && e.name ? ' (' + e.name + ')' : ''));
       return;
     }
@@ -3665,6 +3677,8 @@ async function setMic(on) {
       r.local.getTracks().forEach((t) => t.stop());
       r.local = null;
     }
+
+    setAudioSession('playback');
   }
 
   applyMic();
