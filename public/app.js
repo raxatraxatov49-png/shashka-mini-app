@@ -3601,6 +3601,21 @@ function applyMic() {
   r.tr.sender.replaceTrack(track || null).catch(() => {});
 }
 
+// iPhone: аудио сессия әлі босамаса InvalidStateError береді, сондықтан бір рет қайталаймыз
+async function getMic(constraints) {
+  try {
+    return await navigator.mediaDevices.getUserMedia(constraints);
+  } catch (e) {
+    if (e && e.name === 'InvalidStateError') {
+      await new Promise((res) => setTimeout(res, 400));
+
+      return await navigator.mediaDevices.getUserMedia(constraints);
+    }
+
+    throw e;
+  }
+}
+
 async function setMic(on) {
   const r = S.rtc;
 
@@ -3617,7 +3632,7 @@ async function setMic(on) {
       let st;
 
       try {
-        st = await navigator.mediaDevices.getUserMedia({
+        st = await getMic({
           audio: {
             echoCancellation: true,
             noiseSuppression: true,
@@ -3628,7 +3643,7 @@ async function setMic(on) {
         // iPhone-да кейбір параметрлерді қабылдамауы мүмкін: қарапайым түрде қайталаймыз
         if (e1 && e1.name === 'NotAllowedError') throw e1;
 
-        st = await navigator.mediaDevices.getUserMedia({ audio: true });
+        st = await getMic({ audio: true });
       }
 
       if (S.rtc !== r) {
@@ -3656,12 +3671,15 @@ async function setMic(on) {
   updateRtcUi();
 }
 
-$('btnMic').onclick = () => {
+$('btnMic').onclick = async () => {
   if (!S.rtc) return;
 
   haptic('light');
-  setMic(!S.rtc.micOn);
-  S.rtc.audio.play().catch(() => {});
+
+  // Алдымен микрофон, содан кейін ғана дыбыс: iPhone екеуін бірге бастағанда қате береді
+  await setMic(!S.rtc.micOn);
+
+  if (S.rtc) S.rtc.audio.play().catch(() => {});
 };
 
 $('btnSnd').onclick = () => {
