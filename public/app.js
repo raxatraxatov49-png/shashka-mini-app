@@ -3608,13 +3608,28 @@ async function setMic(on) {
 
   if (on) {
     try {
-      const st = await navigator.mediaDevices.getUserMedia({
-        audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true
-        }
-      });
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        const err = new Error('no mediaDevices');
+        err.name = 'NoMediaDevices';
+        throw err;
+      }
+
+      let st;
+
+      try {
+        st = await navigator.mediaDevices.getUserMedia({
+          audio: {
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true
+          }
+        });
+      } catch (e1) {
+        // iPhone-да кейбір параметрлерді қабылдамауы мүмкін: қарапайым түрде қайталаймыз
+        if (e1 && e1.name === 'NotAllowedError') throw e1;
+
+        st = await navigator.mediaDevices.getUserMedia({ audio: true });
+      }
 
       if (S.rtc !== r) {
         st.getTracks().forEach((t) => t.stop());
@@ -3624,7 +3639,8 @@ async function setMic(on) {
       r.local = st;
       r.micOn = true;
     } catch (e) {
-      ptoast(tr('micDenied'));
+      // Қатенің атын да көрсетеміз, себебін анықтау үшін
+      ptoast(tr('micDenied') + (e && e.name ? ' (' + e.name + ')' : ''));
       return;
     }
   } else {
