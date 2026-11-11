@@ -220,6 +220,21 @@ const I18N = {
     "item_p11": "Жаңа жылдық шырша",
     "item_p12": "Жаңа жылдық сыйлық",
     "watchBtn": "Ойынды қарау",
+    "vipBtn": "VIP сатып алу",
+    "vipOn": "VIP белсенді",
+    "vipTitle": "Shashka VIP",
+    "vipNew": "ЖАҢА",
+    "vipSub": "1 ай бойы барлық мүмкіндік ашық",
+    "vipP1": "Ойынды қарағанда чатқа жазу",
+    "vipP2": "Барлық тақта түрлері",
+    "vipP3": "Барлық тас түрлері",
+    "vipP4": "Профильде VIP жазуы мен тәжі",
+    "vipP5": "Мерзімі: 30 күн",
+    "vipBuy": "{n} Stars / ай",
+    "vipRenew": "Ұзарту: {n} Stars",
+    "vipNote": "Төлем Telegram Stars арқылы жасалады",
+    "vipLeft": "VIP белсенді: {n} күн қалды",
+    "vipPaid": "VIP қосылды! Рахмет 👑",
     "watchBanner": "Сіз ойынды қарап отырсыз",
     "watchExit": "Қараудан шығу",
     "watchWhiteWin": "Ақ жеңді",
@@ -407,6 +422,21 @@ const I18N = {
     "item_p11": "Yangi yil archasi",
     "item_p12": "Yangi yil sovg‘asi",
     "watchBtn": "O‘yinni kuzatish",
+    "vipBtn": "VIP sotib olish",
+    "vipOn": "VIP faol",
+    "vipTitle": "Shashka VIP",
+    "vipNew": "YANGI",
+    "vipSub": "1 oy davomida barcha imkoniyatlar ochiq",
+    "vipP1": "O‘yinni kuzatayotganda chatga yozish",
+    "vipP2": "Barcha taxta turlari",
+    "vipP3": "Barcha tosh turlari",
+    "vipP4": "Profilda VIP yozuvi va toj",
+    "vipP5": "Muddati: 30 kun",
+    "vipBuy": "{n} Stars / oy",
+    "vipRenew": "Uzaytirish: {n} Stars",
+    "vipNote": "To‘lov Telegram Stars orqali amalga oshiriladi",
+    "vipLeft": "VIP faol: {n} kun qoldi",
+    "vipPaid": "VIP yoqildi! Rahmat 👑",
     "watchBanner": "Siz o‘yinni kuzatyapsiz",
     "watchExit": "Kuzatishdan chiqish",
     "watchWhiteWin": "Oq yutdi",
@@ -594,6 +624,21 @@ const I18N = {
     "item_p11": "Новогодняя ёлка",
     "item_p12": "Новогодний подарок",
     "watchBtn": "Смотреть игру",
+    "vipBtn": "Купить VIP",
+    "vipOn": "VIP активен",
+    "vipTitle": "Shashka VIP",
+    "vipNew": "НОВОЕ",
+    "vipSub": "Все возможности открыты на 1 месяц",
+    "vipP1": "Писать в чат при просмотре игры",
+    "vipP2": "Все виды досок",
+    "vipP3": "Все виды шашек",
+    "vipP4": "Надпись VIP и корона в профиле",
+    "vipP5": "Срок: 30 дней",
+    "vipBuy": "{n} Stars / мес",
+    "vipRenew": "Продлить: {n} Stars",
+    "vipNote": "Оплата через Telegram Stars",
+    "vipLeft": "VIP активен: осталось {n} дн.",
+    "vipPaid": "VIP подключён! Спасибо 👑",
     "watchBanner": "Вы наблюдаете за игрой",
     "watchExit": "Выйти из просмотра",
     "watchWhiteWin": "Белые победили",
@@ -653,7 +698,7 @@ function setLang(l) {
 
   applyStatic();
   setSearching(S.searching);
-  if (S.shop) { renderShop(); renderRefs(); }
+  if (S.shop) { renderShop(); renderRefs(); renderVip(); }
   if (S.rating) renderRating();
   if (S.players) { renderPlayers(); updatePlayersTile(); }
   if (S.shop) renderPacks();
@@ -1108,7 +1153,7 @@ function show(id) {
         tg.BackButton.show();
         tg.enableClosingConfirmation();
       } else {
-        id === 'shop' || id === 'refs' || id === 'rating' || id === 'players' || id === 'coins'
+        id === 'shop' || id === 'vip' || id === 'refs' || id === 'rating' || id === 'players' || id === 'coins'
           ? tg.BackButton.show()
           : tg.BackButton.hide();
         tg.disableClosingConfirmation();
@@ -1179,6 +1224,8 @@ function onMsg(m) {
       setAva($('meAva'), m.me);
       send({ t: 'players_get' });
       $('meName').textContent = m.me.name;
+      addVipTag($('meName'), m.me);
+      $('meAva').classList.toggle('vipf', Boolean(m.me.vip));
 
       const refCode = getRefCode();
 
@@ -1444,7 +1491,7 @@ function applySpectatorUi(on) {
     resign.dataset.i18n = 'watchExit';
     resign.textContent = tr('watchExit');
 
-    chatBtn.style.display = 'none';
+    chatBtn.style.display = isVip() ? '' : 'none';
 
     clearInterval(S.awayTimer);
 
@@ -1603,12 +1650,21 @@ function startGame(m) {
 
   $('oppAva').classList.toggle('admf', Boolean(opp.admin));
   $('myAva').classList.toggle('admf', Boolean(me.admin));
+  $('oppAva').classList.toggle('vipf', Boolean(opp.vip));
+  $('myAva').classList.toggle('vipf', Boolean(me.vip));
 
-  const adm = m.players.w.admin
-    ? m.players.w
-    : (m.players.b.admin ? m.players.b : null);
+  /*
+    Админ/VIP тақта мен тасын қарсыласына көрсетеді.
+    Екеуінде де бар болса, әрқайсысы өзінікін көреді.
+    Көрермен VIP/админ ойыншының тақтасын көреді.
+  */
+  if (m.spectator) {
+    const o = m.players.w.skin ? m.players.w : m.players.b;
 
-  S.g.skin = adm && adm.skin ? adm.skin : null;
+    S.g.skin = o && o.skin ? o.skin : null;
+  } else {
+    S.g.skin = opp.skin && !me.skin ? opp.skin : null;
+  }
   applySkin();
 
   $('oppDot').className = 'pdot ' + (m.you === 'w' ? 'b' : 'w');
@@ -2323,12 +2379,16 @@ function showAway(m) {
 function addChat(m, silent) {
   if (!S.g) return;
 
-  const mine = m.from === S.g.you;
+  const mine = S.g.spectator
+    ? Boolean(S.me && m.uid && m.uid === S.me.id)
+    : m.from === S.g.you;
   const box = $('msgs');
   const d = document.createElement('div');
 
   d.className = 'm ' + (mine ? 'me' : 'opp');
-  d.textContent = m.text;
+  d.textContent = (m.from === 's' || S.g.spectator) && m.name
+    ? m.name + ': ' + m.text
+    : m.text;
 
   box.append(d);
   box.scrollTop = box.scrollHeight;
@@ -2358,7 +2418,7 @@ function sendChat() {
   if (!t) return;
 
   send({
-    t: 'chat',
+    t: S.g && S.g.spectator ? 'watch_chat' : 'chat',
     text: t
   });
 
@@ -2837,6 +2897,7 @@ function onShop(m) {
   applySkin();
   renderShop();
   renderRefs();
+  renderVip();
 
   const ev = m.ev;
   if (!ev) return;
@@ -2852,6 +2913,11 @@ function onShop(m) {
     if (ev.ok) {
       toast(`${tr('selected')}: ${tr('item_' + ev.id)}`);
       haptic('light');
+    }
+  } else if (ev.type === 'vip') {
+    if (ev.ok) {
+      toast(tr('vipPaid'));
+      haptic('heavy');
     }
   } else if (ev.type === 'ref') {
     toast(tr('refJoined', { name: ev.name, n: ev.reward }));
@@ -3232,6 +3298,7 @@ function playerRow(p) {
 
   const b = document.createElement('b');
   b.textContent = p.name;
+  addVipTag(b, p);
 
   const small = document.createElement('small');
 
@@ -3596,8 +3663,20 @@ $('btnSnd').onclick = () => {
 
 /* ---------- АДМИН БЕЛГІСІ ---------- */
 
+function addVipTag(el, p) {
+  if (!p || !p.vip) return;
+
+  const tag = document.createElement('span');
+
+  tag.className = 'viptag';
+  tag.textContent = 'VIP';
+
+  el.append(tag);
+}
+
 function setGameName(el, p) {
   el.textContent = p.name;
+  addVipTag(el, p);
 
   if (p.admin) {
     const tag = document.createElement('span');
@@ -3671,6 +3750,62 @@ $('btnCoinsBuy').onclick = () => {
 };
 
 $('btnCoinsBack').onclick = () => show('shop');
+
+/* ---------- VIP ---------- */
+
+function isVip() {
+  return Boolean(S.shop && S.shop.vip);
+}
+
+function vipDaysLeft() {
+  if (!S.shop || !S.shop.vipUntil) return 0;
+
+  return Math.max(0, Math.ceil((S.shop.vipUntil - Date.now()) / 86400000));
+}
+
+function renderVip() {
+  const m = S.shop;
+
+  if (!m) return;
+
+  const on = Boolean(m.vip);
+  const n = m.vipStars || 100;
+
+  $('vipBtnTxt').textContent = tr(on ? 'vipOn' : 'vipBtn');
+  $('btnVip').classList.toggle('on', on);
+
+  $('vipStatus').textContent = on
+    ? tr('vipLeft', { n: vipDaysLeft() })
+    : tr('vipSub');
+
+  $('vipPrice').textContent = on
+    ? tr('vipRenew', { n })
+    : tr('vipBuy', { n });
+
+  // Басты экрандағы өз профилі
+  if (S.me) {
+    S.me.vip = on;
+
+    const name = $('meName');
+
+    name.textContent = S.me.name;
+    addVipTag(name, S.me);
+    $('meAva').classList.toggle('vipf', on);
+  }
+}
+
+function openVip() {
+  send({ t: 'shop_get' });
+  renderVip();
+  show('vip');
+}
+
+$('btnVip').onclick = openVip;
+
+$('btnVipBuy').onclick = () => {
+  haptic('light');
+  send({ t: 'vip_buy' });
+};
 
 /* ---------- ІСКЕ ҚОСУ ---------- */
 
