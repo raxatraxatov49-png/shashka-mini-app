@@ -275,6 +275,8 @@ const firstSeen = {
 const shopMsg = (id, ev) => {
   const m = Object.assign({ t: 'shop' }, shop.view(id));
   m.packs = COIN_PACKS;
+  m.vipStars = VIP_STARS;
+  m.vipDays = VIP_DAYS;
   if (ev) m.ev = ev;
   return m;
 };
@@ -1266,14 +1268,26 @@ function adminSkin(id) {
   }
 }
 
+const isVipId = id => {
+  try {
+    return Boolean(id) && shop.isVip(id);
+  } catch (e) {
+    return false;
+  }
+};
+
 const pub = u => {
   const admin = u ? isAdmin(u.id) : false;
+  const vip = u ? isVipId(u.id) : false;
 
   return {
+    id: u ? u.id : null,
     name: u ? u.name : 'Ойыншы',
     avatar: u ? u.avatar : null,
     admin,
-    skin: admin ? adminSkin(u.id) : null
+    vip,
+    // Админ мен VIP таңдаған тақта/тасын қарсыласына көрсетеді
+    skin: admin || vip ? adminSkin(u.id) : null
   };
 };
 
@@ -1302,6 +1316,19 @@ function sendWatchers(g, msg) {
 
   for (const id of g.watchers) {
     send(users.get(id), msg);
+  }
+}
+
+// Чат хабарламасы: ойыншыларға және VIP көрермендерге
+function broadcastChat(g, msg) {
+  for (const id of [g.p.w, g.p.b]) {
+    send(users.get(id), msg);
+  }
+
+  if (!g.watchers) return;
+
+  for (const id of g.watchers) {
+    if (isVipId(id)) send(users.get(id), msg);
   }
 }
 
@@ -1354,7 +1381,12 @@ function watchStart(u, playerId) {
   g.watchers.add(u.id);
   u.watch = g.id;
 
-  send(u, watchState(g));
+  const st = watchState(g);
+
+  // VIP көрермен чат тарихын көреді
+  if (isVipId(u.id)) st.chat = g.chat;
+
+  send(u, st);
 }
 
 /* ---------- Таймерлер ---------- */
@@ -4913,6 +4945,16 @@ const COIN_PACKS = [
   { coins: 10000, stars: 100 }
 ];
 
+// VIP: 1 ай, Telegram Stars арқылы
+const VIP_STARS = 100;
+const VIP_DAYS = 30;
+
+const VIP_PAID_TEXT = {
+  kk: (d) => `✅ Төлем сәтті өтті!\n👑 <b>Shashka VIP</b> қосылды. Қалған мерзім: <b>${d}</b> күн.`,
+  uz: (d) => `✅ To‘lov muvaffaqiyatli o‘tdi!\n👑 <b>Shashka VIP</b> yoqildi. Qolgan muddat: <b>${d}</b> kun.`,
+  ru: (d) => `✅ Оплата прошла успешно!\n👑 <b>Shashka VIP</b> подключён. Осталось дней: <b>${d}</b>.`
+};
+
 const COIN_PAID_TEXT = {
   kk: (n, c) => `✅ Төлем сәтті өтті!\n💰 Балансқа <b>${n}</b> койн қосылды.\nҚазіргі койн: <b>${c}</b>`,
   uz: (n, c) => `✅ To‘lov muvaffaqiyatli o‘tdi!\n💰 Balansga <b>${n}</b> koin qo‘shildi.\nHozirgi koin: <b>${c}</b>`,
@@ -4940,7 +4982,30 @@ async function createCoinInvoice(u, idx) {
   }
 }
 
+async function createVipInvoice(u) {
+  try {
+    const r = await telegramApi('createInvoiceLink', {
+      title: 'Shashka VIP',
+      description: `Shashka VIP: ${VIP_DAYS} күн`,
+      payload: `vip:${u.id}`,
+      currency: 'XTR',
+      prices: [{ label: 'Shashka VIP', amount: VIP_STARS }]
+    });
+
+    send(u, { t: 'invoice', url: r.result });
+  } catch (e) {
+    console.error('VIP invoice қатесі:', e.message);
+    send(u, { t: 'pay_error' });
+  }
+}
+
 function parseOrder(payload) {
+  const v = /^vip:(.+)$/.exec(payload || '');
+
+  if (v) {
+    return { kind: 'vip', id: v[1], amount: VIP_STARS };
+  }
+
   const m = /^coins:(.+):(\d+)$/.exec(payload || '');
 
   if (m && COIN_PACKS[Number(m[2])]) {
@@ -5000,6 +5065,28 @@ function handleSuccessfulPayment(message) {
     if (payData.charges.length > 500) payData.charges.shift();
 
     savePay();
+  }
+
+  if (o.kind === 'vip') {
+    const v = shop.addVip(id, VIP_DAYS);
+
+    if (!v || !v.ok) {
+      console.error('VIP қосылмады:', id);
+      return;
+    }
+
+    send(users.get(id), shopMsg(id, { type: 'vip', ok: true }));
+
+    const left = Math.ceil((v.vipUntil - Date.now()) / 86400000);
+    const fmtVip = VIP_PAID_TEXT[getLang(id)] || VIP_PAID_TEXT.kk;
+
+    telegramApi('sendMessage', {
+      chat_id: id,
+      parse_mode: 'HTML',
+      text: fmtVip(left)
+    }).catch((e) => console.error('VIP хабарлама қатесі:', e.message));
+
+    return;
   }
 
   const r = shop.addCoins(id, o.pack.coins);
@@ -5095,6 +5182,7 @@ function playersPayload(viewerId) {
       avatar: p.avatar || null,
       status: online ? (isBusy(u) ? 'game' : 'online') : 'offline',
       watch: Boolean(gm && !gm.waitingForOpponent && !gm.st.over),
+      vip: isVipId(id),
       seen: online ? now : (p.seen || 0),
       sent: pinvites.has(me + '>' + id)
     });
@@ -5371,6 +5459,9 @@ function handle(u, m) {
     case 'coin_buy':
       return createCoinInvoice(u, m.pack);
 
+    case 'vip_buy':
+      return createVipInvoice(u);
+
     case 'shop_use': {
       const r = shop.use(u.id, String(m.kind), String(m.id));
 
@@ -5558,9 +5649,38 @@ function handle(u, m) {
         g.chat.shift();
       }
 
-      for (const id of [g.p.w, g.p.b]) {
-        send(users.get(id), msg);
-      }
+      broadcastChat(g, msg);
+
+      return;
+    }
+
+    case 'watch_chat': {
+      const g = u.watch ? games.get(u.watch) : null;
+
+      if (!g || !isVipId(u.id) || typeof m.text !== 'string') return;
+
+      const text = m.text.trim().slice(0, 300);
+      const now = Date.now();
+
+      if (!text || now - (g.lastChat[u.id] || 0) < 400) return;
+
+      g.lastChat[u.id] = now;
+
+      const msg = {
+        t: 'chat',
+        from: 's',
+        uid: u.id,
+        name: u.name,
+        vip: true,
+        text,
+        ts: now
+      };
+
+      g.chat.push(msg);
+
+      if (g.chat.length > 100) g.chat.shift();
+
+      broadcastChat(g, msg);
 
       return;
     }
