@@ -171,7 +171,8 @@ const PERMISSIONS = {
   broadcast: '📢 Топтарға хабарлама',
   group_manage: '🚫 Топтарды басқару',
   admin_manage: '👑 Админдерді басқару',
-  coins: '🪙 Койн беру'
+  coins: '🪙 Койн беру',
+  vip: '👑 VIP беру'
 };
 
 const DEFAULT_PERMISSIONS = [
@@ -1961,6 +1962,13 @@ function adminKeyboard(adminId) {
     }]);
   }
 
+  if (hasPermission(adminId, 'vip')) {
+    rows.push([{
+      text: '👑 VIP беру',
+      callback_data: 'adm:vip'
+    }]);
+  }
+
   if (hasPermission(adminId, 'group_manage')) {
     rows.push([{
       text: '🚫 Топтарды басқару',
@@ -2126,6 +2134,8 @@ function requiredPermission(data) {
   if (data === 'adm:games') return 'games';
 
   if (data.startsWith('adm:coins')) return 'coins';
+
+  if (data.startsWith('adm:vip')) return 'vip';
 
   if (
     data.startsWith('adm:broadcast') ||
@@ -2382,6 +2392,32 @@ async function handleAdminCallback(query) {
       messageId,
       '🪙 <b>КОЙН БЕРУ</b>\n\n' +
       'Койн беретін адамның Telegram ID нөмірін жіберіңіз.\n\n' +
+      '❌ Болдырмау: /cancel',
+      {
+        inline_keyboard: [[{
+          text: '🔙 Басты мәзір',
+          callback_data: 'adm:home'
+        }]]
+      }
+    );
+
+    await answerCallback(query.id, 'Telegram ID күтілуде.');
+
+    return true;
+  }
+
+  /* VIP беру */
+
+  if (data === 'adm:vip') {
+    adminActions.set(adminId, {
+      action: 'vip_id'
+    });
+
+    await editAdminMessage(
+      chatId,
+      messageId,
+      '👑 <b>VIP БЕРУ</b>\n\n' +
+      'VIP беретін адамның Telegram ID нөмірін жіберіңіз.\n\n' +
       '❌ Болдырмау: /cancel',
       {
         inline_keyboard: [[{
@@ -3691,7 +3727,9 @@ async function handleTelegramWebhook(req, res) {
           block_group: 'group_manage',
           unblock_group: 'group_manage',
           coins_id: 'coins',
-          coins_amount: 'coins'
+          coins_amount: 'coins',
+          vip_id: 'vip',
+          vip_days: 'vip'
         }[action.action];
 
         if (needPerm && !hasPermission(adminId, needPerm)) {
@@ -3818,6 +3856,112 @@ async function handleTelegramWebhook(req, res) {
             } catch (error) {
               console.error('Койн хабары жіберілмеді:', error.message);
             }
+          }
+
+          res.writeHead(200);
+          return res.end('ok');
+        }
+
+        if (action.action === 'vip_id') {
+          if (!/^\d+$/.test(input)) {
+            await telegramApi('sendMessage', {
+              chat_id: message.chat.id,
+              text: '⚠️ ID қате. Тек оң сан енгізіңіз.'
+            });
+
+            res.writeHead(200);
+            return res.end('ok');
+          }
+
+          if (!hasOwn(stats.users, input)) {
+            await telegramApi('sendMessage', {
+              chat_id: message.chat.id,
+              text:
+                '⚠️ Бұл ID бойынша ойыншы табылмады.\n' +
+                'Ол ботқа немесе мини аппқа кіруі керек. Басқа ID жіберіңіз немесе /cancel.'
+            });
+
+            res.writeHead(200);
+            return res.end('ok');
+          }
+
+          adminActions.set(adminId, {
+            action: 'vip_days',
+            target: input
+          });
+
+          const cur = shop.get(input);
+          const curLeft = cur.vipUntil > Date.now()
+            ? Math.ceil((cur.vipUntil - Date.now()) / 86400000)
+            : 0;
+
+          await telegramApi('sendMessage', {
+            chat_id: message.chat.id,
+            text:
+              '👑 <b>VIP МЕРЗІМІ</b>\n\n' +
+              `🆔 ID: <code>${escapeHtml(input)}</code>\n` +
+              (curLeft > 0
+                ? `⏳ Қазір VIP бар, қалды: <b>${curLeft}</b> күн\n\n`
+                : '⏳ Қазір VIP жоқ\n\n') +
+              'Неше күнге VIP беру керек? Санды жіберіңіз (мысалы <code>30</code>).\n' +
+              'VIP бар болса, мерзім қалғанның үстіне қосылады.\n\n' +
+              '❌ Болдырмау: /cancel',
+            parse_mode: 'HTML'
+          });
+
+          res.writeHead(200);
+          return res.end('ok');
+        }
+
+        if (action.action === 'vip_days') {
+          const days = Number(input);
+
+          const r = shop.addVip(action.target, days);
+
+          if (!r.ok) {
+            await telegramApi('sendMessage', {
+              chat_id: message.chat.id,
+              text: '⚠️ Күн саны қате (1-ден 3650-ге дейін бүтін сан). Қайта жіберіңіз немесе /cancel.'
+            });
+
+            res.writeHead(200);
+            return res.end('ok');
+          }
+
+          adminActions.delete(adminId);
+
+          const left = Math.ceil((r.vipUntil - Date.now()) / 86400000);
+
+          await telegramApi('sendMessage', {
+            chat_id: message.chat.id,
+            text:
+              '✅ <b>VIP БЕРІЛДІ</b>\n\n' +
+              `🆔 ID: <code>${escapeHtml(action.target)}</code>\n` +
+              `➕ Қосылды: <b>${Math.trunc(days)}</b> күн\n` +
+              `⏳ Барлық қалған мерзім: <b>${left}</b> күн`,
+            parse_mode: 'HTML',
+            reply_markup: adminKeyboard(adminId)
+          });
+
+          // Ойыншы мини аппта болса, VIP бірден қосылады
+          send(users.get(action.target), shopMsg(action.target, { type: 'vip', ok: true }));
+
+          // Ойыншыға боттан хабар
+          try {
+            const lang = getLang(action.target);
+            const texts = {
+              kk: `🎁 Саған <b>Shashka VIP</b> берілді!\n👑 Қосылған мерзім: <b>${Math.trunc(days)}</b> күн. Барлығы қалды: <b>${left}</b> күн.`,
+              uz: `🎁 Sizga <b>Shashka VIP</b> berildi!\n👑 Qo‘shilgan muddat: <b>${Math.trunc(days)}</b> kun. Jami qoldi: <b>${left}</b> kun.`,
+              ru: `🎁 Вам выдан <b>Shashka VIP</b>!\n👑 Добавлено дней: <b>${Math.trunc(days)}</b>. Всего осталось: <b>${left}</b>.`
+            };
+
+            await telegramApi('sendMessage', {
+              chat_id: action.target,
+              parse_mode: 'HTML',
+              text: texts[lang] || texts.kk
+            });
+          } catch (error) {
+            console.error('VIP хабары жіберілмеді:', error.message);
           }
 
           res.writeHead(200);
