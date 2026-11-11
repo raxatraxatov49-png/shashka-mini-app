@@ -1291,6 +1291,72 @@ const legalList = (g, side) =>
       }))
     : [];
 
+/* ---------- Көрермендер: ойынды тек қарау ---------- */
+
+const WATCH_LIMIT = 100;
+
+// Көрермендерге тек жүрістер мен ойын нәтижесі жіберіледі.
+// Чат (chat) пен дауыс (rtc) олар арқылы өтпейді.
+function sendWatchers(g, msg) {
+  if (!g || !g.watchers) return;
+
+  for (const id of g.watchers) {
+    send(users.get(id), msg);
+  }
+}
+
+function unwatch(u) {
+  if (!u || !u.watch) return;
+
+  const g = games.get(u.watch);
+
+  if (g && g.watchers) g.watchers.delete(u.id);
+
+  u.watch = null;
+}
+
+function watchState(g) {
+  return {
+    ...gameState(g, g.p.w),
+    you: 'w',
+    spectator: true,
+    legal: [],
+    chat: [],
+    waitingForOpponent: false
+  };
+}
+
+function watchStart(u, playerId) {
+  const pid = String(playerId || '');
+  const target = users.get(pid);
+  const g = target && target.game ? games.get(target.game) : null;
+
+  const bad =
+    !g ||
+    pid === u.id ||
+    isBusy(u) ||
+    g.waitingForOpponent ||
+    g.st.over ||
+    (g.watchers && g.watchers.size >= WATCH_LIMIT && !g.watchers.has(u.id));
+
+  if (bad) {
+    return send(u, { t: 'error', code: 'watch_unavailable' });
+  }
+
+  unwatch(u);
+
+  dequeue(u.id);
+  removeUserInvite(u.id);
+  clearPInvitesOf(u.id);
+
+  if (!g.watchers) g.watchers = new Set();
+
+  g.watchers.add(u.id);
+  u.watch = g.id;
+
+  send(u, watchState(g));
+}
+
 /* ---------- Таймерлер ---------- */
 
 function clearTurnTimer(g) {
@@ -1374,6 +1440,7 @@ function sendTurnTimer(g) {
 
   send(users.get(g.p.w), message);
   send(users.get(g.p.b), message);
+  sendWatchers(g, message);
 }
 
 function startTurnTimer(g) {
@@ -1504,6 +1571,9 @@ function startGame(a, b, groupInfo = null) {
   clearPInvitesOf(a.id);
   clearPInvitesOf(b.id);
 
+  unwatch(a);
+  unwatch(b);
+
   const [w, bl] = Math.random() < 0.5
     ? [a, b]
     : [b, a];
@@ -1580,6 +1650,9 @@ function createPendingGroupGame(room) {
 
   removeUserInvite(first.id);
   removeUserInvite(second.id);
+
+  unwatch(first);
+  unwatch(second);
 
   const [w, bl] = Math.random() < 0.5
     ? [first, second]
@@ -4338,6 +4411,27 @@ function finish(g, winner, reason) {
     }
   }
 
+  if (g.watchers) {
+    const overMsg = {
+      t: 'over',
+      result: winner || 'draw',
+      reason,
+      score: g.st.score,
+      spectator: true
+    };
+
+    for (const id of g.watchers) {
+      const wu = users.get(id);
+
+      if (wu) {
+        wu.watch = null;
+        send(wu, overMsg);
+      }
+    }
+
+    g.watchers = null;
+  }
+
   // Кездейсоқ қарсылас: тек толық ойнап жеңсе ұпай беріледі
   grRecordGame(g, winner, reason);
 
@@ -4992,6 +5086,7 @@ function playersPayload(viewerId) {
 
     const u = users.get(id);
     const online = isOnline(u);
+    const gm = online && u.game ? games.get(u.game) : null;
 
     list.push({
       id,
@@ -4999,6 +5094,7 @@ function playersPayload(viewerId) {
       username: p.username || '',
       avatar: p.avatar || null,
       status: online ? (isBusy(u) ? 'game' : 'online') : 'offline',
+      watch: Boolean(gm && !gm.waitingForOpponent && !gm.st.over),
       seen: online ? now : (p.seen || 0),
       sent: pinvites.has(me + '>' + id)
     });
@@ -5240,6 +5336,12 @@ function handle(u, m) {
     case 'players_get':
       return send(u, playersPayload(u.id));
 
+    case 'watch_start':
+      return watchStart(u, m.player);
+
+    case 'watch_stop':
+      return unwatch(u);
+
     case 'pinvite_send':
       return sendPInvite(u, m.to);
 
@@ -5366,6 +5468,8 @@ function handle(u, m) {
           )
         });
       }
+
+      sendWatchers(g, { ...base, legal: [] });
 
       if (g.st.over) {
         finish(
@@ -5553,6 +5657,8 @@ function onAuth(ws, m) {
 
   ws.user = u;
 
+  unwatch(u);
+
   send(u, {
     t: 'hello',
     me: pub(u),
@@ -5700,6 +5806,8 @@ wss.on('connection', ws => {
     if (!u || u.ws !== ws) return;
 
     u.ws = null;
+
+    unwatch(u);
 
     dequeue(u.id);
     removeUserInvite(u.id);
