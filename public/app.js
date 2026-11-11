@@ -1520,6 +1520,93 @@ async function pump() {
   S.busy = false;
 }
 
+/* ---------- ДЫБЫС ЭФФЕКТТЕРІ (жүріс / тас жеу): "Жұмсақ тоқ" ---------- */
+
+const SFX = (() => {
+  let ctx = null;
+  let bus = null;
+
+  function init() {
+    if (ctx) return ctx;
+
+    try {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return null;
+
+      ctx = new AC();
+
+      const lp = ctx.createBiquadFilter();
+      lp.type = 'lowpass';
+      lp.frequency.value = 5000;
+
+      const comp = ctx.createDynamicsCompressor();
+
+      lp.connect(comp);
+      comp.connect(ctx.destination);
+
+      bus = lp;
+    } catch (e) {
+      ctx = null;
+    }
+
+    return ctx;
+  }
+
+  function unlock() {
+    const c = init();
+    if (c && c.state === 'suspended') c.resume().catch(() => {});
+  }
+
+  // Браузер дыбысты тек бірінші басқаннан кейін ашады
+  ['pointerdown', 'touchstart', 'click', 'keydown'].forEach((ev) =>
+    document.addEventListener(ev, unlock, { passive: true })
+  );
+
+  function tone(o) {
+    const t = ctx.currentTime + (o.at || 0);
+
+    const osc = ctx.createOscillator();
+    const g = ctx.createGain();
+    const f = ctx.createBiquadFilter();
+
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(o.f, t);
+    osc.frequency.exponentialRampToValueAtTime(o.f2, t + o.d);
+
+    f.type = 'lowpass';
+    f.frequency.value = 1400;
+
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.linearRampToValueAtTime(o.v, t + 0.004);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + o.d);
+
+    osc.connect(f);
+    f.connect(g);
+    g.connect(bus);
+
+    osc.start(t);
+    osc.stop(t + o.d + 0.02);
+  }
+
+  function play(kind) {
+    try {
+      const c = init();
+      if (!c) return;
+
+      if (c.state === 'suspended') c.resume().catch(() => {});
+
+      if (kind === 'capture') {
+        tone({ f: 330, f2: 190, d: 0.13, v: 0.65 });
+        tone({ f: 440, f2: 300, d: 0.09, v: 0.35, at: 0.08 });
+      } else {
+        tone({ f: 420, f2: 260, d: 0.1, v: 0.55 });
+      }
+    } catch (e) {}
+  }
+
+  return { play };
+})();
+
 async function doMove(m) {
   const g = S.g;
   if (!g) return;
@@ -1554,6 +1641,7 @@ async function doMove(m) {
   }
 
   haptic(cap != null ? 'medium' : 'light');
+  SFX.play(cap != null ? 'capture' : 'move');
 
   Object.assign(g, {
     board: m.board,
