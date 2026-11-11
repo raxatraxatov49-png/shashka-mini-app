@@ -219,6 +219,17 @@ const I18N = {
     "item_p10": "Алтын және қара",
     "item_p11": "Галактика",
     "item_p12": "Рубин және сапфир",
+    "watchBtn": "Ойынды қарау",
+    "watchBanner": "Сіз ойынды қарап отырсыз",
+    "watchExit": "Қараудан шығу",
+    "watchWhiteWin": "Ақ жеңді",
+    "watchBlackWin": "Қара жеңді",
+    "watchNoPieces": "Бір ойыншының барлық тастары алынды",
+    "watchNoMoves": "Бір ойыншының жүретін жолы қалмады",
+    "watchResign": "Ойыншы берілді",
+    "watchLeft": "Ойыншы ойыннан шығып кетті",
+    "watchTimeout": "Ойыншының уақыты аяқталды",
+    "watchUnavailable": "Бұл ойын аяқталған немесе қарауға болмайды",
     "rar0": "Қарапайым",
     "rar1": "Сирек",
     "rar2": "Эпик",
@@ -395,6 +406,17 @@ const I18N = {
     "item_p10": "Oltin va qora",
     "item_p11": "Galaktika",
     "item_p12": "Yoqut va sapfir",
+    "watchBtn": "O‘yinni kuzatish",
+    "watchBanner": "Siz o‘yinni kuzatyapsiz",
+    "watchExit": "Kuzatishdan chiqish",
+    "watchWhiteWin": "Oq yutdi",
+    "watchBlackWin": "Qora yutdi",
+    "watchNoPieces": "Bir o‘yinchining barcha toshlari olindi",
+    "watchNoMoves": "Bir o‘yinchining yurish imkoni qolmadi",
+    "watchResign": "O‘yinchi taslim bo‘ldi",
+    "watchLeft": "O‘yinchi o‘yindan chiqib ketdi",
+    "watchTimeout": "O‘yinchining vaqti tugadi",
+    "watchUnavailable": "Bu o‘yin tugagan yoki kuzatib bo‘lmaydi",
     "rar0": "Oddiy",
     "rar1": "Noyob",
     "rar2": "Epik",
@@ -571,6 +593,17 @@ const I18N = {
     "item_p10": "Золото и чёрный",
     "item_p11": "Галактика",
     "item_p12": "Рубин и сапфир",
+    "watchBtn": "Смотреть игру",
+    "watchBanner": "Вы наблюдаете за игрой",
+    "watchExit": "Выйти из просмотра",
+    "watchWhiteWin": "Белые победили",
+    "watchBlackWin": "Чёрные победили",
+    "watchNoPieces": "У одного из игроков не осталось шашек",
+    "watchNoMoves": "У одного из игроков не осталось ходов",
+    "watchResign": "Игрок сдался",
+    "watchLeft": "Игрок покинул игру",
+    "watchTimeout": "У игрока закончилось время",
+    "watchUnavailable": "Эта игра уже закончилась или недоступна",
     "rar0": "Обычный",
     "rar1": "Редкий",
     "rar2": "Эпический",
@@ -1102,6 +1135,11 @@ if (tg) {
         return;
       }
 
+      if (S.g && S.g.spectator) {
+        leaveWatch(true);
+        return;
+      }
+
       if (S.inviteMode) {
         cancelInvite();
         return;
@@ -1133,6 +1171,8 @@ function setSearching(on) {
 function onMsg(m) {
   switch (m.t) {
     case 'hello': {
+      if (S.g && S.g.spectator) leaveWatch(false);
+
       S.me = m.me;
       if (m.lang) setLang(m.lang);
 
@@ -1379,12 +1419,67 @@ function onMsg(m) {
         S.sentTo = null;
         ptoast(tr('pBusy'));
         send({ t: 'players_get' });
+      } else if (m.code === 'watch_unavailable') {
+        ptoast(tr('watchUnavailable'));
+        send({ t: 'players_get' });
       }
       break;
   }
 }
 
 /* ---------- ОЙЫН ---------- */
+
+/* ---------- КӨРЕРМЕН РЕЖИМІ (ойынды тек қарау) ---------- */
+
+function applySpectatorUi(on) {
+  const chatBtn = $('btnChat');
+  const resign = $('btnResign');
+
+  if (on) {
+    if (resign.dataset.specPrevTxt === undefined) {
+      resign.dataset.specPrevTxt = resign.textContent;
+      resign.dataset.specPrevKey = resign.dataset.i18n || '';
+    }
+
+    resign.dataset.i18n = 'watchExit';
+    resign.textContent = tr('watchExit');
+
+    chatBtn.style.display = 'none';
+
+    clearInterval(S.awayTimer);
+    $('away').textContent = tr('watchBanner');
+    $('away').classList.remove('hidden');
+  } else {
+    if (resign.dataset.specPrevTxt !== undefined) {
+      const key = resign.dataset.specPrevKey;
+
+      if (key) resign.dataset.i18n = key;
+      else delete resign.dataset.i18n;
+
+      resign.textContent = key ? tr(key) : resign.dataset.specPrevTxt;
+
+      delete resign.dataset.specPrevTxt;
+      delete resign.dataset.specPrevKey;
+    }
+
+    chatBtn.style.display = '';
+  }
+}
+
+function leaveWatch(notify) {
+  if (notify) send({ t: 'watch_stop' });
+
+  S.g = null;
+  S.q = [];
+  S.busy = false;
+
+  ['sheetMenu', 'sheetChat', 'result', 'away'].forEach((i) => {
+    $(i).classList.add('hidden');
+  });
+
+  applySpectatorUi(false);
+  openPlayers();
+}
 
 const flip = () => S.g.you === 'b';
 
@@ -1415,7 +1510,8 @@ function startGame(m) {
   hideIncoming();
   S.sentTo = null;
 
-  openRtc(m);
+  if (m.spectator) closeRtc();
+  else openRtc(m);
 
   S.inviteMode = false;
   $('game').classList.remove('inviting');
@@ -1424,6 +1520,7 @@ function startGame(m) {
   S.g = {
     id: m.id,
     you: m.you,
+    spectator: Boolean(m.spectator),
     players: m.players,
     board: m.board,
     turn: m.turn,
@@ -1485,6 +1582,8 @@ function startGame(m) {
   updateBadge();
   refresh();
   show('game');
+
+  applySpectatorUi(Boolean(m.spectator));
 }
 
 let sqEls = [];
@@ -1879,14 +1978,19 @@ async function doOver(m) {
 
   await sleep(500);
 
-  const win = m.result === g.you;
+  const spec = Boolean(g.spectator || m.spectator);
+  const win = !spec && m.result === g.you;
   const draw = m.result === 'draw';
 
   $('resEmoji').textContent =
-    draw ? '🤝' : win ? '🏆' : '😔';
+    draw ? '🤝' : spec ? '🏁' : win ? '🏆' : '😔';
 
   $('resTitle').textContent =
-    draw ? tr('draw') : win ? tr('youWin') : tr('youLose');
+    draw
+      ? tr('draw')
+      : spec
+        ? tr(m.result === 'w' ? 'watchWhiteWin' : 'watchBlackWin')
+        : win ? tr('youWin') : tr('youLose');
 
   const R = {
     no_pieces: tr(win ? 'rNoPiecesWin' : 'rNoPiecesLose'),
@@ -1898,7 +2002,19 @@ async function doOver(m) {
     draw: tr('rDraw')
   };
 
+  if (spec) {
+    Object.assign(R, {
+      no_pieces: tr('watchNoPieces'),
+      no_moves: tr('watchNoMoves'),
+      resign: tr('watchResign'),
+      left: tr('watchLeft'),
+      timeout: tr('watchTimeout'),
+      opponent_timeout: tr('watchTimeout')
+    });
+  }
+
   $('resSub').textContent = R[m.reason] || '';
+  $('btnAgain').style.display = spec ? 'none' : '';
 
   $('sheetMenu').classList.add('hidden');
   $('away').classList.add('hidden');
@@ -1909,7 +2025,7 @@ async function doOver(m) {
   try {
     tg && tg.HapticFeedback &&
     tg.HapticFeedback.notificationOccurred(
-      draw ? 'warning' : win ? 'success' : 'error'
+      draw || spec ? 'warning' : win ? 'success' : 'error'
     );
   } catch (e) {}
 }
@@ -1977,6 +2093,11 @@ function refresh() {
         : mine
           ? ''
           : tr('thinking');
+
+  if (g.spectator && !waiting && !g.over) {
+    ms.textContent = g.turn === g.you ? tr('thinking') : '';
+    $('oppSub').textContent = g.turn !== g.you ? tr('thinking') : '';
+  }
 
   if (g.invite) {
     ms.textContent = tr('youReady');
@@ -2070,6 +2191,7 @@ $('field').addEventListener('pointerdown', (e) => {
     !g ||
     g.over ||
     g.waitingForOpponent ||
+    g.spectator ||
     g.turn !== g.you ||
     S.busy ||
     S.q.length
@@ -2268,6 +2390,11 @@ $('sheetMenu').addEventListener('pointerdown', (e) => {
 });
 
 $('btnResign').onclick = () => {
+  if (S.g && S.g.spectator) {
+    leaveWatch(true);
+    return;
+  }
+
   const go = () => send({ t: 'resign' });
 
   if (tg && tg.showConfirm) {
@@ -2283,13 +2410,18 @@ $('btnResign').onclick = () => {
 };
 
 $('btnToMenu').onclick = () => {
+  const wasSpec = Boolean(S.g && S.g.spectator);
+
   S.g = null;
   S.groupWaiting = false;
   S.groupWaitDeadline = null;
   S.groupJoinSent = false;
 
   $('result').classList.add('hidden');
-  show('menu');
+  applySpectatorUi(false);
+
+  if (wasSpec) openPlayers();
+  else show('menu');
 };
 
 $('btnAgain').onclick = () => {
@@ -2402,6 +2534,12 @@ const SKINS = {
 
   const st = document.createElement('style');
   st.textContent = css;
+  document.head.append(st);
+})();
+
+(function plactCss() {
+  const st = document.createElement('style');
+  st.textContent = '.plact{white-space:nowrap}';
   document.head.append(st);
 })();
 
@@ -3006,6 +3144,13 @@ function playerRow(p) {
       send({ t: 'pinvite_send', to: p.id });
       renderPlayers();
       haptic('light');
+    };
+  } else if (p.status === 'game' && p.watch) {
+    btn.className = 'plact';
+    btn.textContent = tr('watchBtn');
+    btn.onclick = () => {
+      haptic('light');
+      send({ t: 'watch_start', player: p.id });
     };
   } else {
     btn.className = 'plact dis';
