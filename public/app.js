@@ -210,15 +210,15 @@ const I18N = {
     "item_p1": "Қызыл және көк",
     "item_p2": "Алтын және күміс",
     "item_p3": "Неон",
-    "item_p4": "Алмаз",
+    "item_p4": "Қарлы адам",
     "item_p5": "Жасыл және сары",
     "item_p6": "Қызғылт және көгілдір",
     "item_p7": "Қызғылт сары және күлгін",
     "item_p8": "Изумруд және топаз",
     "item_p9": "Мұз және от",
-    "item_p10": "Алтын және қара",
-    "item_p11": "Галактика",
-    "item_p12": "Рубин және сапфир",
+    "item_p10": "Қар ұшқыны",
+    "item_p11": "Жаңа жылдық шырша",
+    "item_p12": "Жаңа жылдық сыйлық",
     "watchBtn": "Ойынды қарау",
     "watchBanner": "Сіз ойынды қарап отырсыз",
     "watchExit": "Қараудан шығу",
@@ -397,15 +397,15 @@ const I18N = {
     "item_p1": "Qizil va ko‘k",
     "item_p2": "Oltin va kumush",
     "item_p3": "Neon",
-    "item_p4": "Olmos",
+    "item_p4": "Qorbobo",
     "item_p5": "Yashil va sariq",
     "item_p6": "Pushti va moviy",
     "item_p7": "To‘q sariq va binafsha",
     "item_p8": "Zumrad va topaz",
     "item_p9": "Muz va olov",
-    "item_p10": "Oltin va qora",
-    "item_p11": "Galaktika",
-    "item_p12": "Yoqut va sapfir",
+    "item_p10": "Qor parchasi",
+    "item_p11": "Yangi yil archasi",
+    "item_p12": "Yangi yil sovg‘asi",
     "watchBtn": "O‘yinni kuzatish",
     "watchBanner": "Siz o‘yinni kuzatyapsiz",
     "watchExit": "Kuzatishdan chiqish",
@@ -584,15 +584,15 @@ const I18N = {
     "item_p1": "Красные и синие",
     "item_p2": "Золото и серебро",
     "item_p3": "Неон",
-    "item_p4": "Алмаз",
+    "item_p4": "Снеговик",
     "item_p5": "Зелёный и жёлтый",
     "item_p6": "Розовый и голубой",
     "item_p7": "Оранжевый и фиолетовый",
     "item_p8": "Изумруд и топаз",
     "item_p9": "Лёд и огонь",
-    "item_p10": "Золото и чёрный",
-    "item_p11": "Галактика",
-    "item_p12": "Рубин и сапфир",
+    "item_p10": "Снежинка",
+    "item_p11": "Новогодняя ёлка",
+    "item_p12": "Новогодний подарок",
     "watchBtn": "Смотреть игру",
     "watchBanner": "Вы наблюдаете за игрой",
     "watchExit": "Выйти из просмотра",
@@ -1450,14 +1450,19 @@ function applySpectatorUi(on) {
 
     const away = $('away');
 
-    // баннерді аватарлардың үстінен алып, тақтаның астына қоямыз
+    // баннерді аватарлардың үстінен алып, «Классикалық тақта» тақырыбының үстіне қоямыз
     if (!away.dataset.specHome) {
       away.dataset.specHome = '1';
       away._home = { parent: away.parentNode, next: away.nextSibling };
     }
 
-    const frame = $('field').parentElement;
-    frame.insertAdjacentElement('afterend', away);
+    const title = document.querySelector('[data-i18n="boardTitle"]');
+
+    if (title) {
+      title.insertAdjacentElement('beforebegin', away);
+    } else {
+      $('field').parentElement.insertAdjacentElement('afterend', away);
+    }
     away.classList.add('spec-banner');
 
     away.textContent = tr('watchBanner');
@@ -1497,7 +1502,7 @@ function restoreAwayBanner() {
   const st = document.createElement('style');
   st.textContent =
     '#away.spec-banner{position:static!important;inset:auto!important;' +
-    'transform:none!important;width:auto!important;margin:10px 12px 0!important;' +
+    'transform:none!important;width:auto!important;margin:0 12px 10px!important;' +
     'text-align:center;z-index:auto!important}';
   document.head.append(st);
 })();
@@ -2477,6 +2482,72 @@ $('btnAgain').onclick = () => {
 
 // Түстер тек осында. Ойын тақтасы мен дүкен суреті сол түстерді қолданады.
 // b0 / p0 — бұрынғы style.css дизайны, оны өзгертпейміз.
+/* ---------- ЖАҢА ЖЫЛДЫҚ СУРЕТТЕР (қымбат тастарға) ---------- */
+
+const svgPic = (body) =>
+  "url('data:image/svg+xml," +
+  encodeURIComponent(
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">' + body + '</svg>'
+  ) +
+  "')";
+
+const PICS = {
+  // p10: қар ұшқыны
+  flake: (() => {
+    const arm =
+      '<path d="M32 32V9M32 20l-7-7M32 20l7-7M32 27l-5-5M32 27l5-5"/>';
+    let g = '';
+    for (let a = 0; a < 360; a += 60) {
+      g += '<g transform="rotate(' + a + ' 32 32)">' + arm + '</g>';
+    }
+    return svgPic(
+      '<g fill="none" stroke="#2a3f66" stroke-width="6" stroke-linecap="round" stroke-linejoin="round">' + g + '</g>' +
+      '<g fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">' + g + '</g>'
+    );
+  })(),
+
+  // p4: қарлы адам
+  snowman: svgPic(
+    '<g stroke="#2a3a55" stroke-width="2.5">' +
+    '<circle cx="32" cy="44" r="14" fill="#fff"/>' +
+    '<circle cx="32" cy="23" r="10" fill="#fff"/>' +
+    '<path d="M22 32q10 6 20 0v4q-10 6-20 0z" fill="#e53935"/>' +
+    '<path d="M24 14h16l-2-8H26z" fill="#222"/>' +
+    '</g>' +
+    '<circle cx="28.5" cy="21" r="1.6" fill="#222"/>' +
+    '<circle cx="35.5" cy="21" r="1.6" fill="#222"/>' +
+    '<path d="M32 24l7 2.5-7 1.5z" fill="#ff8a1f"/>' +
+    '<circle cx="32" cy="44" r="1.8" fill="#222"/>' +
+    '<circle cx="32" cy="51" r="1.8" fill="#222"/>'
+  ),
+
+  // p11: жаңа жылдық шырша
+  tree: svgPic(
+    '<g stroke="#0b3d1c" stroke-width="2" stroke-linejoin="round">' +
+    '<rect x="28" y="53" width="8" height="7" fill="#7a4a21"/>' +
+    '<path d="M32 12L44 28H20z" fill="#2fb050"/>' +
+    '<path d="M32 21L48 41H16z" fill="#2fb050"/>' +
+    '<path d="M32 32L52 55H12z" fill="#2fb050"/>' +
+    '</g>' +
+    '<path d="M32 2l2.6 5.4 5.9.8-4.3 4.1 1 5.8L32 15.300l-5.2 2.8 1-5.8-4.3-4.1 5.9-.8z" fill="#ffd54a" stroke="#8a6406" stroke-width="1.2"/>' +
+    '<circle cx="30" cy="30" r="2.4" fill="#ff5252"/>' +
+    '<circle cx="37" cy="40" r="2.4" fill="#ffd54a"/>' +
+    '<circle cx="24" cy="47" r="2.4" fill="#ffd54a"/>' +
+    '<circle cx="40" cy="50" r="2.4" fill="#ff5252"/>'
+  ),
+
+  // p12: жаңа жылдық сыйлық
+  gift: svgPic(
+    '<g stroke="#5a1a1a" stroke-width="2.2" stroke-linejoin="round">' +
+    '<rect x="12" y="30" width="40" height="26" rx="3" fill="#fff"/>' +
+    '<rect x="9" y="21" width="46" height="11" rx="3" fill="#fff"/>' +
+    '<rect x="28" y="21" width="8" height="35" fill="#ffc93c"/>' +
+    '<path d="M32 21C20 4 8 16 32 21z" fill="#ffc93c"/>' +
+    '<path d="M32 21C44 4 56 16 32 21z" fill="#ffc93c"/>' +
+    '</g>'
+  )
+};
+
 const SKINS = {
   boards: {
     b0: { a: '#d8cbb5', b: '#75583e' },
@@ -2512,7 +2583,8 @@ const SKINS = {
     },
     p4: {
       w: 'radial-gradient(circle at 35% 30%,#fff,#7fd8ff 60%,#3a9bd6)',
-      k: 'radial-gradient(circle at 35% 30%,#fff,#d3a6ff 60%,#8c4fd6)'
+      k: 'radial-gradient(circle at 35% 30%,#fff,#d3a6ff 60%,#8c4fd6)',
+      img: PICS.snowman
     },
     p5: {
       w: 'radial-gradient(circle at 35% 30%,#c8f08f,#5aa21e)',
@@ -2536,15 +2608,18 @@ const SKINS = {
     },
     p10: {
       w: 'radial-gradient(circle at 35% 30%,#fff1a8,#d9a017 60%,#8a6406)',
-      k: 'radial-gradient(circle at 35% 30%,#6a6a70,#1a1a1d 60%,#000)'
+      k: 'radial-gradient(circle at 35% 30%,#6a6a70,#1a1a1d 60%,#000)',
+      img: PICS.flake
     },
     p11: {
       w: 'radial-gradient(circle at 35% 30%,#e8d0ff,#8a4fff 55%,#2a0f7a)',
-      k: 'radial-gradient(circle at 35% 30%,#b8f6ff,#19b8ff 55%,#0a3d8a)'
+      k: 'radial-gradient(circle at 35% 30%,#b8f6ff,#19b8ff 55%,#0a3d8a)',
+      img: PICS.tree
     },
     p12: {
       w: 'radial-gradient(circle at 35% 30%,#ffb3c0,#d4143a 60%,#7a0020)',
-      k: 'radial-gradient(circle at 35% 30%,#b3c9ff,#2457e0 60%,#0b1f7a)'
+      k: 'radial-gradient(circle at 35% 30%,#b3c9ff,#2457e0 60%,#0b1f7a)',
+      img: PICS.gift
     }
   }
 };
@@ -2563,9 +2638,18 @@ const SKINS = {
   for (const [id, c] of Object.entries(SKINS.pieces)) {
     if (id === 'p0') continue;
 
+    const w = c.img ? `${c.img} center/64% no-repeat,${c.w}` : c.w;
+    const k = c.img ? `${c.img} center/64% no-repeat,${c.k}` : c.k;
+
     css +=
-      `#field[data-pieces="${id}"] .pc.w>i{background:${c.w}}` +
-      `#field[data-pieces="${id}"] .pc.b>i{background:${c.k}}`;
+      `#field[data-pieces="${id}"] .pc.w>i{background:${w}}` +
+      `#field[data-pieces="${id}"] .pc.b>i{background:${k}}`;
+
+    // дамада тәж сурет үстінде тұрмауы үшін сурет кішірейіп төмен түседі
+    if (c.img) {
+      css +=
+        `#field[data-pieces="${id}"] .pc.king>i{background-size:40%,auto;background-position:50% 78%,center}`;
+    }
   }
 
   const st = document.createElement('style');
@@ -2636,10 +2720,13 @@ function thumb(kind, id) {
 
   const c = SKINS.pieces[id];
 
+  const bw = c.img ? `${c.img} center/70% no-repeat,${c.w}` : c.w;
+  const bk = c.img ? `${c.img} center/70% no-repeat,${c.k}` : c.k;
+
   return (
     '<div class="tp">' +
-    `<b style="background:${c.w}"></b>` +
-    `<b style="background:${c.k}"></b>` +
+    `<b style="background:${bw}"></b>` +
+    `<b style="background:${bk}"></b>` +
     '</div>'
   );
 }
