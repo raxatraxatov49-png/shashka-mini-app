@@ -1447,9 +1447,23 @@ function applySpectatorUi(on) {
     chatBtn.style.display = 'none';
 
     clearInterval(S.awayTimer);
-    $('away').textContent = tr('watchBanner');
-    $('away').classList.remove('hidden');
+
+    const away = $('away');
+
+    // баннерді аватарлардың үстінен алып, тақтаның астына қоямыз
+    if (!away.dataset.specHome) {
+      away.dataset.specHome = '1';
+      away._home = { parent: away.parentNode, next: away.nextSibling };
+    }
+
+    const frame = $('field').parentElement;
+    frame.insertAdjacentElement('afterend', away);
+    away.classList.add('spec-banner');
+
+    away.textContent = tr('watchBanner');
+    away.classList.remove('hidden');
   } else {
+    restoreAwayBanner();
     if (resign.dataset.specPrevTxt !== undefined) {
       const key = resign.dataset.specPrevKey;
 
@@ -1465,6 +1479,28 @@ function applySpectatorUi(on) {
     chatBtn.style.display = '';
   }
 }
+
+function restoreAwayBanner() {
+  const away = $('away');
+
+  away.classList.remove('spec-banner');
+
+  if (away._home && away._home.parent) {
+    away._home.parent.insertBefore(away, away._home.next);
+  }
+
+  delete away.dataset.specHome;
+  away._home = null;
+}
+
+(function specBannerCss() {
+  const st = document.createElement('style');
+  st.textContent =
+    '#away.spec-banner{position:static!important;inset:auto!important;' +
+    'transform:none!important;width:auto!important;margin:10px 12px 0!important;' +
+    'text-align:center;z-index:auto!important}';
+  document.head.append(st);
+})();
 
 function leaveWatch(notify) {
   if (notify) send({ t: 'watch_stop' });
