@@ -819,3 +819,17 @@ body::before {
 .invbtn:active { transform: scale(.97); }
 .invbtn:disabled { opacity: .45; }
 .invcancel { height: 38px; background: transparent; color: #a0a0a0; font-weight: 600; font-size: 15px; }
+
+
+/* ---------- Төменгі ойыншы жолы мен мәзірді төмен түсіру ---------- */
+#game { padding-bottom: calc(var(--safe-b) + 6px); }
+
+#game #rowMe {
+  position: relative;
+  z-index: 1;
+  transform: translateY(26px);
+}
+
+#game .dock {
+  transform: translateY(14px);
+}
