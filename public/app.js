@@ -198,11 +198,27 @@ const I18N = {
     "item_b2": "Мұхит",
     "item_b3": "Қара мәрмәр",
     "item_b4": "Алтын сарай",
+    "item_b5": "Шие гүлі",
+    "item_b6": "Терракота",
+    "item_b7": "Түнгі орман",
+    "item_b8": "Күлгін аспан",
+    "item_b9": "Мұздық",
+    "item_b10": "Лава",
+    "item_b11": "Қара алтын",
+    "item_b12": "Ғарыш",
     "item_p0": "Классикалық",
     "item_p1": "Қызыл және көк",
     "item_p2": "Алтын және күміс",
     "item_p3": "Неон",
     "item_p4": "Алмаз",
+    "item_p5": "Жасыл және сары",
+    "item_p6": "Қызғылт және көгілдір",
+    "item_p7": "Қызғылт сары және күлгін",
+    "item_p8": "Изумруд және топаз",
+    "item_p9": "Мұз және от",
+    "item_p10": "Алтын және қара",
+    "item_p11": "Галактика",
+    "item_p12": "Рубин және сапфир",
     "rar0": "Қарапайым",
     "rar1": "Сирек",
     "rar2": "Эпик",
@@ -358,11 +374,27 @@ const I18N = {
     "item_b2": "Okean",
     "item_b3": "Qora marmar",
     "item_b4": "Oltin saroy",
+    "item_b5": "Olcha guli",
+    "item_b6": "Terrakota",
+    "item_b7": "Tungi o‘rmon",
+    "item_b8": "Binafsha osmon",
+    "item_b9": "Muzlik",
+    "item_b10": "Lava",
+    "item_b11": "Qora oltin",
+    "item_b12": "Koinot",
     "item_p0": "Klassik",
     "item_p1": "Qizil va ko‘k",
     "item_p2": "Oltin va kumush",
     "item_p3": "Neon",
     "item_p4": "Olmos",
+    "item_p5": "Yashil va sariq",
+    "item_p6": "Pushti va moviy",
+    "item_p7": "To‘q sariq va binafsha",
+    "item_p8": "Zumrad va topaz",
+    "item_p9": "Muz va olov",
+    "item_p10": "Oltin va qora",
+    "item_p11": "Galaktika",
+    "item_p12": "Yoqut va sapfir",
     "rar0": "Oddiy",
     "rar1": "Noyob",
     "rar2": "Epik",
@@ -518,11 +550,27 @@ const I18N = {
     "item_b2": "Океан",
     "item_b3": "Чёрный мрамор",
     "item_b4": "Золотой дворец",
+    "item_b5": "Сакура",
+    "item_b6": "Терракота",
+    "item_b7": "Ночной лес",
+    "item_b8": "Лиловое небо",
+    "item_b9": "Ледник",
+    "item_b10": "Лава",
+    "item_b11": "Чёрное золото",
+    "item_b12": "Космос",
     "item_p0": "Классические",
     "item_p1": "Красные и синие",
     "item_p2": "Золото и серебро",
     "item_p3": "Неон",
     "item_p4": "Алмаз",
+    "item_p5": "Зелёный и жёлтый",
+    "item_p6": "Розовый и голубой",
+    "item_p7": "Оранжевый и фиолетовый",
+    "item_p8": "Изумруд и топаз",
+    "item_p9": "Лёд и огонь",
+    "item_p10": "Золото и чёрный",
+    "item_p11": "Галактика",
+    "item_p12": "Рубин и сапфир",
     "rar0": "Обычный",
     "rar1": "Редкий",
     "rar2": "Эпический",
@@ -1523,8 +1571,27 @@ async function pump() {
 /* ---------- ДЫБЫС ЭФФЕКТТЕРІ (жүріс / тас жеу): "Жұмсақ тоқ" ---------- */
 
 const SFX = (() => {
+  const NOTES = {
+    move: [{ f: 420, f2: 260, d: 0.1, v: 0.55, at: 0 }],
+    capture: [
+      { f: 330, f2: 190, d: 0.13, v: 0.65, at: 0 },
+      { f: 440, f2: 300, d: 0.09, v: 0.35, at: 0.08 }
+    ]
+  };
+
   let ctx = null;
   let bus = null;
+  let silentDone = false;
+  let primed = false;
+
+  const clips = {};
+
+  // iPhone-да "үнсіз" режим Web Audio-ны өшіріп тастайды; осы жол оны өшірмейді
+  function setSession() {
+    try {
+      if (navigator.audioSession) navigator.audioSession.type = 'playback';
+    } catch (e) {}
+  }
 
   function init() {
     if (ctx) return ctx;
@@ -1532,6 +1599,8 @@ const SFX = (() => {
     try {
       const AC = window.AudioContext || window.webkitAudioContext;
       if (!AC) return null;
+
+      setSession();
 
       ctx = new AC();
 
@@ -1552,18 +1621,130 @@ const SFX = (() => {
     return ctx;
   }
 
-  function unlock() {
-    const c = init();
-    if (c && c.state === 'suspended') c.resume().catch(() => {});
+  // Қосалқы жол: Web Audio істемесе, дайын WAV файл ойнатылады
+  function wavUri(notes) {
+    const sr = 22050;
+    let total = 0;
+
+    notes.forEach((n) => { total = Math.max(total, n.at + n.d); });
+
+    const len = Math.ceil((total + 0.05) * sr);
+    const buf = new Float32Array(len);
+
+    notes.forEach((n) => {
+      const start = Math.floor(n.at * sr);
+      const cnt = Math.floor(n.d * sr);
+      const ratio = n.f2 / n.f;
+      const lr = Math.log(ratio);
+
+      for (let i = 0; i < cnt; i++) {
+        const t = i / sr;
+        const ph = 2 * Math.PI * n.f * n.d / lr * (Math.pow(ratio, t / n.d) - 1);
+        const env = t < 0.004
+          ? n.v * t / 0.004
+          : n.v * Math.pow(0.0001 / n.v, (t - 0.004) / (n.d - 0.004));
+
+        if (start + i < len) buf[start + i] += env * Math.sin(ph);
+      }
+    });
+
+    const bytes = new Uint8Array(44 + len * 2);
+    const dv = new DataView(bytes.buffer);
+    const wr = (o, str) => {
+      for (let i = 0; i < str.length; i++) bytes[o + i] = str.charCodeAt(i);
+    };
+
+    wr(0, 'RIFF');
+    dv.setUint32(4, 36 + len * 2, true);
+    wr(8, 'WAVE');
+    wr(12, 'fmt ');
+    dv.setUint32(16, 16, true);
+    dv.setUint16(20, 1, true);
+    dv.setUint16(22, 1, true);
+    dv.setUint32(24, sr, true);
+    dv.setUint32(28, sr * 2, true);
+    dv.setUint16(32, 2, true);
+    dv.setUint16(34, 16, true);
+    wr(36, 'data');
+    dv.setUint32(40, len * 2, true);
+
+    for (let i = 0; i < len; i++) {
+      const x = Math.max(-1, Math.min(1, buf[i]));
+      dv.setInt16(44 + i * 2, x * 32767, true);
+    }
+
+    let bin = '';
+    for (let i = 0; i < bytes.length; i += 0x8000) {
+      bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+    }
+
+    return 'data:audio/wav;base64,' + btoa(bin);
   }
 
-  // Браузер дыбысты тек бірінші басқаннан кейін ашады
-  ['pointerdown', 'touchstart', 'click', 'keydown'].forEach((ev) =>
+  try {
+    Object.keys(NOTES).forEach((k) => {
+      const a = new Audio(wavUri(NOTES[k]));
+      a.preload = 'auto';
+      clips[k] = a;
+    });
+  } catch (e) {}
+
+  function prime() {
+    if (primed) return;
+    primed = true;
+
+    Object.keys(clips).forEach((k) => {
+      const a = clips[k];
+
+      try {
+        a.muted = true;
+
+        const done = () => {
+          try { a.pause(); a.currentTime = 0; a.muted = false; } catch (e) {}
+        };
+
+        const p = a.play();
+
+        if (p && p.then) {
+          p.then(done).catch(() => { a.muted = false; primed = false; });
+        } else {
+          done();
+        }
+      } catch (e) {
+        a.muted = false;
+      }
+    });
+  }
+
+  // Экранды басқан сайын дыбыс жүйесін оятып тұрамыз
+  function unlock() {
+    setSession();
+
+    const c = init();
+
+    if (c) {
+      if (c.state !== 'running') c.resume().catch(() => {});
+
+      if (!silentDone) {
+        try {
+          const s = c.createBufferSource();
+          s.buffer = c.createBuffer(1, 1, 22050);
+          s.connect(c.destination);
+          s.start(0);
+          silentDone = true;
+        } catch (e) {}
+      }
+    }
+
+    prime();
+  }
+
+  ['pointerdown', 'pointerup', 'touchstart', 'touchend', 'click', 'keydown'].forEach((ev) =>
     document.addEventListener(ev, unlock, { passive: true })
   );
 
   function tone(o) {
-    const t = ctx.currentTime + (o.at || 0);
+    const t = ctx.currentTime + o.at;
 
     const osc = ctx.createOscillator();
     const g = ctx.createGain();
@@ -1588,20 +1769,35 @@ const SFX = (() => {
     osc.stop(t + o.d + 0.02);
   }
 
+  function playClip(kind) {
+    try {
+      const a = clips[kind];
+      if (!a) return;
+
+      a.muted = false;
+      a.currentTime = 0;
+
+      const p = a.play();
+      if (p && p.catch) p.catch(() => {});
+    } catch (e) {}
+  }
+
   function play(kind) {
+    if (!NOTES[kind]) return;
+
     try {
       const c = init();
-      if (!c) return;
 
-      if (c.state === 'suspended') c.resume().catch(() => {});
-
-      if (kind === 'capture') {
-        tone({ f: 330, f2: 190, d: 0.13, v: 0.65 });
-        tone({ f: 440, f2: 300, d: 0.09, v: 0.35, at: 0.08 });
-      } else {
-        tone({ f: 420, f2: 260, d: 0.1, v: 0.55 });
+      if (c && c.state === 'running') {
+        NOTES[kind].forEach(tone);
+        return;
       }
+
+      // Дыбыс жүйесі ұйықтап қалған болса: оятамыз да, қосалқы жолмен ойнатамыз
+      if (c) c.resume().catch(() => {});
     } catch (e) {}
+
+    playClip(kind);
   }
 
   return { play };
@@ -2119,7 +2315,15 @@ const SKINS = {
     b1: { a: '#eeeed2', b: '#6a9b4f' },
     b2: { a: '#dbe9f4', b: '#4b7fb5' },
     b3: { a: '#9a9a9a', b: '#2b2b2f' },
-    b4: { a: '#fff0b8', b: '#c58a12' }
+    b4: { a: '#fff0b8', b: '#c58a12' },
+    b5: { a: '#fde8ee', b: '#d98aa6' },
+    b6: { a: '#f1dccb', b: '#b8604a' },
+    b7: { a: '#a9c7a0', b: '#1f3d2b' },
+    b8: { a: '#e3d9f5', b: '#6a4aa8' },
+    b9: { a: '#f0fbff', b: '#6fb7c9' },
+    b10: { a: '#2d1b1b', b: '#d9441f' },
+    b11: { a: '#3a3a3f', b: '#e0b13a' },
+    b12: { a: '#3b2f7a', b: '#0e0b2b' }
   },
   pieces: {
     p0: {
@@ -2141,6 +2345,38 @@ const SKINS = {
     p4: {
       w: 'radial-gradient(circle at 35% 30%,#fff,#7fd8ff 60%,#3a9bd6)',
       k: 'radial-gradient(circle at 35% 30%,#fff,#d3a6ff 60%,#8c4fd6)'
+    },
+    p5: {
+      w: 'radial-gradient(circle at 35% 30%,#c8f08f,#5aa21e)',
+      k: 'radial-gradient(circle at 35% 30%,#fff2a0,#e0a800)'
+    },
+    p6: {
+      w: 'radial-gradient(circle at 35% 30%,#ffc2dc,#e0508f)',
+      k: 'radial-gradient(circle at 35% 30%,#bfe9ff,#3a9bd6)'
+    },
+    p7: {
+      w: 'radial-gradient(circle at 35% 30%,#ffd09a,#f07a10)',
+      k: 'radial-gradient(circle at 35% 30%,#d8b8ff,#7a3fd0)'
+    },
+    p8: {
+      w: 'radial-gradient(circle at 35% 30%,#9bffd0,#0b8a55)',
+      k: 'radial-gradient(circle at 35% 30%,#ffe08a,#d98a00)'
+    },
+    p9: {
+      w: 'radial-gradient(circle at 35% 30%,#fff,#a8e4ff 55%,#2f9bd6)',
+      k: 'radial-gradient(circle at 35% 30%,#fff2a0,#ff7a1a 55%,#c4220a)'
+    },
+    p10: {
+      w: 'radial-gradient(circle at 35% 30%,#fff1a8,#d9a017 60%,#8a6406)',
+      k: 'radial-gradient(circle at 35% 30%,#6a6a70,#1a1a1d 60%,#000)'
+    },
+    p11: {
+      w: 'radial-gradient(circle at 35% 30%,#e8d0ff,#8a4fff 55%,#2a0f7a)',
+      k: 'radial-gradient(circle at 35% 30%,#b8f6ff,#19b8ff 55%,#0a3d8a)'
+    },
+    p12: {
+      w: 'radial-gradient(circle at 35% 30%,#ffb3c0,#d4143a 60%,#7a0020)',
+      k: 'radial-gradient(circle at 35% 30%,#b3c9ff,#2457e0 60%,#0b1f7a)'
     }
   }
 };
