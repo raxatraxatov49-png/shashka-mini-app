@@ -1195,7 +1195,7 @@ function show(id) {
         tg.BackButton.show();
         tg.enableClosingConfirmation();
       } else {
-        id === 'shop' || id === 'refs' || id === 'rating' || id === 'players' || id === 'coins'
+        id === 'shop' || id === 'refs' || id === 'rating' || id === 'rank' || id === 'players' || id === 'coins'
           ? tg.BackButton.show()
           : tg.BackButton.hide();
         tg.disableClosingConfirmation();
@@ -1216,6 +1216,7 @@ if (tg) {
         $('shop').classList.contains('active') ||
         $('refs').classList.contains('active') ||
         $('rating').classList.contains('active') ||
+        $('rank').classList.contains('active') ||
         $('players').classList.contains('active')
       ) {
         show('menu');
@@ -1400,6 +1401,10 @@ function onMsg(m) {
 
     case 'rating':
       onRating(m);
+      break;
+
+    case 'rank':
+      onRank(m);
       break;
 
     case 'lang':
@@ -1674,6 +1679,7 @@ function startGame(m) {
     id: m.id,
     you: m.you,
     spectator: Boolean(m.spectator),
+    chatHidden: Boolean(m.chatHidden),
     players: m.players,
     board: m.board,
     turn: m.turn,
@@ -1718,6 +1724,8 @@ function startGame(m) {
   $('oppAva').classList.toggle('vipf', Boolean(opp.vip));
   $('myAva').classList.toggle('vipf', Boolean(me.vip));
 
+  showGameRanks(m, opp, me);
+
   /*
     Админ/VIP тақта мен тасын қарсыласына көрсетеді.
     Екеуінде де бар болса, әрқайсысы өзінікін көреді.
@@ -1746,6 +1754,7 @@ function startGame(m) {
   show('game');
 
   applySpectatorUi(Boolean(m.spectator));
+  updateChatLock();
 }
 
 let sqEls = [];
@@ -3818,7 +3827,8 @@ $('btnSnd').onclick = () => {
 /* ---------- АДМИН БЕЛГІСІ ---------- */
 
 function addVipTag(el, p) {
-  if (!p || !p.vip) return;
+  // Админ/owner болса VIP жазуы шықпайды (рамка мен эффект қалады)
+  if (!p || !p.vip || p.admin || p.owner) return;
 
   const tag = document.createElement('span');
 
@@ -3832,11 +3842,11 @@ function setGameName(el, p) {
   el.textContent = p.name;
   addVipTag(el, p);
 
-  if (p.admin) {
+  if (p.owner || p.admin) {
     const tag = document.createElement('span');
 
-    tag.className = 'admtag';
-    tag.textContent = tr('adminTag');
+    tag.className = p.owner ? 'owntag' : 'admtag';
+    tag.textContent = p.owner ? 'OWNER' : tr('adminTag');
 
     el.append(tag);
   }
@@ -3968,6 +3978,9 @@ $('vipDim').onclick = closeVip;
 // Көрермен режимінде VIP жоқ адамға чат батырмасы құлыптаулы көрінеді
 function updateChatLock() {
   $('btnChat').classList.toggle('locked', Boolean(S.specUi && !isVip()));
+  // Админ ойнап жатқан ойында көрерменге чат мүлде жасырылады
+  $('btnChat').style.display =
+    S.specUi && S.g && S.g.chatHidden ? 'none' : '';
 }
 
 $('btnVip').onclick = openVip;
@@ -4031,3 +4044,194 @@ setSearching(false);
 connect();
 
 })();
+
+
+/* ================= РАНГ ================= */
+
+const RK_NAMES = {
+  kk: ['Қола', 'Күміс', 'Алтын', 'Платина', 'Алмаз', 'Мастер', 'Грандмастер', 'Чемпион', 'Аңыз'],
+  ru: ['Бронза', 'Серебро', 'Золото', 'Платина', 'Алмаз', 'Мастер', 'Грандмастер', 'Чемпион', 'Легенда'],
+  uz: ['Bronza', 'Kumush', 'Oltin', 'Platina', 'Olmos', 'Master', 'Grandmaster', 'Chempion', 'Afsona']
+};
+const RK_T = {
+  kk: { title: 'Ранг', wins: 'жеңіс', next: 'Келесі ранг', max: 'Ең жоғары ранг!', top: 'Топ 100', empty: 'Әзірге ешкім жоқ', place: 'Сіздің орныңыз', note: 'Тек кездейсоқ ойындағы толық жеңістер есептеледі', season: 'Маусым аяқталуына', d: 'күн', h: 'сағ', reset: 'Ранг әр 30 күн сайын жаңарады. Маусым біткенде барлық ойыншының рангы және жеңісі нөлден, қоладан қайта басталады.' },
+  ru: { title: 'Ранг', wins: 'побед', next: 'Следующий ранг', max: 'Максимальный ранг!', top: 'Топ 100', empty: 'Пока никого нет', place: 'Ваше место', note: 'Считаются только полные победы в случайной игре', season: 'До конца сезона', d: 'дн', h: 'ч', reset: 'Ранг обновляется каждые 30 дней. По окончании сезона ранг и победы у всех игроков сбрасываются, все начинают заново с Бронзы.' },
+  uz: { title: 'Rang', wins: 'g‘alaba', next: 'Keyingi rang', max: 'Eng yuqori rang!', top: 'Top 100', empty: 'Hozircha hech kim yo‘q', place: 'Sizning o‘rningiz', note: 'Faqat tasodifiy o‘yindagi to‘liq g‘alabalar hisoblanadi', season: 'Mavsum tugashiga', d: 'kun', h: 'soat', reset: 'Rang har 30 kunda yangilanadi. Mavsum tugagach barcha o‘yinchilarning rangi va g‘alabalari nolga tushadi, hamma Bronzadan qayta boshlaydi.' }
+};
+const RK_COL = [
+  ['#f0a26a', '#8a4a1c'], ['#f4f8fc', '#8d9bb0'], ['#ffe27a', '#d49a12'],
+  ['#9af3ff', '#2aa6c9'], ['#a9d0ff', '#4a6cf0'], ['#e0adff', '#8a3ef0'],
+  ['#ff9a9a', '#d8243f'], ['#ffd36b', '#ff6a2a'], ['#fff6b0', '#ff9d00']
+];
+let rkUid = 0;
+const rkT = () => RK_T[LANG] || RK_T.kk;
+const rkName = (t) => (RK_NAMES[LANG] || RK_NAMES.kk)[t] || '';
+
+// Ранг логотипі: деңгей өскен сайын әшекей көбейіп, әдемілене береді
+function rkLogo(t, size) {
+  const id = 'rk' + (++rkUid);
+  const [c1, c2] = RK_COL[t] || RK_COL[0];
+  let x = '';
+
+  if (t >= 3) x += `<path d="M10 26C2 22 0 12 3 6c4 3 8 5 8 10zM54 26c8-4 10-14 7-20-4 3-8 5-8 10z" fill="url(#${id})" opacity=".85"/>`;
+  if (t >= 6) x += `<path d="M8 34C-2 30-2 16 2 9c2 6 6 9 9 11zM56 34c10-4 10-18 6-25-2 6-6 9-9 11z" fill="url(#${id})" opacity=".6"/>`;
+  x += `<path d="M32 6l20 8v16c0 14-9 24-20 29C21 54 12 44 12 30V14z" fill="url(#${id})" stroke="${c2}" stroke-width="2"/>`;
+  x += `<path d="M32 12l14 5.500V30c0 10-6 17-14 21-8-4-14-11-14-21V17.500z" fill="${c2}" opacity=".35"/>`;
+  if (t === 0) x += `<path d="M24 28l8-6 8 6v8l-8 6-8-6z" fill="#fff" opacity=".55"/>`;
+  if (t === 1) x += `<path d="M22 36l10-10 10 10" fill="none" stroke="#fff" stroke-width="3.500" stroke-linecap="round"/><path d="M22 28l10-10 10 10" fill="none" stroke="#fff" stroke-width="3.500" stroke-linecap="round"/>`;
+  if (t >= 2 && t <= 3) x += `<path d="M32 20l3.500 7.500 8 1-6 5.500 1.700 8L32 38l-7.200 3.900 1.700-8-6-5.500 8-1z" fill="#fff"/>`;
+  if (t === 4) x += `<path d="M32 18l10 9-10 18-10-18z" fill="#fff"/><path d="M22 27h20L32 45z" fill="${c1}" opacity=".7"/>`;
+  if (t >= 5) x += `<path d="M32 21l3.200 7 7.600.9-5.600 5.200 1.500 7.500L32 37.800 25.300 41.600l1.500-7.500-5.600-5.200 7.600-.9z" fill="#fff"/>`;
+  if (t >= 5) x += `<path d="M22 8l5 6 5-8 5 8 5-6-2 10H24z" fill="${c1}" stroke="${c2}" stroke-width="1.500" stroke-linejoin="round"/>`;
+  if (t >= 7) x += `<circle cx="32" cy="32" r="29" fill="none" stroke="${c1}" stroke-width="1.500" stroke-dasharray="3 5" opacity=".8"/>`;
+  if (t >= 8) x += `<path d="M52 4l1.500 4 4 1.500-4 1.500L52 15l-1.500-4-4-1.500 4-1.500zM9 46l1.200 3 3 1.200-3 1.200L9 54l-1.200-3-3-1.200 3-1.200z" fill="#fff"/>`;
+
+  const glow = t >= 4 ? `filter:drop-shadow(0 0 ${3 + t}px ${c1})` : '';
+
+  return `<svg viewBox="0 0 64 64" width="${size}" height="${size}" style="${glow}" aria-hidden="true"><defs><linearGradient id="${id}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${c1}"/><stop offset="1" stop-color="${c2}"/></linearGradient></defs>${x}</svg>`;
+}
+
+function rkChip(el, p, t) {
+  el.innerHTML = '';
+  const logo = document.createElement('span');
+  const txt = document.createElement('span');
+  const n = document.createElement('b');
+  const r = document.createElement('small');
+
+  logo.className = 'rklogo';
+  logo.innerHTML = rkLogo(t, 30);
+  txt.className = 'rktxt';
+  n.textContent = p.name || '';
+  r.textContent = rkName(t);
+  r.style.color = RK_COL[t][0];
+
+  txt.append(n, r);
+  el.append(logo, txt);
+}
+
+// Кездейсоқ ойында екі ойыншының рангы ойын экранының үстінде көрінеді
+function showGameRanks(m, opp, me) {
+  const row = $('rkrow');
+  const on = Boolean(m.random && !m.spectator);
+
+  row.classList.toggle('hidden', !on);
+
+  if (!on) return;
+
+  rkChip($('rkOpp'), opp, opp.rk || 0);
+  rkChip($('rkMe'), me, me.rk || 0);
+}
+
+function openRank() {
+  $('rkTitle').textContent = rkT().title;
+  $('rkTopT').textContent = rkT().top;
+  send({ t: 'rank_get' });
+  show('rank');
+}
+
+function onRank(m) {
+  const T = rkT();
+  const steps = m.steps || [];
+  const t = m.tier || 0;
+  const hero = $('rkHero');
+  const next = steps[t + 1];
+
+  hero.innerHTML = '';
+
+  const logo = document.createElement('div');
+  logo.className = 'rkbig';
+  logo.innerHTML = rkLogo(t, 120);
+
+  const nm = document.createElement('div');
+  nm.className = 'rkname';
+  nm.textContent = rkName(t);
+  nm.style.color = RK_COL[t][0];
+
+  const w = document.createElement('div');
+  w.className = 'rkwins';
+  w.textContent = m.wins + ' ' + T.wins + (m.pos ? '  ·  #' + m.pos : '');
+
+  const bar = document.createElement('div');
+  bar.className = 'rkbar';
+  const fill = document.createElement('i');
+  const pct = next ? Math.min(100, Math.round(((m.wins - steps[t]) / (next - steps[t])) * 100)) : 100;
+  fill.style.width = pct + '%';
+  bar.append(fill);
+
+  const nx = document.createElement('div');
+  nx.className = 'rknext';
+  nx.textContent = next
+    ? T.next + ': ' + rkName(t + 1) + ' (' + m.wins + '/' + next + ')'
+    : T.max;
+
+  const note = document.createElement('div');
+  note.className = 'rknote';
+  note.textContent = T.note;
+
+  const left = Math.max(0, m.seasonLeft || 0);
+  const dd = Math.floor(left / 86400000);
+  const hh = Math.floor((left % 86400000) / 3600000);
+  const se = document.createElement('div');
+  se.className = 'rkseason';
+  se.textContent = '⏳ ' + T.season + ': ' + dd + ' ' + T.d + ' ' + hh + ' ' + T.h;
+  const rs = document.createElement('div');
+  rs.className = 'rkreset';
+  rs.textContent = T.reset;
+
+  hero.append(logo, nm, w, bar, nx, se, rs, note);
+
+  // Барлық рангтар
+  const lad = $('rkLadder');
+  lad.innerHTML = '';
+
+  steps.forEach((need, i) => {
+    const c = document.createElement('div');
+    c.className = 'rkstep' + (i === t ? ' cur' : '') + (i > t ? ' lock' : '');
+    c.innerHTML = rkLogo(i, 40);
+    const s = document.createElement('small');
+    s.textContent = rkName(i);
+    c.append(s);
+    lad.append(c);
+  });
+
+  // Топ 100
+  const list = $('rkList');
+  list.innerHTML = '';
+
+  if (!m.list || !m.list.length) {
+    const e = document.createElement('div');
+    e.className = 'rkempty';
+    e.textContent = T.empty;
+    list.append(e);
+    return;
+  }
+
+  m.list.forEach((p) => {
+    const row = document.createElement('div');
+    const pos = document.createElement('span');
+    const ava = document.createElement('div');
+    const info = document.createElement('div');
+    const b = document.createElement('b');
+    const sm = document.createElement('small');
+    const lg = document.createElement('span');
+
+    row.className = 'rkitem' + (p.pos <= 3 ? ' p' + p.pos : '');
+    pos.className = 'rkpos';
+    pos.textContent = p.pos <= 3 ? RMEDAL[p.pos - 1] : String(p.pos);
+    ava.className = 'ava rkava';
+    setAva(ava, { name: p.name, avatar: p.avatar });
+    info.className = 'rkinfo';
+    b.textContent = p.name;
+    sm.textContent = rkName(p.tier) + ' · ' + p.wins + ' ' + T.wins;
+    sm.style.color = RK_COL[p.tier][0];
+    info.append(b, sm);
+    lg.className = 'rklg';
+    lg.innerHTML = rkLogo(p.tier, 34);
+
+    row.append(pos, ava, info, lg);
+    list.append(row);
+  });
+}
+
+$('btnRank').onclick = openRank;
+$('rankBtnTxt').textContent = rkT().title;
