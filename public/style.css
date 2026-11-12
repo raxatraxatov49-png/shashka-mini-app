@@ -1233,3 +1233,28 @@ body {
 #menu .titlerow .vipbtn {
   height: 44px;
 }
+
+/* === Ойын экраны: тақта төменгі профильге тимеуі үшін === */
+#game .boardwrap { min-height: 0; overflow: hidden; }
+#game .board {
+  box-sizing: border-box;
+  width: min(100cqw, 100cqh);
+  height: min(100cqw, 100cqh);
+  max-width: 100%;
+  max-height: 100%;
+}
+#game > .prow, #game > .dock { flex: none; }
+
+/* Ранг жолы ықшам болсын */
+#game .rkrow { gap: 6px; margin-bottom: 4px; }
+#game .rkchip { padding: 4px 8px; gap: 6px; border-radius: 14px; }
+#game .rkchip svg { width: 24px; height: 24px; }
+#game .rkchip b { font-size: 13px; }
+#game .rkchip small { font-size: 11px; }
+#game .gtitle { margin-bottom: 4px; font-size: 17px; }
+
+/* === Ойын экраны: барлығын жоғары көтеру (тақта кішіреймейді) === */
+#game {
+  padding-top: calc(var(--safe-t, 0px) + 6px) !important;
+}
+#game .rkrow { margin-top: 0; }
