@@ -5263,7 +5263,50 @@ async function createVipInvoice(u) {
   }
 }
 
+const PIECE_PAID_TEXT = {
+  kk: '✅ Төлем сәтті өтті!\n🎨 Жаңа тастар ашылды. Ойында қолданылып жатыр.',
+  uz: '✅ To‘lov muvaffaqiyatli o‘tdi!\n🎨 Yangi toshlar ochildi. O‘yinda ishlatilmoqda.',
+  ru: '✅ Оплата прошла успешно!\n🎨 Новые шашки открыты и уже используются в игре.'
+};
+
+// Тастар: Telegram Stars арқылы (койнға емес)
+async function createPieceInvoice(u, itemId) {
+  const stars = shop.starPrice('pieces', itemId);
+
+  if (!stars) return send(u, { t: 'pay_error' });
+
+  // VIP-ке немесе бұрын алғанға қайта төлемей-ақ ашық
+  if (shop.owns(u.id, 'pieces', itemId)) {
+    return send(u, shopMsg(u.id, { type: 'buy', ok: false, code: 'owned', id: itemId }));
+  }
+
+  try {
+    const r = await telegramApi('createInvoiceLink', {
+      title: 'Shashka: тастар',
+      description: 'Shashka: ойын тастарының жиынтығы',
+      payload: `piece:${u.id}:${itemId}`,
+      currency: 'XTR',
+      prices: [{ label: 'Shashka тастары', amount: stars }]
+    });
+
+    send(u, { t: 'invoice', url: r.result });
+  } catch (e) {
+    console.error('Тас invoice қатесі:', e.message);
+    send(u, { t: 'pay_error' });
+  }
+}
+
 function parseOrder(payload) {
+  const pc = /^piece:([^:]+):(p\d{1,3})$/.exec(payload || '');
+
+  if (pc) {
+    const stars = shop.starPrice('pieces', pc[2]);
+
+    return stars
+      ? { kind: 'piece', id: pc[1], item: pc[2], amount: stars }
+      : null;
+  }
+
   const v = /^vip:(.+)$/.exec(payload || '');
 
   if (v) {
@@ -5349,6 +5392,25 @@ function handleSuccessfulPayment(message) {
       parse_mode: 'HTML',
       text: fmtVip(left)
     }).catch((e) => console.error('VIP хабарлама қатесі:', e.message));
+
+    return;
+  }
+
+  if (o.kind === 'piece') {
+    const g = shop.grant(id, 'pieces', o.item);
+
+    if (!g || !g.ok) {
+      console.error('Тас берілмеді:', id, o.item);
+      return;
+    }
+
+    send(users.get(id), shopMsg(id, { type: 'buy', ok: true, id: o.item }));
+
+    telegramApi('sendMessage', {
+      chat_id: id,
+      parse_mode: 'HTML',
+      text: PIECE_PAID_TEXT[getLang(id)] || PIECE_PAID_TEXT.kk
+    }).catch((e) => console.error('Тас хабарлама қатесі:', e.message));
 
     return;
   }
@@ -5807,6 +5869,9 @@ function handle(u, m) {
 
     case 'vip_buy':
       return createVipInvoice(u);
+
+    case 'piece_buy':
+      return createPieceInvoice(u, String(m.id));
 
     case 'shop_use': {
       const r = shop.use(u.id, String(m.kind), String(m.id));
