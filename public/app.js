@@ -226,6 +226,16 @@ const I18N = {
     "item_p10": "Қар ұшқыны",
     "item_p11": "Жаңа жылдық шырша",
     "item_p12": "Жаңа жылдық сыйлық",
+    "item_p13": "Сакура гүлі",
+    "item_p14": "Көбелектер",
+    "item_p15": "Құлпынай мен балмұздақ",
+    "item_p16": "Бантик пен жүрек",
+    "item_p17": "Графит және күміс",
+    "item_p18": "Түнгі көк және болат",
+    "item_p19": "Қарағай және құм",
+    "item_p20": "Қара және қола",
+    "rarGirl": "Ерекше",
+    "rarBoy": "Қарапайым стиль",
     "watchBtn": "Ойынды қарау",
     "vipP6": "Таңдауыңыз қарсыласқа көрінеді",
     "vipD1": "Ойынды қарап отырғанда чатқа жазасыз. VIP емес көрермендер чатты аша алмайды.",
@@ -442,6 +452,16 @@ const I18N = {
     "item_p10": "Qor parchasi",
     "item_p11": "Yangi yil archasi",
     "item_p12": "Yangi yil sovg‘asi",
+    "item_p13": "Sakura guli",
+    "item_p14": "Kapalaklar",
+    "item_p15": "Qulupnay va muzqaymoq",
+    "item_p16": "Bantik va yurak",
+    "item_p17": "Grafit va kumush",
+    "item_p18": "Tungi ko‘k va po‘lat",
+    "item_p19": "Qarag‘ay va qum",
+    "item_p20": "Qora va bronza",
+    "rarGirl": "Maxsus",
+    "rarBoy": "Oddiy uslub",
     "watchBtn": "O‘yinni kuzatish",
     "vipP6": "Tanlovingiz raqibga ko‘rinadi",
     "vipD1": "O‘yinni kuzatayotganda chatga yozasiz. VIP bo‘lmagan kuzatuvchilar chatni och olmaydi.",
@@ -658,6 +678,16 @@ const I18N = {
     "item_p10": "Снежинка",
     "item_p11": "Новогодняя ёлка",
     "item_p12": "Новогодний подарок",
+    "item_p13": "Цветы сакуры",
+    "item_p14": "Бабочки",
+    "item_p15": "Клубника и мороженое",
+    "item_p16": "Бантик и сердечко",
+    "item_p17": "Графит и серебро",
+    "item_p18": "Ночной синий и сталь",
+    "item_p19": "Сосна и песок",
+    "item_p20": "Чёрный и бронза",
+    "rarGirl": "Особенные",
+    "rarBoy": "Строгий стиль",
     "watchBtn": "Смотреть игру",
     "vipP6": "Ваш выбор виден сопернику",
     "vipD1": "Вы пишете в чат при просмотре игры. Зрители без VIP не могут открыть чат.",
@@ -2779,6 +2809,27 @@ const PICS = {
   )
 };
 
+// Жылтыр тас: жарық шағылысы + көлем. fx='metal' болса металл жылтыры қосылады.
+const gloss = (a, b, fx) =>
+  'radial-gradient(ellipse 46% 26% at 36% 20%,rgba(255,255,255,.8),rgba(255,255,255,0) 70%),' +
+  (fx === 'metal'
+    ? 'conic-gradient(from 210deg,rgba(255,255,255,.2),rgba(255,255,255,0) 22%,rgba(255,255,255,.14) 48%,rgba(255,255,255,0) 72%,rgba(255,255,255,.2)),'
+    : '') +
+  `radial-gradient(circle at 34% 26%,${a},${b} 74%)`;
+
+// Жаңа тастар (Telegram Stars, 15 ⭐). w = ашық жақ, k = қою жақ.
+// Қыздарға: p13–p16 (cute), жігіттерге: p17–p20 (metal)
+const NEW_PIECES = {
+  p13: { fx: 'cute', w: ['#ffffff', '#f4cfe0'], k: ['#ffe6f0', '#ff8ab5'], em: ['🌸', '🌸'] },
+  p14: { fx: 'cute', w: ['#e0fff4', '#6fd3ad'], k: ['#efe0ff', '#a678e6'], em: ['🦋', '🦋'] },
+  p15: { fx: 'cute', w: ['#fffcf5', '#f6dcc2'], k: ['#ffc0c0', '#e8445e'], em: ['🍦', '🍓'] },
+  p16: { fx: 'cute', w: ['#fff0d9', '#ffae6e'], k: ['#ffd8ea', '#ff63ab'], em: ['💖', '🎀'] },
+  p17: { fx: 'metal', w: ['#f5f7fa', '#a9afb8'], k: ['#9094a0', '#33363c'], em: ['⚡', '⚡'] },
+  p18: { fx: 'metal', w: ['#d8e1ea', '#8896a8'], k: ['#5f80b8', '#1b2e5d'], em: ['🦅', '🦅'] },
+  p19: { fx: 'metal', w: ['#f1e5c4', '#b9a273'], k: ['#659672', '#21442f'], em: ['🌲', '🌲'] },
+  p20: { fx: 'metal', w: ['#e6b98e', '#8a5b34'], k: ['#505055', '#0d0d0f'], em: ['🦁', '🦁'] }
+};
+
 const SKINS = {
   boards: {
     b0: { a: '#d8cbb5', b: '#75583e' },
@@ -2804,19 +2855,6 @@ const SKINS = {
       w: 'radial-gradient(circle at 35% 30%,#ff9a9a,#c42b2b)',
       k: 'radial-gradient(circle at 35% 30%,#8fb7ff,#2b55c4)'
     },
-    p2: {
-      w: 'radial-gradient(circle at 35% 30%,#fff1a8,#d9a017)',
-      k: 'radial-gradient(circle at 35% 30%,#fff,#a9b0b8)'
-    },
-    p3: {
-      w: 'radial-gradient(circle at 35% 30%,#b4fff0,#00d1a0)',
-      k: 'radial-gradient(circle at 35% 30%,#ffb4f4,#d100b0)'
-    },
-    p4: {
-      w: 'radial-gradient(circle at 35% 30%,#fff,#7fd8ff 60%,#3a9bd6)',
-      k: 'radial-gradient(circle at 35% 30%,#fff,#d3a6ff 60%,#8c4fd6)',
-      img: PICS.snowman
-    },
     p5: {
       w: 'radial-gradient(circle at 35% 30%,#c8f08f,#5aa21e)',
       k: 'radial-gradient(circle at 35% 30%,#fff2a0,#e0a800)'
@@ -2824,39 +2862,26 @@ const SKINS = {
     p6: {
       w: 'radial-gradient(circle at 35% 30%,#ffc2dc,#e0508f)',
       k: 'radial-gradient(circle at 35% 30%,#bfe9ff,#3a9bd6)'
-    },
-    p7: {
-      w: 'radial-gradient(circle at 35% 30%,#ffd09a,#f07a10)',
-      k: 'radial-gradient(circle at 35% 30%,#d8b8ff,#7a3fd0)'
-    },
-    p8: {
-      w: 'radial-gradient(circle at 35% 30%,#9bffd0,#0b8a55)',
-      k: 'radial-gradient(circle at 35% 30%,#ffe08a,#d98a00)'
-    },
-    p9: {
-      w: 'radial-gradient(circle at 35% 30%,#fff,#a8e4ff 55%,#2f9bd6)',
-      k: 'radial-gradient(circle at 35% 30%,#fff2a0,#ff7a1a 55%,#c4220a)'
-    },
-    p10: {
-      w: 'radial-gradient(circle at 35% 30%,#fff1a8,#d9a017 60%,#8a6406)',
-      k: 'radial-gradient(circle at 35% 30%,#6a6a70,#1a1a1d 60%,#000)',
-      img: PICS.flake
-    },
-    p11: {
-      w: 'radial-gradient(circle at 35% 30%,#e8d0ff,#8a4fff 55%,#2a0f7a)',
-      k: 'radial-gradient(circle at 35% 30%,#b8f6ff,#19b8ff 55%,#0a3d8a)',
-      img: PICS.tree
-    },
-    p12: {
-      w: 'radial-gradient(circle at 35% 30%,#ffb3c0,#d4143a 60%,#7a0020)',
-      k: 'radial-gradient(circle at 35% 30%,#b3c9ff,#2457e0 60%,#0b1f7a)',
-      img: PICS.gift
     }
   }
 };
 
+for (const [id, c] of Object.entries(NEW_PIECES)) {
+  SKINS.pieces[id] = {
+    w: gloss(c.w[0], c.w[1], c.fx),
+    k: gloss(c.k[0], c.k[1], c.fx),
+    em: c.em,
+    fx: c.fx
+  };
+}
+
 (function buildSkinCss() {
-  let css = '';
+  // Тастың ортасындағы белгі (emoji). Дамка болғанда белгі жасырылып, тәж көтеріліп шығады.
+  let css =
+    '.pc{container-type:size}' +
+    '.pc>i::after{position:absolute;inset:0;display:grid;place-items:center;line-height:1;' +
+    'font-size:4vw;font-size:34cqw;z-index:1;pointer-events:none;' +
+    'filter:drop-shadow(0 1px 1px rgba(0,0,0,.4))}';
 
   for (const [id, c] of Object.entries(SKINS.boards)) {
     if (id === 'b0') continue;
@@ -2875,6 +2900,25 @@ const SKINS = {
     css +=
       `#field[data-pieces="${id}"] .pc.w>i{background:${w}}` +
       `#field[data-pieces="${id}"] .pc.b>i{background:${k}}`;
+
+    if (c.em) {
+      const sel = `#field[data-pieces="${id}"] .pc`;
+
+      css +=
+        `${sel}.w>i::after{content:"${c.em[0]}"}` +
+        `${sel}.b>i::after{content:"${c.em[1]}"}` +
+        // дамка: белгі жасырылады, тас көтеріледі, тәж ортасынан шығып тұрады
+        `${sel}.king>i::after{display:none}` +
+        `${sel}.king>i{box-shadow:0 7px 0 rgba(0,0,0,.28),0 10px 10px rgba(0,0,0,.35)}` +
+        `${sel}.king>i svg{width:70%;height:70%;transform:translateY(-14%);fill:#f5b82e;` +
+        `stroke:#8a5408;stroke-width:1.2;filter:drop-shadow(0 3px 2px rgba(0,0,0,.5))}`;
+
+      if (c.fx === 'cute') {
+        css += `${sel}>i::before{box-shadow:none;border:2px dashed rgba(255,255,255,.85)}`;
+      } else {
+        css += `${sel}>i::after{filter:saturate(.55) drop-shadow(0 1px 1px rgba(0,0,0,.5))}`;
+      }
+    }
 
     // дамада тәж сурет үстінде тұрмауы үшін сурет кішірейіп төмен түседі
     if (c.img) {
@@ -2956,8 +3000,8 @@ function thumb(kind, id) {
 
   return (
     '<div class="tp">' +
-    `<b style="background:${bw}"></b>` +
-    `<b style="background:${bk}"></b>` +
+    `<b style="background:${bw}"${c.em ? ` data-em="${c.em[0]}"` : ''}></b>` +
+    `<b style="background:${bk}"${c.em ? ` data-em="${c.em[1]}"` : ''}></b>` +
     '</div>'
   );
 }
@@ -2971,9 +3015,14 @@ function renderShop() {
   $('tabBoards').classList.toggle('on', kind === 'boards');
   $('tabPieces').classList.toggle('on', kind === 'pieces');
 
-  const html = Object.entries(m.prices[kind]).map(([id, price]) => {
+  const starMap = (m.stars && m.stars[kind]) || {};
+  const html = [];
+
+  Object.entries(m.prices[kind]).forEach(([id, price]) => {
+    const star = starMap[id];
     const own = m.own[kind].includes(id);
     const used = m.use[kind] === id;
+    const fx = kind === 'pieces' && SKINS.pieces[id] && SKINS.pieces[id].fx;
 
     let btn;
 
@@ -2981,17 +3030,23 @@ function renderShop() {
       btn = `<button class="sbuy on" type="button" disabled>${tr('inUse')}</button>`;
     } else if (own) {
       btn = `<button class="sbuy use" type="button" data-act="use" data-kind="${kind}" data-id="${id}">${tr('choose')}</button>`;
+    } else if (star) {
+      btn = `<button class="sbuy star" type="button" data-act="starbuy" data-kind="${kind}" data-id="${id}">⭐ ${star}</button>`;
     } else {
       btn =
         `<button class="sbuy${m.coins < price ? ' no' : ''}" type="button" data-act="buy" data-kind="${kind}" data-id="${id}">` +
         `<i class="coin"></i>${fmt(price)}</button>`;
     }
 
-    return (
+    const rar = fx
+      ? `<div class="rar ${fx === 'cute' ? 'rg' : 'rb'}">${tr(fx === 'cute' ? 'rarGirl' : 'rarBoy')}</div>`
+      : `<div class="rar r${rarity(price)}">${tr('rar' + rarity(price))}</div>`;
+
+    html.push(
       `<div class="sitem${used ? ' sel' : ''}">` +
       `<div class="spv">${thumb(kind, id)}</div>` +
       `<h3>${tr('item_' + id)}</h3>` +
-      `<div class="rar r${rarity(price)}">${tr('rar' + rarity(price))}</div>` +
+      rar +
       btn +
       '</div>'
     );
@@ -3183,6 +3238,13 @@ $('shopGrid').addEventListener('click', (e) => {
   if (!b || !S.shop) return;
 
   const { act, kind, id } = b.dataset;
+
+  if (act === 'starbuy') {
+    // Telegram Stars төлемі: сервер invoice жібереді, openInvoice ашады
+    send({ t: 'piece_buy', id });
+    haptic('light');
+    return;
+  }
 
   if (act === 'buy') {
     if (S.shop.coins < S.shop.prices[kind][id]) {
