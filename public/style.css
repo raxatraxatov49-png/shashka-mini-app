@@ -1222,3 +1222,14 @@ body {
 .rkrow { flex: none; }
 .rkchip { border: 1px solid rgba(245, 184, 0, .35); }
 .titlerow .rankbtn { margin-left: 0; }
+
+/* === Меню: Ранг және VIP батырмаларының айналасына бос орын === */
+#menu .titlerow {
+  margin: 18px 0 20px !important;
+  padding: 0 2px;
+  gap: 12px;
+}
+#menu .titlerow .rankbtn,
+#menu .titlerow .vipbtn {
+  height: 44px;
+}
