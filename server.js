@@ -1674,6 +1674,7 @@ function removeInvite(code) {
   if (!invite) return;
 
   clearTimeout(invite.timer);
+  clearTimeout(invite.offlineTimer);
   invites.delete(code);
 
   if (userInvites.get(invite.ownerId) === code) {
@@ -5134,12 +5135,22 @@ function joinInvite(u, code) {
 
   const owner = users.get(invite.ownerId);
 
-  if (!owner || !owner.ws || owner.ws.readyState !== 1) {
+  if (!owner) {
     removeInvite(code);
 
     return send(u, {
       t: 'error',
       code: 'invite_expired'
+    });
+  }
+
+  if (!owner.ws || owner.ws.readyState !== 1) {
+    // Иесі қысқа уақытқа үзілген (мысалы, сілтемені Telegram арқылы жіберіп жатыр).
+    // Сілтемені жоймаймыз: иесі қайта қосылғанда ойын өзі басталады.
+    invite.pending = u.id;
+
+    return send(u, {
+      t: 'invite_waiting'
     });
   }
 
@@ -5550,7 +5561,10 @@ function sendPInvite(u, toId) {
     if (inv.from === u.id) endPInvite(k, 'cancelled', 'to');
   }
 
-  dequeue(u.id);
+  if (queue.includes(u.id)) {
+    dequeue(u.id);
+    send(u, { t: 'idle' });
+  }
 
   const inv = { from: u.id, to: toId, timer: null };
 
@@ -5641,6 +5655,9 @@ function answerPInvite(u, fromId, accept) {
 
 function handle(u, m) {
   switch (m.t) {
+    case 'ping':
+      return send(u, { t: 'pong' });
+
     case 'group_join':
       return joinGroupGame(
         u,
@@ -6101,6 +6118,30 @@ function onAuth(ws, m) {
 
   send(u, shopMsg(u.id));
 
+  {
+    const icode = userInvites.get(u.id);
+    const inv = icode && invites.get(icode);
+
+    if (inv) {
+      clearTimeout(inv.offlineTimer);
+
+      const joiner = inv.pending ? users.get(inv.pending) : null;
+      inv.pending = null;
+
+      if (
+        joiner &&
+        joiner.id !== u.id &&
+        isOnline(joiner) &&
+        !isBusy(joiner) &&
+        !isBusy(u)
+      ) {
+        removeInvite(icode);
+        send(u, { t: 'invite_joined' });
+        startGame(u, joiner);
+      }
+    }
+  }
+
   const g = u.game && games.get(u.game);
 
   if (g) {
@@ -6244,8 +6285,26 @@ wss.on('connection', ws => {
     unwatch(u);
 
     dequeue(u.id);
-    removeUserInvite(u.id);
     clearPInvitesOf(u.id);
+
+    {
+      const icode = userInvites.get(u.id);
+      const inv = icode && invites.get(icode);
+
+      if (inv) {
+        clearTimeout(inv.offlineTimer);
+
+        inv.offlineTimer = setTimeout(() => {
+          const o = users.get(u.id);
+
+          if (!o || !o.ws || o.ws.readyState !== 1) {
+            removeInvite(icode);
+          }
+        }, 90 * 1000);
+
+        if (inv.offlineTimer.unref) inv.offlineTimer.unref();
+      }
+    }
 
     touchProfile(u.id, { seen: Date.now() });
 
