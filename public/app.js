@@ -234,33 +234,6 @@ const I18N = {
     "vipD6": "Ойын басталғанда сіз таңдаған тақта мен тас қарсыласыңызға көрінеді. Екеуі де VIP болса, әрқайсысы өзінікін көреді.",
     "vipD4": "Атыңыздың жанында алтын VIP жазуы, аватарда тәж бен жарқыл. Ойында қарсыласыңыз да көреді.",
     "vipD5": "Мерзім біткенде қайта сатып алуға болады. Қалған күндер жаңасына қосылады.",
-    "trustTitle": "Доверия",
-    "trustLead": "Доверия: ойынды соңына дейін ойнайтыныңыздың көрсеткіші. Барлығында 100%-дан басталады.",
-    "trustGood": "Жақсы. Сізге сенеді.",
-    "trustBad": "Доверия төмен. Ойындарды соңына дейін ойнап көтеріңіз.",
-    "trustLockNow": "Іздеу жабық: {n} мин қалды.",
-    "trustLockMsg": "Доверия төмен болғандықтан, кездейсоқ қарсылас іздеу {n} минуттан кейін ашылады.",
-    "trustDrop": "Доверия −{n}%",
-    "secDrop": "ҚАШАН КЕМИДІ",
-    "secRaise": "ҚАЛАЙ КӨТЕРУГЕ БОЛАДЫ",
-    "secLow": "90%-ДАН ТӨМЕН БОЛСА",
-    "trDrop1": "Берілу немесе шығу",
-    "trDropD1": "Кездейсоқ ойыннан берілсеңіз не шығып кетсеңіз.",
-    "trDrop2": "Ботқа оралмау",
-    "trDropD2": "Ойыннан шығып, 30 секундта қайта кірмесеңіз.",
-    "trDrop3": "Тасты жүрмей қалу",
-    "trDropD3": "Уақытында жүріс жасамай, ойын уақыт бойынша біткенде.",
-    "trUp1": "Ойынды соңына дейін ойнау",
-    "trUpD1": "Кездейсоқ ойынды толық ойнасаңыз: жеңсеңіз де, жеңілсеңіз де.",
-    "trUp2": "Күн сайын кіру",
-    "trUpD2": "Күніне бір рет ботқа кірсеңіз.",
-    "trUp3": "100% қылу",
-    "trUpD3": "Төмендегі батырмамен Stars төлеп, доверияны бірден 100% қылуға болады.",
-    "trLow": "Іздеу жабылады",
-    "trLowD": "Кездейсоқ қарсылас іздеу 30 минутқа жабылады. Достармен ойнауға болады.",
-    "trBuy": "★ {n} Stars · 100% қылу",
-    "trFull": "Доверия 100%",
-    "trPaid": "Доверия 100% болды!",
     "vipBtn": "VIP сатып алу",
     "vipOn": "VIP белсенді",
     "vipTitle": "Shashka VIP",
@@ -477,33 +450,6 @@ const I18N = {
     "vipD6": "O‘yin boshlanganda siz tanlagan taxta va tosh raqibingizga ko‘rinadi. Ikkalangiz ham VIP bo‘lsangiz, har biringiz o‘zingiznikini ko‘rasiz.",
     "vipD4": "Ismingiz yonida oltin VIP yozuvi, avatarda toj va yaltirash. O‘yinda raqibingiz ham ko‘radi.",
     "vipD5": "Muddat tugagach, qayta sotib olish mumkin. Qolgan kunlar yangisiga qo‘shiladi.",
-    "trustTitle": "Ishonch",
-    "trustLead": "Ishonch: o‘yinni oxirigacha o‘ynash ko‘rsatkichi. Hammada 100% dan boshlanadi.",
-    "trustGood": "Yaxshi. Sizga ishonishadi.",
-    "trustBad": "Ishonch past. O‘yinlarni oxirigacha o‘ynab ko‘taring.",
-    "trustLockNow": "Qidiruv yopiq: {n} daq qoldi.",
-    "trustLockMsg": "Ishonch past bo‘lgani uchun tasodifiy raqib qidirish {n} daqiqadan keyin ochiladi.",
-    "trustDrop": "Ishonch −{n}%",
-    "secDrop": "QACHON KAMAYADI",
-    "secRaise": "QANDAY OSHIRISH MUMKIN",
-    "secLow": "90% DAN PAST BO‘LSA",
-    "trDrop1": "Taslim bo‘lish yoki chiqish",
-    "trDropD1": "Tasodifiy o‘yindan taslim bo‘lsangiz yoki chiqib ketsangiz.",
-    "trDrop2": "Botga qaytmaslik",
-    "trDropD2": "O‘yindan chiqib, 30 soniyada qayta kirmasangiz.",
-    "trDrop3": "Yurmay qolish",
-    "trDropD3": "Vaqtida yurmasdan, o‘yin vaqt bo‘yicha tugasa.",
-    "trUp1": "O‘yinni oxirigacha o‘ynash",
-    "trUpD1": "Tasodifiy o‘yinni to‘liq o‘ynasangiz: yutsangiz ham, yutqazsangiz ham.",
-    "trUp2": "Har kuni kirish",
-    "trUpD2": "Kuniga bir marta botga kirsangiz.",
-    "trUp3": "100% qilish",
-    "trUpD3": "Pastdagi tugma bilan Stars to‘lab, ishonchni darrov 100% qilish mumkin.",
-    "trLow": "Qidiruv yopiladi",
-    "trLowD": "Tasodifiy raqib qidirish 30 daqiqaga yopiladi. Do‘stlar bilan o‘ynash mumkin.",
-    "trBuy": "★ {n} Stars · 100% qilish",
-    "trFull": "Ishonch 100%",
-    "trPaid": "Ishonch 100% bo‘ldi!",
     "vipBtn": "VIP sotib olish",
     "vipOn": "VIP faol",
     "vipTitle": "Shashka VIP",
@@ -720,33 +666,6 @@ const I18N = {
     "vipD6": "В игре выбранные вами доска и шашки видны сопернику. Если оба с VIP, каждый видит свои.",
     "vipD4": "Золотая надпись VIP рядом с именем, корона и сияние на аватаре. Соперник тоже это видит.",
     "vipD5": "После окончания срока можно купить снова. Оставшиеся дни прибавятся к новому.",
-    "trustTitle": "Доверие",
-    "trustLead": "Доверие: показатель того, что вы доигрываете игры до конца. У всех начинается со 100%.",
-    "trustGood": "Хорошо. Вам доверяют.",
-    "trustBad": "Доверие низкое. Доигрывайте игры до конца, чтобы поднять его.",
-    "trustLockNow": "Поиск закрыт: осталось {n} мин.",
-    "trustLockMsg": "Из-за низкого доверия поиск случайного соперника откроется через {n} мин.",
-    "trustDrop": "Доверие −{n}%",
-    "secDrop": "КОГДА СНИЖАЕТСЯ",
-    "secRaise": "КАК ПОДНЯТЬ",
-    "secLow": "ЕСЛИ НИЖЕ 90%",
-    "trDrop1": "Сдаться или выйти",
-    "trDropD1": "Если сдались или вышли из игры со случайным соперником.",
-    "trDrop2": "Не вернуться в бот",
-    "trDropD2": "Если вышли из игры и не вернулись за 30 секунд.",
-    "trDrop3": "Не ходить",
-    "trDropD3": "Если не сделали ход вовремя и игра закончилась по времени.",
-    "trUp1": "Доиграть до конца",
-    "trUpD1": "Если полностью доиграли случайную игру: победа или поражение.",
-    "trUp2": "Заходить каждый день",
-    "trUpD2": "Если заходите в бот раз в день.",
-    "trUp3": "Сделать 100%",
-    "trUpD3": "Кнопкой ниже можно за Stars сразу вернуть доверие до 100%.",
-    "trLow": "Поиск закрывается",
-    "trLowD": "Поиск случайного соперника закрывается на 30 минут. С друзьями играть можно.",
-    "trBuy": "★ {n} Stars · сделать 100%",
-    "trFull": "Доверие 100%",
-    "trPaid": "Доверие 100%!",
     "vipBtn": "Купить VIP",
     "vipOn": "VIP активен",
     "vipTitle": "Shashka VIP",
@@ -821,7 +740,7 @@ function setLang(l) {
 
   applyStatic();
   setSearching(S.searching);
-  if (S.shop) { renderShop(); renderRefs(); renderVip(); renderDnd(); renderTrust(); }
+  if (S.shop) { renderShop(); renderRefs(); renderVip(); renderDnd(); }
   if (S.rating) renderRating();
   if (S.players) { renderPlayers(); updatePlayersTile(); }
   if (S.shop) renderPacks();
@@ -1589,11 +1508,6 @@ function onMsg(m) {
         S.sentTo = null;
         ptoast(tr('pBusy'));
         send({ t: 'players_get' });
-      } else if (m.code === 'trust_full') {
-        toast(tr('trFull'));
-      } else if (m.code === 'trust_lock') {
-        setSearching(false);
-        toast(tr('trustLockMsg', { n: Math.max(1, Math.ceil((m.left || 60) / 60)) }));
       } else if (m.code === 'pinvite_dnd') {
         S.sentTo = null;
 
@@ -3057,7 +2971,6 @@ function onShop(m) {
   renderRefs();
   renderVip();
   renderDnd();
-  renderTrust();
 
   const ev = m.ev;
   if (!ev) return;
@@ -3073,15 +2986,6 @@ function onShop(m) {
     if (ev.ok) {
       toast(`${tr('selected')}: ${tr('item_' + ev.id)}`);
       haptic('light');
-    }
-  } else if (ev.type === 'trust_ok') {
-    toast(tr('trPaid'));
-    haptic('heavy');
-    closeTrust();
-  } else if (ev.type === 'trust') {
-    if (ev.d < 0) {
-      toast(tr('trustDrop', { n: Math.abs(ev.d) }));
-      haptic('heavy');
     }
   } else if (ev.type === 'dnd') {
     toast(tr(ev.on ? 'dndOn' : 'dndOff'));
@@ -4086,55 +3990,6 @@ $('btnDnd').onclick = () => {
   haptic('light');
   send({ t: 'dnd_set', on: !(S.shop && S.shop.dnd) });
 };
-
-/* ---------- Доверия ---------- */
-
-function renderTrust() {
-  const m = S.shop;
-  const v = m && typeof m.trust === 'number' ? m.trust : 100;
-  const col = v >= 90 ? '#34c759' : v >= 70 ? '#f4c542' : '#ff6b6b';
-
-  $('trustPct').textContent = v + '%';
-  $('trustBig').textContent = v + '%';
-
-  const ring = $('trustRing');
-
-  ring.style.setProperty('--tp', v);
-  ring.style.setProperty('--tc', col);
-
-  const lockMin = m && m.trustLock ? Math.ceil(m.trustLock / 60) : 0;
-
-  const n = (m && m.trustStars) || 10;
-
-  $('trStarBadge').textContent = '★ ' + n;
-  $('btnTrustBuy').disabled = v >= 100;
-  $('btnTrustBuy').textContent = v >= 100 ? tr('trFull') : tr('trBuy', { n });
-
-  $('trustState').textContent = lockMin > 0
-    ? tr('trustLockNow', { n: lockMin })
-    : tr(v >= 90 ? 'trustGood' : 'trustBad');
-}
-
-function openTrust() {
-  send({ t: 'shop_get' });
-  renderTrust();
-
-  $('trustDim').classList.add('show');
-  $('trustSheet').classList.add('show');
-}
-
-function closeTrust() {
-  $('trustDim').classList.remove('show');
-  $('trustSheet').classList.remove('show');
-}
-
-$('btnTrust').onclick = openTrust;
-$('btnTrustBuy').onclick = () => {
-  haptic('light');
-  send({ t: 'trust_buy' });
-};
-$('trustClose').onclick = closeTrust;
-$('trustDim').onclick = closeTrust;
 
 function coolSecs(p) {
   return p.coolUntil
