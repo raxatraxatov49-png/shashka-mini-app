@@ -1,109 +1,87 @@
-/* ============ ҚЫСҚЫ ТАҚЫРЫП — тек басты мәзір (#menu) ============
-   Басқа беттерге (#shop, #game, #rating ...) әсер етпейді.
-   Өшіру үшін index.html ішіндегі winter.css жолын алып тастаңыз. */
-
-/* Фон */
+/* ===== ҚЫСҚЫ ТҮН — тек басты мәзір (#menu) ===== */
 #menu {
+  position: relative;
+  overflow: hidden;
   background:
-    radial-gradient(120% 40% at 50% -5%, rgba(143, 211, 255, .28), transparent 70%),
-    linear-gradient(180deg, #081428 0%, #0f2547 55%, #1b3a68 100%);
+    radial-gradient(90% 30% at 50% -4%, rgba(110, 170, 255, .14), transparent 70%),
+    linear-gradient(180deg, #02060d 0%, #050f20 45%, #0a1a36 100%);
 }
 
-/* Жауып тұрған қар: екі қабат (жақын үлкен + алыс кішкентай) */
+/* Қар: екі қабат, баяу және жұмсақ */
 #menu::before,
 #menu::after {
   content: "";
   position: absolute;
-  inset: 0;
+  inset: 0 -24px;
   pointer-events: none;
   z-index: 5;
 }
-
-#menu::before {
+#menu::before { /* жақын, сәл үлкен */
   background-image:
-    radial-gradient(3px 3px at 20px 30px, #fff, rgba(255, 255, 255, 0)),
-    radial-gradient(2.5px 2.5px at 90px 150px, #fff, rgba(255, 255, 255, 0)),
-    radial-gradient(3px 3px at 170px 70px, #fff, rgba(255, 255, 255, 0)),
-    radial-gradient(2px 2px at 220px 200px, #fff, rgba(255, 255, 255, 0)),
-    radial-gradient(3.5px 3.5px at 130px 240px, #fff, rgba(255, 255, 255, 0)),
-    radial-gradient(2px 2px at 50px 110px, #fff, rgba(255, 255, 255, 0));
+    radial-gradient(4px 4px at 20px 30px,  rgba(255,255,255,.9), transparent),
+    radial-gradient(3px 3px at 90px 150px, rgba(255,255,255,.7),  transparent),
+    radial-gradient(4.4px 4.4px at 170px 70px, rgba(255,255,255,.9), transparent),
+    radial-gradient(2.6px 2.6px at 220px 200px,rgba(255,255,255,.65), transparent),
+    radial-gradient(4px 4px at 130px 240px,rgba(255,255,255,.9), transparent),
+    radial-gradient(2.6px 2.6px at 50px 110px, rgba(255,255,255,.65), transparent);
   background-size: 260px 260px;
-  animation: snowA 8s linear infinite;
+  animation: snowA 4.5s linear infinite, sway 3s ease-in-out infinite alternate;
 }
-
-#menu::after {
+#menu::after { /* алыс, ұсақ, одан да баяу */
   background-image:
-    radial-gradient(2px 2px at 30px 20px, rgba(255, 255, 255, .8), rgba(255, 255, 255, 0)),
-    radial-gradient(1.5px 1.5px at 110px 60px, rgba(255, 255, 255, .8), rgba(255, 255, 255, 0)),
-    radial-gradient(2px 2px at 70px 130px, rgba(255, 255, 255, .8), rgba(255, 255, 255, 0)),
-    radial-gradient(1.5px 1.5px at 150px 160px, rgba(255, 255, 255, .8), rgba(255, 255, 255, 0)),
-    radial-gradient(2px 2px at 10px 100px, rgba(255, 255, 255, .8), rgba(255, 255, 255, 0));
+    radial-gradient(2px 2px at 30px 20px,  rgba(255,255,255,.8), transparent),
+    radial-gradient(2px 2px at 110px 60px, rgba(255,255,255,.8), transparent),
+    radial-gradient(2px 2px at 70px 130px, rgba(255,255,255,.8), transparent),
+    radial-gradient(2px 2px at 150px 160px,rgba(255,255,255,.8), transparent),
+    radial-gradient(2px 2px at 10px 100px, rgba(255,255,255,.8), transparent);
   background-size: 180px 180px;
-  animation: snowB 14s linear infinite;
+  animation: snowB 8s linear infinite, sway 4.5s ease-in-out infinite alternate-reverse;
 }
-
-@keyframes snowA { from { background-position: 0 0; } to { background-position: 0 260px; } }
-@keyframes snowB { from { background-position: 0 0; } to { background-position: -180px 180px; } }
+@keyframes snowA { to { background-position: 0 260px; } }
+@keyframes snowB { to { background-position: 0 180px; } }
+@keyframes sway  { from { transform: translateX(-18px); } to { transform: translateX(18px); } }
 
 @media (prefers-reduced-motion: reduce) {
   #menu::before, #menu::after { animation: none !important; }
 }
 
-/* Тақырып */
-#menu h1 { color: #fff; text-shadow: 0 2px 14px rgba(143, 211, 255, .35); }
+#menu h1 { color: #fff; text-shadow: 0 2px 14px rgba(120, 170, 255, .25); }
 
-/* Карточкалар: мұзды әйнек + үстінде қар */
+/* Карточкалар: қараңғы мұзды әйнек */
 #menu .card.brown {
-  background: linear-gradient(160deg, rgba(255, 255, 255, .13), rgba(255, 255, 255, .05)) !important;
-  border: 1px solid rgba(190, 225, 255, .22);
-  box-shadow: 0 18px 40px rgba(0, 0, 0, .35), inset 0 1px 0 rgba(255, 255, 255, .12);
+  background: linear-gradient(160deg, rgba(150,190,255,.09), rgba(150,190,255,.03)) !important;
+  border: 1px solid rgba(150, 190, 255, .16);
+  box-shadow: 0 16px 36px rgba(0,0,0,.5), inset 0 1px 0 rgba(255,255,255,.08);
 }
-
 #menu .card::before {
   content: "";
-  position: absolute;
-  top: 0;
-  left: 26px;
-  right: 26px;
-  height: 7px;
+  position: absolute; top: 0; left: 26px; right: 26px; height: 6px;
   border-radius: 0 0 10px 10px;
-  background: linear-gradient(#fff, #d9efff);
-  z-index: 2;
-  pointer-events: none;
+  background: linear-gradient(#f2f8ff, #c9e2fa);
+  opacity: .9;
+  z-index: 2; pointer-events: none;
 }
 
-/* Төменгі плиткалар (Магазин, Достар, Рейтинг, Ойыншылар) */
 #menu .tile {
   position: relative;
-  background: rgba(255, 255, 255, .08) !important;
-  border: 1px solid rgba(190, 225, 255, .2) !important;
+  background: rgba(150,190,255,.06) !important;
+  border: 1px solid rgba(150,190,255,.14) !important;
 }
-
 #menu .tile::before {
   content: "";
-  position: absolute;
-  top: 0;
-  left: 18px;
-  right: 18px;
-  height: 5px;
+  position: absolute; top: 0; left: 18px; right: 18px; height: 5px;
   border-radius: 0 0 8px 8px;
-  background: #e8f5ff;
+  background: #dcecfa; opacity: .85;
   pointer-events: none;
 }
 
-/* Профиль аватарындағы жаңа жылдық колпак */
+/* Аватардағы жаңа жылдық колпак */
 #menu .who .ava { overflow: visible; }
 #menu .who .ava img { border-radius: 50%; }
-
 #menu .who .ava::before {
   content: "";
-  position: absolute;
-  top: -22px;
-  left: -8px;
-  width: 58px;
-  height: 44px;
+  position: absolute; top: -22px; left: -8px; width: 58px; height: 44px;
   transform: rotate(-8deg);
-  pointer-events: none;
-  z-index: 2;
+  pointer-events: none; z-index: 2;
   background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 60 46'%3E%3Cpath d='M9 36C10 17 26 5 44 11C41 20 47 29 54 35Z' fill='%23e5383b'/%3E%3Crect x='5' y='31' width='50' height='11' rx='5.5' fill='%23fff'/%3E%3Ccircle cx='46' cy='10' r='6.5' fill='%23fff'/%3E%3C/svg%3E") center / contain no-repeat;
 }
