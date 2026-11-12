@@ -145,6 +145,13 @@ const I18N = {
     "playersTile": "Ойыншылар",
     "playersTileSub": "Бот ойыншылары",
     "playersOnlineN": "● {n} онлайн",
+    "dndHint": "Ай белгісі: «Мазаламаңыз» режимі. Қосылғанда сізді ешкім шақыра алмайды.",
+    "dndNote": "Мазаламаңыз қосулы. Сіз онлайн көрінесіз, бірақ ешкім сізді шақыра алмайды. Сіз басқаларды шақыра аласыз.",
+    "dndLbl": "Мазаламаңыз режимі",
+    "dndOn": "Мазаламаңыз қосылды",
+    "dndOff": "Мазаламаңыз өшірілді",
+    "pDnd": "{name}: «Мазаламаңыз» режимі қосулы. Кейінірек көріңіз.",
+    "pCool": "{name} шақыруды 2 рет қабылдамады. Келесі шақыруды 2 минуттан кейін жасай аласыз.",
     "playersTitle": "Ойыншылар",
     "playersOnline": "Онлайн",
     "playersOffline": "Офлайн",
@@ -220,6 +227,13 @@ const I18N = {
     "item_p11": "Жаңа жылдық шырша",
     "item_p12": "Жаңа жылдық сыйлық",
     "watchBtn": "Ойынды қарау",
+    "vipP6": "Таңдауыңыз қарсыласқа көрінеді",
+    "vipD1": "Ойынды қарап отырғанда чатқа жазасыз. VIP емес көрермендер чатты аша алмайды.",
+    "vipD2": "Дүкендегі барлық тақта VIP мерзіміне ашық болады.",
+    "vipD3": "Дүкендегі барлық тас VIP мерзіміне ашық болады.",
+    "vipD6": "Ойын басталғанда сіз таңдаған тақта мен тас қарсыласыңызға көрінеді. Екеуі де VIP болса, әрқайсысы өзінікін көреді.",
+    "vipD4": "Атыңыздың жанында алтын VIP жазуы, аватарда тәж бен жарқыл. Ойында қарсыласыңыз да көреді.",
+    "vipD5": "Мерзім біткенде қайта сатып алуға болады. Қалған күндер жаңасына қосылады.",
     "vipBtn": "VIP сатып алу",
     "vipOn": "VIP белсенді",
     "vipTitle": "Shashka VIP",
@@ -347,6 +361,13 @@ const I18N = {
     "playersTile": "O‘yinchilar",
     "playersTileSub": "Bot o‘yinchilari",
     "playersOnlineN": "● {n} onlayn",
+    "dndHint": "Oy belgisi: «Bezovta qilmang» rejimi. Yoqilganda sizni hech kim taklif qila olmaydi.",
+    "dndNote": "«Bezovta qilmang» yoqilgan. Siz onlayn ko‘rinasiz, lekin sizni hech kim taklif qila olmaydi. Siz boshqalarni taklif qila olasiz.",
+    "dndLbl": "Bezovta qilmang rejimi",
+    "dndOn": "«Bezovta qilmang» yoqildi",
+    "dndOff": "«Bezovta qilmang» o‘chirildi",
+    "pDnd": "{name}: «Bezovta qilmang» rejimi yoqilgan. Keyinroq urinib ko‘ring.",
+    "pCool": "{name} taklifni 2 marta rad etdi. Keyingi taklifni 2 daqiqadan keyin yuborishingiz mumkin.",
     "playersTitle": "O‘yinchilar",
     "playersOnline": "Onlayn",
     "playersOffline": "Oflayn",
@@ -422,6 +443,13 @@ const I18N = {
     "item_p11": "Yangi yil archasi",
     "item_p12": "Yangi yil sovg‘asi",
     "watchBtn": "O‘yinni kuzatish",
+    "vipP6": "Tanlovingiz raqibga ko‘rinadi",
+    "vipD1": "O‘yinni kuzatayotganda chatga yozasiz. VIP bo‘lmagan kuzatuvchilar chatni och olmaydi.",
+    "vipD2": "Do‘kondagi barcha taxtalar VIP muddatiga ochiq bo‘ladi.",
+    "vipD3": "Do‘kondagi barcha toshlar VIP muddatiga ochiq bo‘ladi.",
+    "vipD6": "O‘yin boshlanganda siz tanlagan taxta va tosh raqibingizga ko‘rinadi. Ikkalangiz ham VIP bo‘lsangiz, har biringiz o‘zingiznikini ko‘rasiz.",
+    "vipD4": "Ismingiz yonida oltin VIP yozuvi, avatarda toj va yaltirash. O‘yinda raqibingiz ham ko‘radi.",
+    "vipD5": "Muddat tugagach, qayta sotib olish mumkin. Qolgan kunlar yangisiga qo‘shiladi.",
     "vipBtn": "VIP sotib olish",
     "vipOn": "VIP faol",
     "vipTitle": "Shashka VIP",
@@ -549,6 +577,13 @@ const I18N = {
     "playersTile": "Игроки",
     "playersTileSub": "Игроки бота",
     "playersOnlineN": "● {n} онлайн",
+    "dndHint": "Значок луны: режим «Не беспокоить». Когда он включён, вас никто не сможет пригласить.",
+    "dndNote": "Режим «Не беспокоить» включён. Вы видны онлайн, но пригласить вас никто не сможет. Вы можете приглашать других.",
+    "dndLbl": "Режим «Не беспокоить»",
+    "dndOn": "Режим «Не беспокоить» включён",
+    "dndOff": "Режим «Не беспокоить» выключен",
+    "pDnd": "{name}: включён режим «Не беспокоить». Попробуйте позже.",
+    "pCool": "{name} дважды отклонил(а) приглашение. Следующее приглашение можно отправить через 2 минуты.",
     "playersTitle": "Игроки",
     "playersOnline": "Онлайн",
     "playersOffline": "Офлайн",
@@ -624,6 +659,13 @@ const I18N = {
     "item_p11": "Новогодняя ёлка",
     "item_p12": "Новогодний подарок",
     "watchBtn": "Смотреть игру",
+    "vipP6": "Ваш выбор виден сопернику",
+    "vipD1": "Вы пишете в чат при просмотре игры. Зрители без VIP не могут открыть чат.",
+    "vipD2": "Все доски из магазина доступны на срок VIP.",
+    "vipD3": "Все шашки из магазина доступны на срок VIP.",
+    "vipD6": "В игре выбранные вами доска и шашки видны сопернику. Если оба с VIP, каждый видит свои.",
+    "vipD4": "Золотая надпись VIP рядом с именем, корона и сияние на аватаре. Соперник тоже это видит.",
+    "vipD5": "После окончания срока можно купить снова. Оставшиеся дни прибавятся к новому.",
     "vipBtn": "Купить VIP",
     "vipOn": "VIP активен",
     "vipTitle": "Shashka VIP",
@@ -698,7 +740,7 @@ function setLang(l) {
 
   applyStatic();
   setSearching(S.searching);
-  if (S.shop) { renderShop(); renderRefs(); renderVip(); }
+  if (S.shop) { renderShop(); renderRefs(); renderVip(); renderDnd(); }
   if (S.rating) renderRating();
   if (S.players) { renderPlayers(); updatePlayersTile(); }
   if (S.shop) renderPacks();
@@ -1153,7 +1195,7 @@ function show(id) {
         tg.BackButton.show();
         tg.enableClosingConfirmation();
       } else {
-        id === 'shop' || id === 'vip' || id === 'refs' || id === 'rating' || id === 'players' || id === 'coins'
+        id === 'shop' || id === 'refs' || id === 'rating' || id === 'players' || id === 'coins'
           ? tg.BackButton.show()
           : tg.BackButton.hide();
         tg.disableClosingConfirmation();
@@ -1466,6 +1508,25 @@ function onMsg(m) {
         S.sentTo = null;
         ptoast(tr('pBusy'));
         send({ t: 'players_get' });
+      } else if (m.code === 'pinvite_dnd') {
+        S.sentTo = null;
+
+        const q = S.players && S.players.list.find((x) => x.id === m.to);
+
+        ptoast(tr('pDnd', { name: q ? q.name : '' }));
+        send({ t: 'players_get' });
+      } else if (m.code === 'pinvite_cool') {
+        S.sentTo = null;
+
+        const q = S.players && S.players.list.find((x) => x.id === m.to);
+
+        if (q) {
+          q.coolUntil = Date.now() + (m.left || 120) * 1000;
+          startCoolTick();
+        }
+
+        renderPlayers();
+        send({ t: 'players_get' });
       } else if (m.code === 'watch_unavailable') {
         ptoast(tr('watchUnavailable'));
         send({ t: 'players_get' });
@@ -1482,6 +1543,8 @@ function applySpectatorUi(on) {
   const chatBtn = $('btnChat');
   const resign = $('btnResign');
 
+  S.specUi = on;
+
   if (on) {
     if (resign.dataset.specPrevTxt === undefined) {
       resign.dataset.specPrevTxt = resign.textContent;
@@ -1491,7 +1554,8 @@ function applySpectatorUi(on) {
     resign.dataset.i18n = 'watchExit';
     resign.textContent = tr('watchExit');
 
-    chatBtn.style.display = isVip() ? '' : 'none';
+    chatBtn.style.display = '';
+    updateChatLock();
 
     clearInterval(S.awayTimer);
 
@@ -1529,6 +1593,7 @@ function applySpectatorUi(on) {
     }
 
     chatBtn.style.display = '';
+    updateChatLock();
   }
 }
 
@@ -2426,6 +2491,13 @@ function sendChat() {
 }
 
 $('btnChat').onclick = () => {
+  // VIP жоқ көрермен: чат орнына VIP сатып алу беті ашылады
+  if ($('btnChat').classList.contains('locked')) {
+    haptic('light');
+    openVip();
+    return;
+  }
+
   S.unread = 0;
   updateBadge();
 
@@ -2898,6 +2970,7 @@ function onShop(m) {
   renderShop();
   renderRefs();
   renderVip();
+  renderDnd();
 
   const ev = m.ev;
   if (!ev) return;
@@ -2914,10 +2987,14 @@ function onShop(m) {
       toast(`${tr('selected')}: ${tr('item_' + ev.id)}`);
       haptic('light');
     }
+  } else if (ev.type === 'dnd') {
+    toast(tr(ev.on ? 'dndOn' : 'dndOff'));
+    haptic('light');
   } else if (ev.type === 'vip') {
     if (ev.ok) {
       toast(tr('vipPaid'));
       haptic('heavy');
+      closeVip();
     }
   } else if (ev.type === 'ref') {
     toast(tr('refJoined', { name: ev.name, n: ev.reward }));
@@ -3236,6 +3313,8 @@ function stopPlayersPoll() {
 
 function openPlayers() {
   send({ t: 'players_get' });
+  send({ t: 'shop_get' });
+  renderDnd();
   renderPlayers();
   show('players');
 
@@ -3245,6 +3324,13 @@ function openPlayers() {
 
 function onPlayers(m) {
   S.players = m;
+
+  // Кідіріс (секунд) -> аяқталу уақыты
+  m.list.forEach((p) => {
+    p.coolUntil = p.cool ? Date.now() + p.cool * 1000 : 0;
+  });
+
+  if (m.list.some((p) => p.coolUntil)) startCoolTick();
 
   const sent = m.list.find((p) => p.sent);
   S.sentTo = sent ? sent.id : null;
@@ -3326,6 +3412,17 @@ function playerRow(p) {
       send({ t: 'pinvite_cancel', to: p.id });
       renderPlayers();
     };
+  } else if (p.status === 'online' && coolSecs(p) > 0) {
+    btn.className = 'plact dis';
+    btn.disabled = true;
+    btn.textContent = fmtCool(coolSecs(p));
+  } else if (p.status === 'online' && p.dnd) {
+    btn.className = 'plact';
+    btn.textContent = tr('pInvite');
+    btn.onclick = () => {
+      haptic('light');
+      ptoast(tr('pDnd', { name: p.name }));
+    };
   } else if (p.status === 'online') {
     btn.className = 'plact';
     btn.textContent = tr('pInvite');
@@ -3356,6 +3453,7 @@ function playerRow(p) {
 
 function renderPlayers() {
   const box = $('plList');
+  const keepScroll = box.scrollTop;
 
   box.textContent = '';
 
@@ -3388,6 +3486,8 @@ function renderPlayers() {
     head('playersOffline', off.length);
     off.forEach((p) => box.append(playerRow(p)));
   }
+
+  box.scrollTop = keepScroll;
 }
 
 function showIncoming(m) {
@@ -3422,7 +3522,13 @@ function onPInviteEnd(m) {
   const p = S.players && S.players.list.find((x) => x.id === m.to);
 
   if (m.reason === 'declined') {
-    ptoast(tr('pDeclined', { name: p ? p.name : '' }));
+    if (m.cool && p) {
+      p.coolUntil = Date.now() + m.cool * 1000;
+      startCoolTick();
+      ptoast(tr('pCool', { name: p.name }));
+    } else {
+      ptoast(tr('pDeclined', { name: p ? p.name : '' }));
+    }
   } else if (m.reason === 'expired') {
     ptoast(tr('pExpired'));
   } else if (m.reason === 'unavailable') {
@@ -3821,6 +3927,7 @@ function renderVip() {
 
   $('vipBtnTxt').textContent = tr(on ? 'vipOn' : 'vipBtn');
   $('btnVip').classList.toggle('on', on);
+  updateChatLock();
 
   $('vipStatus').textContent = on
     ? tr('vipLeft', { n: vipDaysLeft() })
@@ -3845,10 +3952,71 @@ function renderVip() {
 function openVip() {
   send({ t: 'shop_get' });
   renderVip();
-  show('vip');
+
+  $('vipDim').classList.add('show');
+  $('vipSheet').classList.add('show');
+}
+
+function closeVip() {
+  $('vipDim').classList.remove('show');
+  $('vipSheet').classList.remove('show');
+}
+
+$('vipClose').onclick = closeVip;
+$('vipDim').onclick = closeVip;
+
+// Көрермен режимінде VIP жоқ адамға чат батырмасы құлыптаулы көрінеді
+function updateChatLock() {
+  $('btnChat').classList.toggle('locked', Boolean(S.specUi && !isVip()));
 }
 
 $('btnVip').onclick = openVip;
+
+/* ---------- «Мазаламаңыз» режимі және шақыру кідірісі ---------- */
+
+function renderDnd() {
+  const on = Boolean(S.shop && S.shop.dnd);
+  const b = $('btnDnd');
+
+  b.classList.toggle('on', on);
+  b.setAttribute('aria-checked', on ? 'true' : 'false');
+  b.setAttribute('aria-label', tr('dndLbl'));
+
+  $('dndNote').classList.toggle('show', on);
+  $('dndHint').style.display = on ? 'none' : 'block';
+}
+
+$('btnDnd').onclick = () => {
+  haptic('light');
+  send({ t: 'dnd_set', on: !(S.shop && S.shop.dnd) });
+};
+
+function coolSecs(p) {
+  return p.coolUntil
+    ? Math.max(0, Math.ceil((p.coolUntil - Date.now()) / 1000))
+    : 0;
+}
+
+function fmtCool(s) {
+  return String(Math.floor(s / 60)).padStart(2, '0') + ':' +
+    String(s % 60).padStart(2, '0');
+}
+
+function startCoolTick() {
+  if (S.coolTick) return;
+
+  S.coolTick = setInterval(() => {
+    const list = (S.players && S.players.list) || [];
+    const any = list.some((p) => coolSecs(p) > 0);
+
+    renderPlayers();
+
+    if (!any) {
+      clearInterval(S.coolTick);
+      S.coolTick = null;
+    }
+  }, 1000);
+}
 
 $('btnVipBuy').onclick = () => {
   haptic('light');
