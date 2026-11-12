@@ -782,6 +782,8 @@ const S = {
   inviteLink: '',
   inviteMode: false,
   joinCode: null,
+  joinDone: false,
+  lastRx: 0,
   groupCode: null,
   groupJoinSent: false,
   groupWaiting: false,
@@ -1072,6 +1074,7 @@ function connect() {
 
   ws.onopen = () => {
     S.retry = 0;
+    S.lastRx = Date.now();
     $('conn').classList.add('hidden');
 
     const p = new URLSearchParams(location.search);
@@ -1098,6 +1101,8 @@ function connect() {
   };
 
   ws.onmessage = (e) => {
+    S.lastRx = Date.now();
+
     try {
       onMsg(JSON.parse(e.data));
     } catch (err) {
@@ -1137,11 +1142,60 @@ function fatal(t, s) {
   $('fatal').classList.remove('hidden');
 }
 
-document.addEventListener('visibilitychange', () => {
-  if (!document.hidden && (!S.ws || S.ws.readyState > 1)) {
-    connect();
+// Өліп қалған (бірақ «ашық» көрінетін) байланысты күшпен қайта қосу
+function forceReconnect() {
+  if (S.fatal) return;
+
+  const old = S.ws;
+
+  if (old) {
+    old.onopen = old.onmessage = old.onclose = old.onerror = null;
+    try { old.close(); } catch (e) {}
   }
+
+  S.ws = null;
+  S.retry = 0;
+
+  $('conn').classList.remove('hidden');
+  setSearching(false);
+
+  connect();
+}
+
+function checkAlive() {
+  if (S.fatal) return;
+
+  if (!S.ws || S.ws.readyState > 1) {
+    connect();
+    return;
+  }
+
+  if (S.ws.readyState !== 1) return;
+
+  const mark = Date.now();
+
+  send({ t: 'ping' });
+
+  setTimeout(() => {
+    if (S.lastRx < mark && !S.fatal) forceReconnect();
+  }, 3500);
+}
+
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden) checkAlive();
 });
+
+window.addEventListener('pageshow', checkAlive);
+window.addEventListener('online', checkAlive);
+
+setInterval(() => {
+  if (document.hidden || S.fatal) return;
+
+  if (S.ws && S.ws.readyState === 1) {
+    if (Date.now() - S.lastRx > 25000) forceReconnect();
+    else send({ t: 'ping' });
+  }
+}, 10000);
 
 /* ---------- КӨМЕКШІ ФУНКЦИЯЛАР ---------- */
 
@@ -1290,9 +1344,9 @@ function onMsg(m) {
           token: S.groupCode
         });
       } else {
-        if (!S.joinCode) S.joinCode = getStartCode();
+        if (!S.joinDone && !S.joinCode) S.joinCode = getStartCode();
 
-        if (S.joinCode) {
+        if (!S.joinDone && S.joinCode) {
           $('sheetInvite').classList.remove('hidden');
 
           showInviteStatus(
@@ -1434,6 +1488,13 @@ function onMsg(m) {
       showInviteStatus(tr('friendJoined'));
       break;
 
+    case 'invite_waiting':
+      showInviteStatus(tr('joiningFriend'));
+      break;
+
+    case 'pong':
+      break;
+
     case 'invite_expired':
       S.inviteCode = null;
       S.inviteLink = '';
@@ -1498,12 +1559,20 @@ function onMsg(m) {
           tr('authSub')
         );
       } else if (m.code === 'invite_invalid') {
+        S.joinDone = true;
+        S.joinCode = null;
         showInviteStatus(tr('inviteInvalid'));
       } else if (m.code === 'invite_expired') {
+        S.joinDone = true;
+        S.joinCode = null;
         showInviteStatus(tr('inviteExpired'));
       } else if (m.code === 'invite_self') {
+        S.joinDone = true;
+        S.joinCode = null;
         showInviteStatus(tr('inviteSelf'));
       } else if (m.code === 'busy') {
+        S.joinDone = true;
+        S.joinCode = null;
         showInviteStatus(tr('playerBusy'));
       } else if (m.code === 'pinvite_offline') {
         S.sentTo = null;
@@ -1664,6 +1733,7 @@ function startGame(m) {
   S.sel = null;
   S.unread = 0;
   S.joinCode = null;
+  S.joinDone = true;
 
   hideIncoming();
   S.sentTo = null;
@@ -2534,11 +2604,16 @@ $('chatInput').addEventListener('keydown', (e) => {
 /* ---------- БАТЫРМАЛАР ---------- */
 
 $('btnBatl').onclick = () => {
-  if (!S.searching) {
-    setSearching(true);
-    send({ t: 'find' });
-    haptic('light');
+  if (S.searching) return;
+
+  if (!S.ws || S.ws.readyState !== 1) {
+    checkAlive();
+    return;
   }
+
+  setSearching(true);
+  send({ t: 'find' });
+  haptic('light');
 };
 
 $('btnCancel').onclick = () =>
@@ -2614,6 +2689,11 @@ $('btnAgain').onclick = () => {
 
   $('result').classList.add('hidden');
   show('menu');
+
+  if (!S.ws || S.ws.readyState !== 1) {
+    checkAlive();
+    return;
+  }
 
   setSearching(true);
   send({ t: 'find' });
