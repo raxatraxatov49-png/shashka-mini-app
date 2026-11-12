@@ -5267,6 +5267,31 @@ const profiles = new Map();
 // 'fromId>toId' -> { from, to, timer }
 const pinvites = new Map();
 
+// Шақыруды қабылдамау: 'fromId>toId' -> { count, until, last }
+// 2 рет қабылдамаса, шақырушы 2 минут қайта шақыра алмайды
+const PDECLINE_LIMIT = 2;
+const PDECLINE_COOL = 2 * 60 * 1000;
+const PDECLINE_RESET = 10 * 60 * 1000;
+const pdecl = new Map();
+
+function coolLeft(fromId, toId) {
+  const rec = pdecl.get(String(fromId) + '>' + String(toId));
+
+  if (!rec || rec.until <= Date.now()) return 0;
+
+  return Math.ceil((rec.until - Date.now()) / 1000);
+}
+
+const pdeclTimer = setInterval(() => {
+  const now = Date.now();
+
+  for (const [k, r] of pdecl) {
+    if (r.until < now && now - r.last > PDECLINE_RESET) pdecl.delete(k);
+  }
+}, 10 * 60 * 1000);
+
+if (pdeclTimer.unref) pdeclTimer.unref();
+
 let profilesTimer = null;
 
 function saveProfilesSoon() {
@@ -5327,6 +5352,8 @@ function playersPayload(viewerId) {
       status: online ? (isBusy(u) ? 'game' : 'online') : 'offline',
       watch: Boolean(gm && !gm.waitingForOpponent && !gm.st.over),
       vip: isVipId(id),
+      dnd: shop.isDnd(id),
+      cool: coolLeft(me, id),
       seen: online ? now : (p.seen || 0),
       sent: pinvites.has(me + '>' + id)
     });
@@ -5349,7 +5376,7 @@ function playersPayload(viewerId) {
 }
 
 // notify: 'to' | 'from' | 'both' | 'none'
-function endPInvite(key, reason, notify) {
+function endPInvite(key, reason, notify, extra) {
   const inv = pinvites.get(key);
 
   if (!inv) return;
@@ -5369,7 +5396,8 @@ function endPInvite(key, reason, notify) {
     send(users.get(inv.from), {
       t: 'pinvite_end',
       to: inv.to,
-      reason
+      reason,
+      ...(extra || {})
     });
   }
 }
@@ -5403,6 +5431,18 @@ function sendPInvite(u, toId) {
 
   if (isBusy(target)) {
     return send(u, { t: 'error', code: 'pinvite_busy' });
+  }
+
+  // Қабылдаушыда «Мазаламаңыз» режимі қосулы
+  if (shop.isDnd(toId)) {
+    return send(u, { t: 'error', code: 'pinvite_dnd', to: toId });
+  }
+
+  // 2 рет қабылдамаған соң 2 минут кідіріс
+  const cl = coolLeft(u.id, toId);
+
+  if (cl > 0) {
+    return send(u, { t: 'error', code: 'pinvite_cool', to: toId, left: cl });
   }
 
   const key = u.id + '>' + toId;
@@ -5466,7 +5506,25 @@ function answerPInvite(u, fromId, accept) {
   }
 
   if (!accept) {
-    return endPInvite(key, 'declined', 'from');
+    const now = Date.now();
+    const rec = pdecl.get(key) || { count: 0, until: 0, last: 0 };
+
+    if (now - rec.last > PDECLINE_RESET) rec.count = 0;
+
+    rec.count++;
+    rec.last = now;
+
+    let cool = 0;
+
+    if (rec.count >= PDECLINE_LIMIT) {
+      rec.count = 0;
+      rec.until = now + PDECLINE_COOL;
+      cool = PDECLINE_COOL / 1000;
+    }
+
+    pdecl.set(key, rec);
+
+    return endPInvite(key, 'declined', 'from', cool ? { cool } : undefined);
   }
 
   const from = users.get(inv.from);
@@ -5564,6 +5622,21 @@ function handle(u, m) {
       return send(u, {
         t: 'invite_cancelled'
       });
+
+    case 'dnd_set': {
+      const on = Boolean(m.on);
+
+      shop.setDnd(u.id, on);
+
+      // Қосылғанда саған келген шақырулар жабылады
+      if (on) {
+        for (const [k, inv] of pinvites) {
+          if (inv.to === u.id) endPInvite(k, 'unavailable', 'both');
+        }
+      }
+
+      return send(u, shopMsg(u.id, { type: 'dnd', on }));
+    }
 
     case 'players_get':
       return send(u, playersPayload(u.id));
