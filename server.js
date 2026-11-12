@@ -663,7 +663,11 @@ const GR_NO_POINTS = new Set([
 
 // users[id] = { name, username, avatar, points, wins, games, wk, wp }
 // wk — апталық ұпай қай кезеңге жататыны, wp — сол кезеңдегі ұпай
-const globalRating = { periodStart: 0, users: {}, rewarded: 0, seasonStart: 0 };
+const globalRating = { periodStart: 0, users: {}, rewarded: 0, seasonStart: 0, rankReset: 0 };
+
+// Ранг тек осы нөмірден төмен болса, бір рет нөлден (Қоладан) қайта басталады.
+// Рейтинг ұпайлары (points, wins, апталық wp) өзгермейді. Қайта нөлдеу керек болса, санды көбейтіңіз.
+const RANK_RESET_ID = 1;
 
 let grSaveTimer = null;
 
@@ -675,7 +679,8 @@ function grSaveNow() {
     periodStart: globalRating.periodStart,
     users: globalRating.users,
     rewarded: globalRating.rewarded || 0,
-    seasonStart: globalRating.seasonStart || 0
+    seasonStart: globalRating.seasonStart || 0,
+    rankReset: globalRating.rankReset || 0
   });
 }
 
@@ -1041,6 +1046,7 @@ async function initStorage() {
         globalRating.periodStart = Number(grData.periodStart) || 0;
         globalRating.rewarded = Number(grData.rewarded) || 0;
         globalRating.seasonStart = Number(grData.seasonStart) || 0;
+        globalRating.rankReset = Number(grData.rankReset) || 0;
 
         globalRating.users =
           grData.users && typeof grData.users === 'object'
@@ -1050,6 +1056,15 @@ async function initStorage() {
 
       // Алғаш рет іске қосылғанда 7 күндік санақ қазірден басталады
       grRoll();
+
+      // Рангты бір рет нөлдеу: жаңа маусым қазірден басталады, барлығы Қоладан бастайды.
+      // Рейтинг ұпайларына тимейді.
+      if ((globalRating.rankReset || 0) < RANK_RESET_ID) {
+        globalRating.seasonStart = Date.now();
+        globalRating.rankReset = RANK_RESET_ID;
+        grSaveNow();
+        console.log('Ранг нөлденді: жаңа маусым басталды');
+      }
 
       payData.charges = [];
       if (payRaw && Array.isArray(payRaw.charges)) {
