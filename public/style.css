@@ -1208,3 +1208,17 @@ body {
   flex-shrink: 0;
 }
 
+
+/* === Ранг: scroll және орналасу түзетулері === */
+#rank {
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: contain;
+  touch-action: pan-y;
+  padding-bottom: calc(var(--safe-b) + 40px);
+}
+#rank > * { flex-shrink: 0; }
+.rkrow { flex: none; }
+.rkchip { border: 1px solid rgba(245, 184, 0, .35); }
+.titlerow .rankbtn { margin-left: 0; }
