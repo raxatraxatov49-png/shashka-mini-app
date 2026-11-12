@@ -740,6 +740,16 @@ function setLang(l) {
 
   applyStatic();
   setSearching(S.searching);
+
+  try {
+    if ($('rankBtnTxt')) $('rankBtnTxt').textContent = rkT().title;
+
+    if ($('rank') && $('rank').classList.contains('active')) {
+      $('rkTitle').textContent = rkT().title;
+      $('rkTopT').textContent = rkT().top;
+      send({ t: 'rank_get' });
+    }
+  } catch (e) {}
   if (S.shop) { renderShop(); renderRefs(); renderVip(); renderDnd(); }
   if (S.rating) renderRating();
   if (S.players) { renderPlayers(); updatePlayersTile(); }
