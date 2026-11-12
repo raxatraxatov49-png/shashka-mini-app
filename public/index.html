@@ -11,14 +11,7 @@
 <link rel="stylesheet" href="shop.css">
 <link rel="stylesheet" href="rating.css">
 <link rel="stylesheet" href="winter.css?v=1">
-<style>
-:root{ --top-gap: 0px; }
-body{
-  padding-top: var(--top-gap);
-  padding-bottom: env(safe-area-inset-bottom, 0px);
-  box-sizing: border-box;
-}
-</style>
+
 <style>
 .rprize{margin:0 0 12px;padding:12px;border-radius:16px;background:rgba(245,197,66,.10);border:1px solid rgba(245,197,66,.35)}
 .rprize.hidden{display:none}
@@ -290,6 +283,7 @@ body{
   if (!tg) return;
   tg.ready();
   tg.expand();
+  try { tg.disableVerticalSwipes && tg.disableVerticalSwipes(); } catch (e) {}
 
   function applyInsets() {
     var sys = (tg.safeAreaInset && tg.safeAreaInset.top) || 0;
@@ -297,7 +291,7 @@ body{
     var top = sys + content;
     // Fullscreen режимінде Android кейде 0 қайтарады — запас мән
     if (tg.isFullscreen && top < 24) top = 48;
-    document.documentElement.style.setProperty('--top-gap', top + 'px');
+    document.documentElement.style.setProperty('--safe-t', top + 'px');
   }
 
   applyInsets();
