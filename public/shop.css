@@ -105,3 +105,14 @@
   opacity: 0; pointer-events: none; transition: .25s;
 }
 .toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+/* ---------- Жаңа тастар: Stars, бөлім тақырыптары, белгілер ---------- */
+.sbuy.star { background: linear-gradient(135deg, #3b82f6, #7c5cff); color: #fff; }
+.ssec { grid-column: 1 / -1; display: flex; align-items: center; gap: 8px; margin: 8px 2px 0; font-weight: 800; font-size: 16px; color: #f0e5d2; }
+.ssec small { color: #a0a0a0; font-weight: 600; font-size: 12px; }
+.sitem .rar.rg { color: #ff8fc0; }
+.sitem .rar.rb { color: #9fb3c8; }
+.tp b[data-em]::before {
+  content: attr(data-em); position: absolute; inset: 0; display: grid; place-items: center; z-index: 1;
+  font-size: clamp(13px, 4.6vw, 22px); line-height: 1; filter: drop-shadow(0 1px 1px rgba(0, 0, 0, .4));
+}
