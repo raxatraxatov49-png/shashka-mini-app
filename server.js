@@ -277,6 +277,7 @@ const shopMsg = (id, ev) => {
   const m = Object.assign({ t: 'shop' }, shop.view(id));
   m.packs = COIN_PACKS;
   m.vipStars = VIP_STARS;
+  m.trustStars = TRUST_STARS;
   m.vipDays = VIP_DAYS;
   if (ev) m.ev = ev;
   return m;
@@ -4610,6 +4611,7 @@ function finish(g, winner, reason) {
 
   // Кездейсоқ қарсылас: тек толық ойнап жеңсе ұпай беріледі
   grRecordGame(g, winner, reason);
+  trustRecordGame(g, winner, reason);
 
   if (g.groupInfo) {
     const room = groupRooms.get(g.groupInfo.code);
@@ -5144,6 +5146,12 @@ async function createVipInvoice(u) {
 }
 
 function parseOrder(payload) {
+  const tr = /^trust:(.+)$/.exec(payload || '');
+
+  if (tr) {
+    return { kind: 'trust', id: tr[1], amount: TRUST_STARS };
+  }
+
   const v = /^vip:(.+)$/.exec(payload || '');
 
   if (v) {
@@ -5209,6 +5217,20 @@ function handleSuccessfulPayment(message) {
     if (payData.charges.length > 500) payData.charges.shift();
 
     savePay();
+  }
+
+  if (o.kind === 'trust') {
+    shop.trustRestore(id);
+
+    send(users.get(id), shopMsg(id, { type: 'trust_ok' }));
+
+    telegramApi('sendMessage', {
+      chat_id: id,
+      parse_mode: 'HTML',
+      text: TRUST_PAID_TEXT[getLang(id)] || TRUST_PAID_TEXT.kk
+    }).catch((e) => console.error('Trust хабарлама қатесі:', e.message));
+
+    return;
   }
 
   if (o.kind === 'vip') {
@@ -5291,6 +5313,68 @@ const pdeclTimer = setInterval(() => {
 }, 10 * 60 * 1000);
 
 if (pdeclTimer.unref) pdeclTimer.unref();
+
+/* ---------- Доверия (кездейсоқ ойыннан шығып кетуді азайту) ---------- */
+
+const TRUST_QUIT = 2;                    // берілсе/шығып кетсе -2%
+const TRUST_FINISH = 2;                  // соңына дейін ойнаса +2% (жеңсе де, жеңілсе де)
+const TRUST_DAILY = 2;                   // күн сайын кіргенге +2%
+const TRUST_LOW = 90;                    // осыдан төмен болса іздеу жабылады
+const TRUST_LOCK_MS = 30 * 60 * 1000;    // 30 минут
+const TRUST_STARS = 10;                  // доверияны 100% қылу бағасы (Stars)
+
+const TRUST_PAID_TEXT = {
+  kk: '✅ Төлем сәтті өтті!\n🛡 Доверия <b>100%</b> болды, кездейсоқ қарсылас іздеу ашық.',
+  uz: '✅ To‘lov muvaffaqiyatli o‘tdi!\n🛡 Ishonch <b>100%</b> bo‘ldi, tasodifiy raqib qidirish ochiq.',
+  ru: '✅ Оплата прошла успешно!\n🛡 Доверие <b>100%</b>, поиск случайного соперника открыт.'
+};
+
+async function createTrustInvoice(u) {
+  if (shop.view(u.id).trust >= 100) {
+    return send(u, { t: 'error', code: 'trust_full' });
+  }
+
+  try {
+    const r = await telegramApi('createInvoiceLink', {
+      title: 'Доверия 100%',
+      description: 'Доверияны 100% қылу',
+      payload: `trust:${u.id}`,
+      currency: 'XTR',
+      prices: [{ label: 'Доверия 100%', amount: TRUST_STARS }]
+    });
+
+    send(u, { t: 'invoice', url: r.result });
+  } catch (e) {
+    console.error('Trust invoice қатесі:', e.message);
+    send(u, { t: 'pay_error' });
+  }
+}
+
+function trustRecordGame(g, winner, reason) {
+  if (!g.random || g.groupInfo) return;
+
+  // Берілу, шығып оралмау ('left') және жүріс жасамай уақыт біту ('timeout')
+  const quit = (reason === 'resign' || reason === 'left' || reason === 'timeout') && winner;
+
+  if (quit) {
+    const loserId = winner === 'w' ? g.p.b : g.p.w;
+
+    shop.trustQuit(loserId, TRUST_QUIT, TRUST_LOCK_MS);
+
+    send(users.get(loserId), shopMsg(loserId, { type: 'trust', d: -TRUST_QUIT }));
+
+    return;
+  }
+
+  // Уақыт біткен ойындар есептелмейді; толық ойналғандарға ғана +1
+  if (GR_NO_POINTS.has(reason)) return;
+
+  for (const id of [g.p.w, g.p.b]) {
+    shop.trustAdd(id, TRUST_FINISH);
+
+    send(users.get(id), shopMsg(id, { type: 'trust', d: TRUST_FINISH }));
+  }
+}
 
 let profilesTimer = null;
 
@@ -5561,6 +5645,13 @@ function handle(u, m) {
         );
       }
 
+      // Доверия төмен болса, кездейсоқ қарсылас іздеу уақытша жабық
+      const lockLeft = shop.trustLock(u.id);
+
+      if (lockLeft > 0) {
+        return send(u, { t: 'error', code: 'trust_lock', left: lockLeft });
+      }
+
       if (queue.includes(u.id)) {
         return send(u, {
           t: 'searching'
@@ -5678,6 +5769,9 @@ function handle(u, m) {
 
     case 'vip_buy':
       return createVipInvoice(u);
+
+    case 'trust_buy':
+      return createTrustInvoice(u);
 
     case 'shop_use': {
       const r = shop.use(u.id, String(m.kind), String(m.id));
@@ -6001,6 +6095,8 @@ function onAuth(ws, m) {
     me: pub(u),
     lang: userLang(u)
   });
+
+  shop.trustDaily(u.id, TRUST_DAILY);
 
   send(u, shopMsg(u.id));
 
