@@ -7,12 +7,12 @@
     linear-gradient(180deg, #02060d 0%, #050f20 45%, #0a1a36 100%);
 }
 
-/* Қар: екі қабат, баяу және жұмсақ */
+/* Қар: екі қабат, ТҰРАҚТЫ (жаумайды, анимациясыз) */
 #menu::before,
 #menu::after {
   content: "";
   position: absolute;
-  inset: 0 -24px;
+  inset: 0;
   pointer-events: none;
   z-index: 5;
 }
@@ -25,7 +25,6 @@
     radial-gradient(4px 4px at 130px 240px,rgba(255,255,255,.9), transparent),
     radial-gradient(2.6px 2.6px at 50px 110px, rgba(255,255,255,.65), transparent);
   background-size: 260px 260px;
-  animation: snowA 4.5s linear infinite, sway 3s ease-in-out infinite alternate;
 }
 #menu::after { /* алыс, ұсақ, одан да баяу */
   background-image:
@@ -35,14 +34,6 @@
     radial-gradient(2px 2px at 150px 160px,rgba(255,255,255,.8), transparent),
     radial-gradient(2px 2px at 10px 100px, rgba(255,255,255,.8), transparent);
   background-size: 180px 180px;
-  animation: snowB 8s linear infinite, sway 4.5s ease-in-out infinite alternate-reverse;
-}
-@keyframes snowA { to { background-position: 0 260px; } }
-@keyframes snowB { to { background-position: 0 180px; } }
-@keyframes sway  { from { transform: translateX(-18px); } to { transform: translateX(18px); } }
-
-@media (prefers-reduced-motion: reduce) {
-  #menu::before, #menu::after { animation: none !important; }
 }
 
 #menu h1 { color: #fff; text-shadow: 0 2px 14px rgba(120, 170, 255, .25); }
