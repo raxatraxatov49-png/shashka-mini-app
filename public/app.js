@@ -1270,7 +1270,7 @@ if (tg) {
         $('shop').classList.contains('active') ||
         $('refs').classList.contains('active') ||
         $('rating').classList.contains('active') ||
-        $('rank').classList.contains('active') ||
+        ($('rank') && $('rank').classList.contains('active')) ||
         $('players').classList.contains('active')
       ) {
         show('menu');
@@ -1794,7 +1794,7 @@ function startGame(m) {
   $('oppAva').classList.toggle('vipf', Boolean(opp.vip));
   $('myAva').classList.toggle('vipf', Boolean(me.vip));
 
-  showGameRanks(m, opp, me);
+  try { showGameRanks(m, opp, me); } catch (e) { console.error(e); }
 
   /*
     Админ/VIP тақта мен тасын қарсыласына көрсетеді.
@@ -4116,16 +4116,6 @@ $('btnVipBuy').onclick = () => {
   send({ t: 'vip_buy' });
 };
 
-/* ---------- ІСКЕ ҚОСУ ---------- */
-
-applyStatic();
-setSearching(false);
-
-connect();
-
-})();
-
-
 /* ================= РАНГ ================= */
 
 const RK_NAMES = {
@@ -4191,18 +4181,27 @@ function rkChip(el, p, t) {
 
 // Кездейсоқ ойында екі ойыншының рангы ойын экранының үстінде көрінеді
 function showGameRanks(m, opp, me) {
-  const row = $('rkrow');
-  const on = Boolean(m.random && !m.spectator);
+  try {
+    const row = $('rkrow');
 
-  row.classList.toggle('hidden', !on);
+    if (!row) return;
 
-  if (!on) return;
+    const on = Boolean(m.random && !m.spectator);
 
-  rkChip($('rkOpp'), opp, opp.rk || 0);
-  rkChip($('rkMe'), me, me.rk || 0);
+    row.classList.toggle('hidden', !on);
+
+    if (!on) return;
+
+    if ($('rkOpp')) rkChip($('rkOpp'), opp, opp.rk || 0);
+    if ($('rkMe')) rkChip($('rkMe'), me, me.rk || 0);
+  } catch (e) {
+    console.error('Ранг қатесі:', e);
+  }
 }
 
 function openRank() {
+  if (!$('rank')) return;
+
   $('rkTitle').textContent = rkT().title;
   $('rkTopT').textContent = rkT().top;
   send({ t: 'rank_get' });
@@ -4210,6 +4209,8 @@ function openRank() {
 }
 
 function onRank(m) {
+  if (!$('rkLadder') || !$('rkList')) return;
+
   const T = rkT();
   const steps = m.steps || [];
   const t = m.tier || 0;
@@ -4313,5 +4314,14 @@ function onRank(m) {
   });
 }
 
-$('btnRank').onclick = openRank;
-$('rankBtnTxt').textContent = rkT().title;
+if ($('btnRank')) $('btnRank').onclick = openRank;
+if ($('rankBtnTxt')) $('rankBtnTxt').textContent = rkT().title;
+
+/* ---------- ІСКЕ ҚОСУ ---------- */
+
+applyStatic();
+setSearching(false);
+
+connect();
+
+})();
