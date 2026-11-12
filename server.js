@@ -663,7 +663,7 @@ const GR_NO_POINTS = new Set([
 
 // users[id] = { name, username, avatar, points, wins, games, wk, wp }
 // wk — апталық ұпай қай кезеңге жататыны, wp — сол кезеңдегі ұпай
-const globalRating = { periodStart: 0, users: {}, rewarded: 0 };
+const globalRating = { periodStart: 0, users: {}, rewarded: 0, seasonStart: 0 };
 
 let grSaveTimer = null;
 
@@ -674,7 +674,8 @@ function grSaveNow() {
   storeSave('global_rating', GLOBAL_RATING_FILE, {
     periodStart: globalRating.periodStart,
     users: globalRating.users,
-    rewarded: globalRating.rewarded || 0
+    rewarded: globalRating.rewarded || 0,
+    seasonStart: globalRating.seasonStart || 0
   });
 }
 
@@ -794,6 +795,7 @@ function grRecordGame(g, winnerSide, reason) {
   if (GR_NO_POINTS.has(reason)) return;
 
   grRoll();
+  rkRoll();
 
   const winnerId = winnerSide === 'w'
     ? String(g.p.w)
@@ -829,7 +831,14 @@ function grRecordGame(g, winnerSide, reason) {
 
     entry.games++;
 
+    // Ранг маусымы (30 күн): маусым ауысса, жеңіс нөлден басталады
+    if (entry.sk !== globalRating.seasonStart) {
+      entry.sk = globalRating.seasonStart;
+      entry.sw = 0;
+    }
+
     if (winnerId && id === winnerId) {
+      entry.sw = (entry.sw || 0) + 1;
       entry.wins++;
       entry.points += WIN_POINTS;
       entry.wp += WIN_POINTS;
@@ -858,6 +867,80 @@ function grBoard(kind) {
       ((b.e.wins || 0) - (a.e.wins || 0)) ||
       ((a.e.games || 0) - (b.e.games || 0))
     );
+}
+
+/* ---------- РАНГ: кездейсоқ ойындағы жеңіс санына қарай ---------- */
+// Ойын ережесі бойынша толық аяқталған жеңістер ғана (GR_NO_POINTS есептелмейді)
+const RK_WINS = [0, 5, 15, 30, 60, 100, 160, 250, 400];
+
+function rkTier(wins) {
+  let t = 0;
+
+  RK_WINS.forEach((w, i) => {
+    if (wins >= w) t = i;
+  });
+
+  return t;
+}
+
+// Ранг 30 күн сайын жаңарады: маусым біткенде барлығы қоладан қайта басталады
+const RK_SEASON_MS = 30 * 24 * 60 * 60 * 1000;
+
+function rkRoll() {
+  const now = Date.now();
+
+  if (!globalRating.seasonStart) {
+    globalRating.seasonStart = now;
+    grSaveNow();
+    return;
+  }
+
+  const passed = Math.floor((now - globalRating.seasonStart) / RK_SEASON_MS);
+
+  if (passed > 0) {
+    globalRating.seasonStart += passed * RK_SEASON_MS;
+    grSaveNow();
+  }
+}
+
+function rkSeasonWins(userId) {
+  rkRoll();
+
+  const e = globalRating.users[String(userId)];
+
+  return e && e.sk === globalRating.seasonStart ? (e.sw || 0) : 0;
+}
+
+function rkPayload(userId) {
+  rkRoll();
+
+  const all = Object.entries(globalRating.users)
+    .map(([id, e]) => ({ id, e, w: e.sk === globalRating.seasonStart ? (e.sw || 0) : 0 }))
+    .filter(x => x.w > 0)
+    .sort((a, b) =>
+      (b.w - a.w) ||
+      ((a.e.games || 0) - (b.e.games || 0))
+    );
+
+  const idx = all.findIndex(x => x.id === String(userId));
+  const wins = rkSeasonWins(userId);
+
+  return {
+    t: 'rank',
+    seasonLeft: Math.max(0, globalRating.seasonStart + RK_SEASON_MS - Date.now()),
+    wins,
+    tier: rkTier(wins),
+    pos: idx >= 0 ? idx + 1 : null,
+    steps: RK_WINS,
+    list: all.slice(0, 100).map((x, i) => ({
+      pos: i + 1,
+      name: x.e.name || 'Ойыншы',
+      username: x.e.username || '',
+      avatar: x.e.avatar || null,
+      wins: x.w,
+      tier: rkTier(x.w)
+    }))
+  };
 }
 
 function grPayload(userId) {
@@ -957,6 +1040,7 @@ async function initStorage() {
       if (grData && typeof grData === 'object') {
         globalRating.periodStart = Number(grData.periodStart) || 0;
         globalRating.rewarded = Number(grData.rewarded) || 0;
+        globalRating.seasonStart = Number(grData.seasonStart) || 0;
 
         globalRating.users =
           grData.users && typeof grData.users === 'object'
@@ -1286,6 +1370,8 @@ const pub = u => {
     name: u ? u.name : 'Ойыншы',
     avatar: u ? u.avatar : null,
     admin,
+    rk: u ? rkTier(rkSeasonWins(u.id)) : 0,
+    owner: u ? isOwner(u.id) : false,
     vip,
     // Админ мен VIP таңдаған тақта/тасын қарсыласына көрсетеді
     skin: admin || vip ? adminSkin(u.id) : null
@@ -1320,6 +1406,11 @@ function sendWatchers(g, msg) {
   }
 }
 
+// Ойында админ/owner бар болса, чатты ешкім (VIP те) бақыламайды
+function adminInGame(g) {
+  return Boolean(g) && (isAdmin(g.p.w) || isAdmin(g.p.b));
+}
+
 // Чат хабарламасы: ойыншыларға және VIP көрермендерге
 function broadcastChat(g, msg) {
   for (const id of [g.p.w, g.p.b]) {
@@ -1329,7 +1420,7 @@ function broadcastChat(g, msg) {
   if (!g.watchers) return;
 
   for (const id of g.watchers) {
-    if (isVipId(id)) send(users.get(id), msg);
+    if (isVipId(id) && !adminInGame(g)) send(users.get(id), msg);
   }
 }
 
@@ -1350,6 +1441,7 @@ function watchState(g) {
     spectator: true,
     legal: [],
     chat: [],
+    chatHidden: adminInGame(g),
     waitingForOpponent: false
   };
 }
@@ -1385,7 +1477,7 @@ function watchStart(u, playerId) {
   const st = watchState(g);
 
   // VIP көрермен чат тарихын көреді
-  if (isVipId(u.id)) st.chat = g.chat;
+  if (isVipId(u.id) && !adminInGame(g)) st.chat = g.chat;
 
   send(u, st);
 }
@@ -1552,6 +1644,7 @@ function gameState(g, uid) {
   return {
     t: 'game',
     id: g.id,
+    random: Boolean(g.random),
     you,
     players: {
       w: pub(users.get(g.p.w)),
@@ -1594,7 +1687,7 @@ function removeUserInvite(userId) {
   if (code) removeInvite(code);
 }
 
-function startGame(a, b, groupInfo = null) {
+function startGame(a, b, groupInfo = null, random = false) {
   dequeue(a.id);
   dequeue(b.id);
 
@@ -1625,6 +1718,7 @@ function startGame(a, b, groupInfo = null) {
     turnTimerSide: null,
     lastChat: {},
     groupInfo,
+    random,
     waitingForOpponent: false
   };
 
@@ -5589,7 +5683,7 @@ function handle(u, m) {
         if (!alive(oppId)) continue;
 
         const opp = users.get(oppId);
-        const randomGame = startGame(opp, u);
+        const randomGame = startGame(opp, u, null, true);
 
         if (randomGame) randomGame.random = true;
 
@@ -5658,6 +5752,9 @@ function handle(u, m) {
 
     case 'rating_get':
       return send(u, grPayload(u.id));
+
+    case 'rank_get':
+      return send(u, rkPayload(u.id));
 
     case 'shop_get':
       return send(u, shopMsg(u.id));
@@ -5874,7 +5971,7 @@ function handle(u, m) {
     case 'watch_chat': {
       const g = u.watch ? games.get(u.watch) : null;
 
-      if (!g || !isVipId(u.id) || typeof m.text !== 'string') return;
+      if (!g || !isVipId(u.id) || adminInGame(g) || typeof m.text !== 'string') return;
 
       const text = m.text.trim().slice(0, 300);
       const now = Date.now();
