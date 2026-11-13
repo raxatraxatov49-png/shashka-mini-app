@@ -1181,7 +1181,7 @@ const GROUP_WAIT_SECONDS = 90;
 const GROUP_WAIT_MS = GROUP_WAIT_SECONDS * 1000;
 
 const WEBHOOK_URL =
-  'https://shashka-mini-app.onrender.com/telegram-webhook';
+  'https://shashka-mini-app-tp6r.onrender.com/telegram-webhook';
 
 const MINI_APP_LINK =
   'https://t.me/shashkaoyinibot?startapp=';
@@ -3410,7 +3410,7 @@ async function handleGroupCallback(query) {
 
 /* ---------- Жеке чаттағы /start батырмалары ---------- */
 
-const MINI_APP_URL = 'https://shashka-mini-app.onrender.com';
+const MINI_APP_URL = 'https://shashka-mini-app.raxatarzubaev.workers.dev';
 
 function mainKeyboard(lang) {
   return {
