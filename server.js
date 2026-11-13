@@ -648,7 +648,8 @@ function grPrizeFor(rank) {
 const GR_PRIZE_MSG = {
   kk: (rank, c) => `🏆 Апталық рейтингте ${rank}-орын алдыңыз!\nСізге +${c} 🪙 койн берілді.`,
   uz: (rank, c) => `🏆 Haftalik reytingda ${rank}-o‘rin!\nSizga +${c} 🪙 koin berildi.`,
-  ru: (rank, c) => `🏆 Вы заняли ${rank}-е место в рейтинге недели!\nВам начислено +${c} 🪙 коинов.`
+  ru: (rank, c) => `🏆 Вы заняли ${rank}-е место в рейтинге недели!\nВам начислено +${c} 🪙 коинов.`,
+  kaa: (rank, c) => `🏆 Ҳәптелик рейтингте ${rank}-орынды ийелеудиңиз!\nСизге +${c} 🪙 койн берилди.`
 };
 
 // Осы себептермен аяқталған ойынға ұпай берілмейді:
@@ -3443,12 +3444,14 @@ function languageKeyboard() {
       { text: '🇺🇿 O‘zbekcha', callback_data: 'lang:uz' },
       { text: '🇰🇿 Қазақша', callback_data: 'lang:kk' },
       { text: '🇷🇺 Русский', callback_data: 'lang:ru' }
+    ], [
+      { text: 'Қарақалпақша', callback_data: 'lang:kaa' }
     ]]
   };
 }
 
 async function handleLangCallback(query) {
-  const match = String(query.data || '').match(/^lang:(uz|kk|ru)$/);
+  const match = String(query.data || '').match(/^lang:(uz|kk|ru|kaa)$/);
 
   if (!match) return false;
 
@@ -3535,7 +3538,8 @@ async function sendGroupWelcome(chatId) {
 const REF_TEXTS = {
   kk: (name, n) => `🎉 ${name} сілтемең арқылы қосылды! +${n} койн`,
   uz: (name, n) => `🎉 ${name} havolang orqali qo‘shildi! +${n} koin`,
-  ru: (name, n) => `🎉 ${name} присоединился по твоей ссылке! +${n} коинов`
+  ru: (name, n) => `🎉 ${name} присоединился по твоей ссылке! +${n} коинов`,
+  kaa: (name, n) => `🎉 ${name} сизиң силтемеңиз арқалы қосылды! +${n} койн`
 };
 
 async function handleStartReferral(message) {
@@ -3956,7 +3960,8 @@ async function handleTelegramWebhook(req, res) {
               const texts = {
                 kk: `🎁 Саған ${Math.trunc(amount)} койн берілді!`,
                 uz: `🎁 Sizga ${Math.trunc(amount)} koin berildi!`,
-                ru: `🎁 Вам начислено ${Math.trunc(amount)} коинов!`
+                ru: `🎁 Вам начислено ${Math.trunc(amount)} коинов!`,
+                kaa: `🎁 Сизге ${Math.trunc(amount)} койн берилди!`
               };
 
               await telegramApi('sendMessage', {
@@ -4062,7 +4067,8 @@ async function handleTelegramWebhook(req, res) {
             const texts = {
               kk: `🎁 Саған <b>Shashka VIP</b> берілді!\n👑 Қосылған мерзім: <b>${Math.trunc(days)}</b> күн. Барлығы қалды: <b>${left}</b> күн.`,
               uz: `🎁 Sizga <b>Shashka VIP</b> berildi!\n👑 Qo‘shilgan muddat: <b>${Math.trunc(days)}</b> kun. Jami qoldi: <b>${left}</b> kun.`,
-              ru: `🎁 Вам выдан <b>Shashka VIP</b>!\n👑 Добавлено дней: <b>${Math.trunc(days)}</b>. Всего осталось: <b>${left}</b>.`
+              ru: `🎁 Вам выдан <b>Shashka VIP</b>!\n👑 Добавлено дней: <b>${Math.trunc(days)}</b>. Всего осталось: <b>${left}</b>.`,
+              kaa: `🎁 Сизге <b>Shashka VIP</b> берилди!\n👑 Қосылған мүддет: <b>${Math.trunc(days)}</b> күн. Жәми қалды: <b>${left}</b> күн.`
             };
 
             await telegramApi('sendMessage', {
@@ -4448,7 +4454,8 @@ async function setupTelegramWebhook() {
       { code: null, lang: 'kk' },
       { code: 'kk', lang: 'kk' },
       { code: 'uz', lang: 'uz' },
-      { code: 'ru', lang: 'ru' }
+      { code: 'ru', lang: 'ru' },
+      { code: 'kaa', lang: 'kaa' }
     ];
 
     for (const { code, lang } of commandLocales) {
@@ -5216,13 +5223,15 @@ const VIP_DAYS = 30;
 const VIP_PAID_TEXT = {
   kk: (d) => `✅ Төлем сәтті өтті!\n👑 <b>Shashka VIP</b> қосылды. Қалған мерзім: <b>${d}</b> күн.`,
   uz: (d) => `✅ To‘lov muvaffaqiyatli o‘tdi!\n👑 <b>Shashka VIP</b> yoqildi. Qolgan muddat: <b>${d}</b> kun.`,
-  ru: (d) => `✅ Оплата прошла успешно!\n👑 <b>Shashka VIP</b> подключён. Осталось дней: <b>${d}</b>.`
+  ru: (d) => `✅ Оплата прошла успешно!\n👑 <b>Shashka VIP</b> подключён. Осталось дней: <b>${d}</b>.`,
+  kaa: (d) => `✅ Төлем табыслы өтти!\n👑 <b>Shashka VIP</b> қосылды. Қалған мүддет: <b>${d}</b> күн.`
 };
 
 const COIN_PAID_TEXT = {
   kk: (n, c) => `✅ Төлем сәтті өтті!\n💰 Балансқа <b>${n}</b> койн қосылды.\nҚазіргі койн: <b>${c}</b>`,
   uz: (n, c) => `✅ To‘lov muvaffaqiyatli o‘tdi!\n💰 Balansga <b>${n}</b> koin qo‘shildi.\nHozirgi koin: <b>${c}</b>`,
-  ru: (n, c) => `✅ Оплата прошла успешно!\n💰 На баланс зачислено <b>${n}</b> коинов.\nСейчас коинов: <b>${c}</b>`
+  ru: (n, c) => `✅ Оплата прошла успешно!\n💰 На баланс зачислено <b>${n}</b> коинов.\nСейчас коинов: <b>${c}</b>`,
+  kaa: (n, c) => `✅ Төлем табыслы өтти!\n💰 Балансқа <b>${n}</b> койн қосылды.\nҲәзирги койн: <b>${c}</b>`
 };
 
 async function createCoinInvoice(u, idx) {
@@ -5266,7 +5275,8 @@ async function createVipInvoice(u) {
 const PIECE_PAID_TEXT = {
   kk: '✅ Төлем сәтті өтті!\n🎨 Жаңа тастар ашылды. Ойында қолданылып жатыр.',
   uz: '✅ To‘lov muvaffaqiyatli o‘tdi!\n🎨 Yangi toshlar ochildi. O‘yinda ishlatilmoqda.',
-  ru: '✅ Оплата прошла успешно!\n🎨 Новые шашки открыты и уже используются в игре.'
+  ru: '✅ Оплата прошла успешно!\n🎨 Новые шашки открыты и уже используются в игре.',
+  kaa: '✅ Төлем табыслы өтти!\n🎨 Жаңа таслар ашылды. Ойында қолланылып атыр.'
 };
 
 // Тастар: Telegram Stars арқылы (койнға емес)
