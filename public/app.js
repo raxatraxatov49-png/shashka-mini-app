@@ -1463,12 +1463,21 @@ document.addEventListener('visibilitychange', () => {
 window.addEventListener('pageshow', checkAlive);
 window.addEventListener('online', checkAlive);
 
+let lastPingAt = 0;
+
 setInterval(() => {
   if (document.hidden || S.fatal) return;
 
   if (S.ws && S.ws.readyState === 1) {
-    if (Date.now() - S.lastRx > 25000) forceReconnect();
-    else send({ t: 'ping' });
+    // Ойын кезінде жиі (10с), бос тұрғанда сирек (20с) тексереміз
+    const inGame = Boolean(S.g && !S.g.over);
+    const now = Date.now();
+
+    if (now - S.lastRx > (inGame ? 25000 : 50000)) forceReconnect();
+    else if (inGame || now - lastPingAt >= 20000) {
+      lastPingAt = now;
+      send({ t: 'ping' });
+    }
   }
 }, 10000);
 
@@ -3715,7 +3724,9 @@ function openPlayers() {
   show('players');
 
   stopPlayersPoll();
-  S.playersPoll = setInterval(() => send({ t: 'players_get' }), 20000);
+  S.playersPoll = setInterval(() => {
+    if (!document.hidden) send({ t: 'players_get' });
+  }, 20000);
 }
 
 function onPlayers(m) {
