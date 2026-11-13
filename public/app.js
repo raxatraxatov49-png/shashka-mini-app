@@ -1334,8 +1334,15 @@ function connect() {
      S.ws.readyState === WebSocket.OPEN)
   ) return;
 
+  const WS_HOST = (
+    location.hostname === 'localhost' ||
+    location.hostname === '127.0.0.1'
+  )
+    ? location.host
+    : 'shashka-mini-app-tp6r.onrender.com';
+
   const ws = new WebSocket(
-    `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`
+    `${location.hostname === 'localhost' || location.hostname === '127.0.0.1' ? (location.protocol === 'https:' ? 'wss' : 'ws') : 'wss'}://${WS_HOST}/ws`
   );
 
   S.ws = ws;
