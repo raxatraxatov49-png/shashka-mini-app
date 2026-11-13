@@ -4598,7 +4598,11 @@ const server = http.createServer((req, res) => {
 const wss = new WebSocketServer({
   server,
   path: '/ws',
-  maxPayload: 4096
+  maxPayload: 4096,
+  perMessageDeflate: {
+    threshold: 256,
+    zlibDeflateOptions: { level: 6 }
+  }
 });
 
 /* ---------- Ойын функциялары ---------- */
@@ -5458,7 +5462,7 @@ function handleSuccessfulPayment(message) {
 
 const PROFILES_FILE = path.join(DATA_DIR, 'profiles.json');
 const PINVITE_TTL = 30 * 1000;
-const PLAYERS_LIMIT = 5000;
+const PLAYERS_LIMIT = 100;
 
 // id -> { name, username, avatar, seen }
 const profiles = new Map();
