@@ -71,7 +71,7 @@ function writeJSON(file, data) {
 
   fs.writeFileSync(
     temp,
-    JSON.stringify(data, null, 2)
+    JSON.stringify(data)
   );
 
   fs.renameSync(temp, file);
@@ -120,7 +120,10 @@ async function storeLoad(name, file, fallback) {
 }
 
 const writeQueue = new Map();
+const lastSaved = new Map();
+const REDIS_COALESCE_MS = 2000;
 let flushPromise = null;
+let flushTimer = null;
 
 async function flushWrites() {
   while (writeQueue.size) {
@@ -128,6 +131,8 @@ async function flushWrites() {
 
     try {
       await redisCommand(['SET', REDIS_PREFIX + name, json]);
+
+      lastSaved.set(name, json);
 
       if (writeQueue.get(name) === json) {
         writeQueue.delete(name);
@@ -140,25 +145,51 @@ async function flushWrites() {
 }
 
 function flushStorage() {
+  if (flushTimer) {
+    clearTimeout(flushTimer);
+    flushTimer = null;
+  }
+
   if (!flushPromise) {
     flushPromise = flushWrites().finally(() => {
       flushPromise = null;
+
+      if (writeQueue.size) scheduleFlush();
     });
   }
 
   return flushPromise;
 }
 
+// Қысқа уақыт ішіндегі көп жазуды бір Redis SET-ке біріктіреді
+function scheduleFlush() {
+  if (flushTimer || flushPromise) return;
+
+  flushTimer = setTimeout(() => {
+    flushTimer = null;
+    flushStorage();
+  }, REDIS_COALESCE_MS);
+
+  if (flushTimer.unref) flushTimer.unref();
+}
+
 function storeSave(name, file, data) {
+  if (USE_REDIS) {
+    // Redis қолданылса, уақытша файлға қайта-қайта жазбаймыз (CPU/диск үнемдеу)
+    const json = JSON.stringify(data);
+
+    // Деректер өзгермесе, Redis-ке қайта жібермейміз
+    if (!writeQueue.has(name) && lastSaved.get(name) === json) return;
+
+    writeQueue.set(name, json);
+    scheduleFlush();
+    return;
+  }
+
   try {
     writeJSON(file, data);
   } catch (error) {
     console.error('Файлға жазу қатесі:', file, error.message);
-  }
-
-  if (USE_REDIS) {
-    writeQueue.set(name, JSON.stringify(data));
-    flushStorage();
   }
 }
 
@@ -282,8 +313,22 @@ const shopMsg = (id, ev) => {
   return m;
 };
 
-function saveStats() {
+let statsTimer = null;
+
+function saveStatsNow() {
+  clearTimeout(statsTimer);
+  statsTimer = null;
+
   storeSave('stats', STATS_FILE, stats);
+}
+
+// Әр ойын басталғанда бүкіл stats-ты қайта жазбау үшін 4 секундқа біріктіреміз
+function saveStats() {
+  if (statsTimer) return;
+
+  statsTimer = setTimeout(saveStatsNow, 4000);
+
+  if (statsTimer.unref) statsTimer.unref();
 }
 
 function trackUser(id) {
@@ -1705,6 +1750,7 @@ function removeUserInvite(userId) {
 }
 
 function startGame(a, b, groupInfo = null, random = false) {
+  playersDirty();
   dequeue(a.id);
   dequeue(b.id);
 
@@ -4545,10 +4591,119 @@ async function setupTelegramWebhook() {
 
 /* ---------- HTTP ---------- */
 
+/* ---------- Статикалық файлдар (жадта кэштеу + gzip + ETag) ---------- */
+
+const zlib = require('zlib');
+
+const COMPRESSIBLE = new Set(['.html', '.js', '.css', '.svg']);
+const IMAGE_EXT = new Set(['.png', '.ico', '.svg']);
+
+let staticFiles = new Map();
+
+function buildStatic() {
+  const map = new Map();
+
+  const walk = (dir, prefix) => {
+    let entries = [];
+
+    try {
+      entries = fs.readdirSync(dir, { withFileTypes: true });
+    } catch {
+      return;
+    }
+
+    for (const entry of entries) {
+      const full = path.join(dir, entry.name);
+      const key = prefix + '/' + entry.name;
+
+      if (entry.isDirectory()) {
+        walk(full, key);
+        continue;
+      }
+
+      if (!entry.isFile()) continue;
+
+      let data;
+
+      try {
+        data = fs.readFileSync(full);
+      } catch {
+        continue;
+      }
+
+      const ext = path.extname(entry.name);
+
+      map.set(key, {
+        data,
+        gzip: COMPRESSIBLE.has(ext) && data.length > 1024
+          ? zlib.gzipSync(data, { level: 9 })
+          : null,
+        type: MIME[ext] || 'application/octet-stream',
+        etag: '"' + crypto.createHash('sha1').update(data).digest('base64') + '"',
+        cache: IMAGE_EXT.has(ext) && ext !== '.svg'
+          ? 'public, max-age=3600'
+          : 'no-cache'
+      });
+    }
+  };
+
+  walk(PUBLIC, '');
+  staticFiles = map;
+}
+
+buildStatic();
+
+function serveStatic(req, res, url) {
+  if (DEV) buildStatic();
+
+  const key = url === '/' ? '/index.html' : url;
+  const f = staticFiles.get(key);
+
+  if (!f) {
+    res.writeHead(404);
+    return res.end('Not found');
+  }
+
+  const headers = {
+    'Content-Type': f.type,
+    'Cache-Control': f.cache,
+    ETag: f.etag,
+    Vary: 'Accept-Encoding'
+  };
+
+  if (req.headers['if-none-match'] === f.etag) {
+    res.writeHead(304, headers);
+    return res.end();
+  }
+
+  let body = f.data;
+
+  if (
+    f.gzip &&
+    /\bgzip\b/.test(String(req.headers['accept-encoding'] || ''))
+  ) {
+    body = f.gzip;
+    headers['Content-Encoding'] = 'gzip';
+  }
+
+  headers['Content-Length'] = body.length;
+
+  res.writeHead(200, headers);
+  res.end(req.method === 'HEAD' ? undefined : body);
+}
+
 const server = http.createServer((req, res) => {
-  const url = decodeURIComponent(
-    (req.url || '/').split('?')[0]
-  );
+  let url;
+
+  try {
+    url = decodeURIComponent(
+      (req.url || '/').split('?')[0]
+    );
+  } catch {
+    // Қате кодталған URL серверді құлатпауы керек
+    res.writeHead(400);
+    return res.end('Bad request');
+  }
 
   if (
     req.method === 'POST' &&
@@ -4565,32 +4720,12 @@ const server = http.createServer((req, res) => {
     return res.end('ok');
   }
 
-  const rel = url === '/'
-    ? 'index.html'
-    : url.replace(/^\/+/, '');
-
-  const file = path.join(PUBLIC, rel);
-
-  if (!file.startsWith(PUBLIC + path.sep)) {
-    res.writeHead(403);
+  if (req.method !== 'GET' && req.method !== 'HEAD') {
+    res.writeHead(405);
     return res.end();
   }
 
-  fs.readFile(file, (err, data) => {
-    if (err) {
-      res.writeHead(404);
-      return res.end('Not found');
-    }
-
-    res.writeHead(200, {
-      'Content-Type':
-        MIME[path.extname(file)] ||
-        'application/octet-stream',
-      'Cache-Control': 'no-cache'
-    });
-
-    res.end(data);
-  });
+  serveStatic(req, res, url);
 });
 
 /* ---------- WebSocket ---------- */
@@ -4691,6 +4826,7 @@ function startGroupWaitingTimer(
 }
 
 function finish(g, winner, reason) {
+  playersDirty();
   if (!games.has(g.id)) return;
 
   games.delete(g.id);
@@ -5495,14 +5631,23 @@ const pdeclTimer = setInterval(() => {
 if (pdeclTimer.unref) pdeclTimer.unref();
 
 let profilesTimer = null;
+let profilesSavedAt = 0;
+
+// «seen» (соңғы кірген уақыт) жалғыз өзгерсе, көбі 10 минутта бір рет сақталады
+const SEEN_PERSIST_MS = 10 * 60 * 1000;
+
+function saveProfilesNow() {
+  clearTimeout(profilesTimer);
+  profilesTimer = null;
+  profilesSavedAt = Date.now();
+
+  storeSave('profiles', PROFILES_FILE, Object.fromEntries(profiles));
+}
 
 function saveProfilesSoon() {
   if (profilesTimer) return;
 
-  profilesTimer = setTimeout(() => {
-    profilesTimer = null;
-    storeSave('profiles', PROFILES_FILE, Object.fromEntries(profiles));
-  }, 5000);
+  profilesTimer = setTimeout(saveProfilesNow, 15000);
 
   if (profilesTimer.unref) profilesTimer.unref();
 }
@@ -5512,20 +5657,42 @@ function touchProfile(id, data) {
 
   if (id.startsWith('dev')) return;
 
-  const p = profiles.get(id) || {
+  const existing = profiles.get(id);
+
+  const p = existing || {
     name: '',
     username: '',
     avatar: null,
     seen: 0
   };
 
-  if (data.name) p.name = String(data.name).slice(0, 40);
-  if (data.username) p.username = String(data.username);
-  if (data.avatar) p.avatar = String(data.avatar);
-  if (data.seen) p.seen = data.seen;
+  let changed = !existing;
+
+  if (data.name) {
+    const v = String(data.name).slice(0, 40);
+    if (p.name !== v) { p.name = v; changed = true; }
+  }
+
+  if (data.username) {
+    const v = String(data.username);
+    if (p.username !== v) { p.username = v; changed = true; }
+  }
+
+  if (data.avatar) {
+    const v = String(data.avatar);
+    if (p.avatar !== v) { p.avatar = v; changed = true; }
+  }
+
+  if (data.seen) {
+    p.seen = data.seen;
+
+    if (Date.now() - profilesSavedAt > SEEN_PERSIST_MS) changed = true;
+  }
 
   profiles.set(id, p);
-  saveProfilesSoon();
+
+  // Тек шынымен өзгеріс болғанда ғана барлық профильдерді қайта сақтаймыз
+  if (changed) saveProfilesSoon();
 }
 
 const isOnline = u =>
@@ -5534,30 +5701,45 @@ const isOnline = u =>
 const isBusy = u =>
   Boolean(u && u.game && games.has(u.game));
 
-function playersPayload(viewerId) {
-  const me = String(viewerId);
+// Барлық ойыншылар тізімі бір рет есептеліп, 2 секунд бойы ортақ қолданылады
+// (әр сұраныста 5000 профильді қайта айналып сұрыптамау үшін)
+const PLAYERS_CACHE_MS = 2000;
+let playersBase = null;
+let playersBaseAt = 0;
+
+function playersDirty() {
+  playersBaseAt = 0;
+}
+
+function playersBaseList() {
   const now = Date.now();
+
+  if (playersBase && now - playersBaseAt < PLAYERS_CACHE_MS) {
+    return playersBase;
+  }
+
   const list = [];
+  const online = new Set();
 
   for (const [id, p] of profiles) {
-    if (id === me) continue;
-
     const u = users.get(id);
-    const online = isOnline(u);
-    const gm = online && u.game ? games.get(u.game) : null;
+    const isOn = isOnline(u);
+    const gm = isOn && u.game ? games.get(u.game) : null;
+
+    if (isOn) online.add(id);
 
     list.push({
       id,
       name: p.name || p.username || ('Ойыншы ' + String(id).slice(-4)),
       username: p.username || '',
       avatar: p.avatar || null,
-      status: online ? (isBusy(u) ? 'game' : 'online') : 'offline',
+      status: isOn ? (isBusy(u) ? 'game' : 'online') : 'offline',
       watch: Boolean(gm && !gm.waitingForOpponent && !gm.st.over),
       vip: isVipId(id),
       dnd: shop.isDnd(id),
-      cool: coolLeft(me, id),
-      seen: online ? now : (p.seen || 0),
-      sent: pinvites.has(me + '>' + id)
+      cool: 0,
+      seen: isOn ? now : (p.seen || 0),
+      sent: false
     });
   }
 
@@ -5568,11 +5750,49 @@ function playersPayload(viewerId) {
     (b.seen - a.seen)
   );
 
+  playersBase = { list, online };
+  playersBaseAt = now;
+
+  return playersBase;
+}
+
+function playersPayload(viewerId) {
+  const me = String(viewerId);
+  const base = playersBaseList();
+
+  // Осы ойыншы жіберген шақырулар
+  let sentTo = null;
+
+  if (pinvites.size) {
+    sentTo = new Set();
+
+    for (const key of pinvites.keys()) {
+      if (key.startsWith(me + '>')) sentTo.add(key.slice(me.length + 1));
+    }
+  }
+
+  const useCool = pdecl.size > 0;
+  const list = [];
+  let onlineCount = 0;
+
+  for (const e of base.list) {
+    if (e.id === me) continue;
+
+    if (e.status !== 'offline') onlineCount++;
+
+    if (list.length >= PLAYERS_LIMIT) continue;
+
+    const cool = useCool ? coolLeft(me, e.id) : 0;
+    const sent = Boolean(sentTo && sentTo.has(e.id));
+
+    list.push(cool || sent ? Object.assign({}, e, { cool, sent }) : e);
+  }
+
   return {
     t: 'players',
-    list: list.slice(0, PLAYERS_LIMIT),
-    total: list.length,
-    onlineCount: list.filter(x => x.status !== 'offline').length,
+    list,
+    total: base.list.length - (profiles.has(me) ? 1 : 0),
+    onlineCount,
     ttl: PINVITE_TTL / 1000
   };
 }
@@ -6208,6 +6428,8 @@ function onAuth(ws, m) {
 
   ws.user = u;
 
+  playersDirty();
+
   unwatch(u);
 
   send(u, {
@@ -6382,6 +6604,8 @@ wss.on('connection', ws => {
 
     u.ws = null;
 
+    playersDirty();
+
     unwatch(u);
 
     dequeue(u.id);
@@ -6465,7 +6689,7 @@ setInterval(() => {
     ws.isAlive = false;
     ws.ping();
   });
-}, 15000).unref();
+}, 25000).unref();
 
 /* ---------- Серверді іске қосу ---------- */
 
@@ -6474,6 +6698,11 @@ if (require.main === module) {
     console.log(signal + ': жабылар алдында деректер сақталуда...');
 
     try {
+      // Күтіп тұрған (біріктірілген) сақтауларды дереу жазамыз
+      if (statsTimer) saveStatsNow();
+      if (profilesTimer) saveProfilesNow();
+      if (grSaveTimer) grSaveNow();
+
       await Promise.race([
         flushStorage(),
         new Promise(r => setTimeout(r, 8000))
