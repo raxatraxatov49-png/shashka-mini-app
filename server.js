@@ -4454,13 +4454,13 @@ async function setupTelegramWebhook() {
       { code: null, lang: 'kk' },
       { code: 'kk', lang: 'kk' },
       { code: 'uz', lang: 'uz' },
-      { code: 'ru', lang: 'ru' },
-      { code: 'kaa', lang: 'kaa' }
+      { code: 'ru', lang: 'ru' }
     ];
 
     for (const { code, lang } of commandLocales) {
       const extra = code ? { language_code: code } : {};
 
+      try {
       await telegramApi('setMyCommands', {
         commands: [
           {
@@ -4510,6 +4510,12 @@ async function setupTelegramWebhook() {
         },
         ...extra
       });
+      } catch (localeError) {
+        console.error(
+          'Командалар қатесі (' + (code || 'default') + '):',
+          localeError.message
+        );
+      }
     }
 
     console.log('Telegram командалары орнатылды');
