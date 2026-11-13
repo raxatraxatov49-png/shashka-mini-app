@@ -3715,7 +3715,7 @@ function openPlayers() {
   show('players');
 
   stopPlayersPoll();
-  S.playersPoll = setInterval(() => send({ t: 'players_get' }), 8000);
+  S.playersPoll = setInterval(() => send({ t: 'players_get' }), 20000);
 }
 
 function onPlayers(m) {
@@ -3866,6 +3866,12 @@ function renderPlayers() {
   const on = list.filter((p) => p.status !== 'offline');
   const off = list.filter((p) => p.status === 'offline');
 
+  const onTotal = Math.max(on.length, (S.players && S.players.onlineCount) || 0);
+  const offTotal = Math.max(
+    off.length,
+    ((S.players && S.players.total) || 0) - ((S.players && S.players.onlineCount) || 0)
+  );
+
   const head = (key, n) => {
     const h = document.createElement('div');
     h.className = 'plhead';
@@ -3874,12 +3880,12 @@ function renderPlayers() {
   };
 
   if (on.length) {
-    head('playersOnline', on.length);
+    head('playersOnline', onTotal);
     on.forEach((p) => box.append(playerRow(p)));
   }
 
   if (off.length) {
-    head('playersOffline', off.length);
+    head('playersOffline', offTotal);
     off.forEach((p) => box.append(playerRow(p)));
   }
 
