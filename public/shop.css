@@ -116,3 +116,11 @@
   content: attr(data-em); position: absolute; inset: 0; display: grid; place-items: center; z-index: 1;
   font-size: clamp(13px, 4.6vw, 22px); line-height: 1; filter: drop-shadow(0 1px 1px rgba(0, 0, 0, .4));
 }
+
+/* ---------- Реалистік тастар: дүкендегі превью ---------- */
+.tp.wood { background: #b98a5a linear-gradient(180deg, rgba(255, 236, 200, .25), rgba(0, 0, 0, .25)); }
+.tp b.rp { background: radial-gradient(circle at 38% 28%, var(--wa), var(--wb) 80%); box-shadow: 0 4px 5px rgba(0, 0, 0, .5), 0 1px 2px rgba(0, 0, 0, .5), inset 0 -2px 3px rgba(0, 0, 0, .4), inset 0 2px 2px rgba(255, 255, 255, .55); }
+.tp b.rp::before { content: ""; position: absolute; inset: 14%; border-radius: 50%; background: radial-gradient(circle at 40% 32%, var(--wc), var(--wd)); box-shadow: inset 0 2px 3px rgba(0, 0, 0, .45), 0 1px 0 rgba(255, 255, 255, .5); }
+.tp b.rp::after { inset: 33%; background: radial-gradient(circle at 40% 32%, var(--wc), var(--wd)); box-shadow: inset 0 1px 2px rgba(0, 0, 0, .3), 0 1px 0 rgba(255, 255, 255, .45); }
+.tp b.rp.k { background: radial-gradient(circle at 38% 28%, var(--ka), var(--kb) 80%); }
+.tp b.rp.k::before, .tp b.rp.k::after { background: radial-gradient(circle at 40% 32%, var(--kc), var(--kd)); }
