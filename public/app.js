@@ -236,6 +236,14 @@ const I18N = {
     "item_p18": "Түнгі көк және болат",
     "item_p19": "Қарағай және құм",
     "item_p20": "Қара және қола",
+    "item_p21": "Лағыл және сапфир",
+    "item_p22": "Зүмірет және аметист",
+    "item_p23": "Қызғылт және бірюза",
+    "item_p24": "Күміс және қою көк",
+    "item_p25": "Лайм және индиго",
+    "item_p26": "Лаванда және жасыл-көк",
+    "item_p27": "Маджента және циан",
+    "item_p28": "Аспан және раушан",
     "rarGirl": "Ерекше",
     "rarBoy": "Қарапайым стиль",
     "watchBtn": "Ойынды қарау",
@@ -462,6 +470,14 @@ const I18N = {
       "item_p18": "Түнги көк ҳәм болат",
       "item_p19": "Қарағай ҳәм қум",
       "item_p20": "Қара ҳәм қола",
+      "item_p21": "Лағыл ҳәм сапфир",
+      "item_p22": "Зүмрет ҳәм аметист",
+      "item_p23": "Қызғылт ҳәм бирюза",
+      "item_p24": "Гүмис ҳәм қара көк",
+      "item_p25": "Лайм ҳәм индиго",
+      "item_p26": "Лаванда ҳәм жасыл-көк",
+      "item_p27": "Маджента ҳәм циан",
+      "item_p28": "Аспан ҳәм раушан",
       "rarGirl": "Өзгеше",
       "rarBoy": "Қарапайым стиль",
       "watchBtn": "Ойынды қарау",
@@ -688,6 +704,14 @@ const I18N = {
     "item_p18": "Tungi ko‘k va po‘lat",
     "item_p19": "Qarag‘ay va qum",
     "item_p20": "Qora va bronza",
+    "item_p21": "Yoqut va safir",
+    "item_p22": "Zumrad va ametist",
+    "item_p23": "Pushti va firuza",
+    "item_p24": "Kumush va to‘q ko‘k",
+    "item_p25": "Laym va indigo",
+    "item_p26": "Lavanda va yashil-ko‘k",
+    "item_p27": "Magenta va tsian",
+    "item_p28": "Osmon va atirgul",
     "rarGirl": "Maxsus",
     "rarBoy": "Oddiy uslub",
     "watchBtn": "O‘yinni kuzatish",
@@ -914,6 +938,14 @@ const I18N = {
     "item_p18": "Ночной синий и сталь",
     "item_p19": "Сосна и песок",
     "item_p20": "Чёрный и бронза",
+    "item_p21": "Рубин и сапфир",
+    "item_p22": "Изумруд и аметист",
+    "item_p23": "Розовый и бирюзовый",
+    "item_p24": "Серебро и тёмно-синий",
+    "item_p25": "Лайм и индиго",
+    "item_p26": "Лаванда и морская волна",
+    "item_p27": "Маджента и циан",
+    "item_p28": "Небесный и розовый",
     "rarGirl": "Особенные",
     "rarBoy": "Строгий стиль",
     "watchBtn": "Смотреть игру",
@@ -1059,7 +1091,7 @@ const S = {
   fatal: false,
   refSent: false,
   shop: null,
-  shopTab: 'boards',
+  shopTab: 'pieces',
   rating: null,
   ratingTab: 'week',
   players: null,
@@ -3062,113 +3094,54 @@ const gloss = (a, b, fx) =>
   `radial-gradient(circle at 34% 26%,${a},${b} 74%)`;
 
 // Жаңа тастар (Telegram Stars, 15 ⭐). w = ашық жақ, k = қою жақ.
-// Қыздарға: p13–p16 (cute), жігіттерге: p17–p20 (metal)
-const NEW_PIECES = {
-  p13: { fx: 'cute', w: ['#ffffff', '#f4cfe0'], k: ['#ffe6f0', '#ff8ab5'], em: ['🌸', '🌸'] },
-  p14: { fx: 'cute', w: ['#e0fff4', '#6fd3ad'], k: ['#efe0ff', '#a678e6'], em: ['🦋', '🦋'] },
-  p15: { fx: 'cute', w: ['#fffcf5', '#f6dcc2'], k: ['#ffc0c0', '#e8445e'], em: ['🍦', '🍓'] },
-  p16: { fx: 'cute', w: ['#fff0d9', '#ffae6e'], k: ['#ffd8ea', '#ff63ab'], em: ['💖', '🎀'] },
-  p17: { fx: 'metal', w: ['#f5f7fa', '#a9afb8'], k: ['#9094a0', '#33363c'], em: ['⚡', '⚡'] },
-  p18: { fx: 'metal', w: ['#d8e1ea', '#8896a8'], k: ['#5f80b8', '#1b2e5d'], em: ['🦅', '🦅'] },
-  p19: { fx: 'metal', w: ['#f1e5c4', '#b9a273'], k: ['#659672', '#21442f'], em: ['🌲', '🌲'] },
-  p20: { fx: 'metal', w: ['#e6b98e', '#8a5b34'], k: ['#505055', '#0d0d0f'], em: ['🦁', '🦁'] }
+/* ---------- ТАСТАР: реалистік стиль (классикалық + 8 жаңа жұп) ---------- */
+// Тақта бір ғана (ағаш), оны ешкім өзгертпейді. Тек тастың түсі таңдалады.
+const hexToRgb = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
+
+const mixHex = (base, other, t) => {
+  const a = hexToRgb(base);
+  const b = hexToRgb(other);
+
+  return '#' + a.map((x, i) =>
+    Math.round(x * t + b[i] * (1 - t)).toString(16).padStart(2, '0')
+  ).join('');
 };
+
+const stoneTones = (base, p) => ({
+  a: mixHex(base, '#ffffff', p[0]),
+  b: mixHex(base, '#000000', p[1]),
+  c: mixHex(base, '#ffffff', p[2]),
+  d: mixHex(base, '#000000', p[3])
+});
+
+const stone = (w, k) => ({
+  wc: stoneTones(w, [0.4, 0.68, 0.8, 0.8]),
+  kc: stoneTones(k, [0.48, 0.65, 0.82, 0.78])
+});
+
+const stoneVars = (c) =>
+  `--wa:${c.wc.a};--wb:${c.wc.b};--wc:${c.wc.c};--wd:${c.wc.d};` +
+  `--ka:${c.kc.a};--kb:${c.kc.b};--kc:${c.kc.c};--kd:${c.kc.d}`;
 
 const SKINS = {
-  boards: {
-    b0: { a: '#d8cbb5', b: '#75583e' },
-    b1: { a: '#eeeed2', b: '#6a9b4f' },
-    b2: { a: '#dbe9f4', b: '#4b7fb5' },
-    b3: { a: '#9a9a9a', b: '#2b2b2f' },
-    b4: { a: '#fff0b8', b: '#c58a12' },
-    b5: { a: '#fde8ee', b: '#d98aa6' },
-    b6: { a: '#f1dccb', b: '#b8604a' },
-    b7: { a: '#a9c7a0', b: '#1f3d2b' },
-    b8: { a: '#e3d9f5', b: '#6a4aa8' },
-    b9: { a: '#f0fbff', b: '#6fb7c9' },
-    b10: { a: '#2d1b1b', b: '#d9441f' },
-    b11: { a: '#3a3a3f', b: '#e0b13a' },
-    b12: { a: '#3b2f7a', b: '#0e0b2b' }
-  },
   pieces: {
-    p0: {
-      w: 'radial-gradient(circle at 35% 30%,#fff,#e9e3d5 70%,#cfc6b3)',
-      k: 'radial-gradient(circle at 35% 30%,#5a5a5f,#26262a 65%,#121214)'
-    },
-    p1: {
-      w: 'radial-gradient(circle at 35% 30%,#ff9a9a,#c42b2b)',
-      k: 'radial-gradient(circle at 35% 30%,#8fb7ff,#2b55c4)'
-    },
-    p5: {
-      w: 'radial-gradient(circle at 35% 30%,#c8f08f,#5aa21e)',
-      k: 'radial-gradient(circle at 35% 30%,#fff2a0,#e0a800)'
-    },
-    p6: {
-      w: 'radial-gradient(circle at 35% 30%,#ffc2dc,#e0508f)',
-      k: 'radial-gradient(circle at 35% 30%,#bfe9ff,#3a9bd6)'
-    }
+    p0: stone('#ece9e2', '#2c2c31'),
+    p21: stone('#e63946', '#2b6cdf'),
+    p22: stone('#22b573', '#8e55e0'),
+    p23: stone('#ff6fa8', '#19c3c9'),
+    p24: stone('#cfd6df', '#1e3a8a'),
+    p25: stone('#9be03f', '#4338ca'),
+    p26: stone('#c9b6ff', '#0e8f8a'),
+    p27: stone('#d62fb4', '#35b8ff'),
+    p28: stone('#7cc4ff', '#ff4d6d')
   }
 };
 
-for (const [id, c] of Object.entries(NEW_PIECES)) {
-  SKINS.pieces[id] = {
-    w: gloss(c.w[0], c.w[1], c.fx),
-    k: gloss(c.k[0], c.k[1], c.fx),
-    em: c.em,
-    fx: c.fx
-  };
-}
-
 (function buildSkinCss() {
-  // Тастың ортасындағы белгі (emoji). Дамка болғанда белгі жасырылып, тәж көтеріліп шығады.
-  let css =
-    '.pc{container-type:size}' +
-    '.pc>i::after{position:absolute;inset:0;display:grid;place-items:center;line-height:1;' +
-    'font-size:4vw;font-size:34cqw;z-index:1;pointer-events:none;' +
-    'filter:drop-shadow(0 1px 1px rgba(0,0,0,.4))}';
-
-  for (const [id, c] of Object.entries(SKINS.boards)) {
-    if (id === 'b0') continue;
-
-    css +=
-      `#field[data-board="${id}"] .sq{background:${c.a}}` +
-      `#field[data-board="${id}"] .sq.d{background:${c.b}}`;
-  }
+  let css = '';
 
   for (const [id, c] of Object.entries(SKINS.pieces)) {
-    if (id === 'p0') continue;
-
-    const w = c.img ? `${c.img} center/64% no-repeat,${c.w}` : c.w;
-    const k = c.img ? `${c.img} center/64% no-repeat,${c.k}` : c.k;
-
-    css +=
-      `#field[data-pieces="${id}"] .pc.w>i{background:${w}}` +
-      `#field[data-pieces="${id}"] .pc.b>i{background:${k}}`;
-
-    if (c.em) {
-      const sel = `#field[data-pieces="${id}"] .pc`;
-
-      css +=
-        `${sel}.w>i::after{content:"${c.em[0]}"}` +
-        `${sel}.b>i::after{content:"${c.em[1]}"}` +
-        // дамка: белгі жасырылады, тас көтеріледі, тәж ортасынан шығып тұрады
-        `${sel}.king>i::after{display:none}` +
-        `${sel}.king>i{box-shadow:0 7px 0 rgba(0,0,0,.28),0 10px 10px rgba(0,0,0,.35)}` +
-        `${sel}.king>i svg{width:70%;height:70%;transform:translateY(-14%);fill:#f5b82e;` +
-        `stroke:#8a5408;stroke-width:1.2;filter:drop-shadow(0 3px 2px rgba(0,0,0,.5))}`;
-
-      if (c.fx === 'cute') {
-        css += `${sel}>i::before{box-shadow:none;border:2px dashed rgba(255,255,255,.85)}`;
-      } else {
-        css += `${sel}>i::after{filter:saturate(.55) drop-shadow(0 1px 1px rgba(0,0,0,.5))}`;
-      }
-    }
-
-    // дамада тәж сурет үстінде тұрмауы үшін сурет кішірейіп төмен түседі
-    if (c.img) {
-      css +=
-        `#field[data-pieces="${id}"] .pc.king>i{background-size:40%,auto;background-position:50% 78%,center}`;
-    }
+    css += `#field[data-pieces="${id}"]{${stoneVars(c)}}`;
   }
 
   const st = document.createElement('style');
@@ -3206,46 +3179,25 @@ function applySkin() {
   const f = $('field');
   const sk = S.g && S.g.skin;
 
-  // Админмен ойнағанда екеуі де админнің тақтасы мен тастарын көреді
-  if (
-    sk &&
-    SKINS.boards[sk.boards] &&
-    SKINS.pieces[sk.pieces]
-  ) {
-    f.dataset.board = sk.boards;
+  // Админмен/VIP-пен ойнағанда екеуі де оның тастарын көреді (тақта бәріне бірдей)
+  if (sk && SKINS.pieces[sk.pieces]) {
     f.dataset.pieces = sk.pieces;
     return;
   }
 
   if (!S.shop) return;
 
-  f.dataset.board = S.shop.use.boards;
-  f.dataset.pieces = S.shop.use.pieces;
+  f.dataset.pieces = SKINS.pieces[S.shop.use.pieces]
+    ? S.shop.use.pieces
+    : 'p0';
 }
 
 function thumb(kind, id) {
-  if (kind === 'boards') {
-    const c = SKINS.boards[id];
-    let h = '';
-
-    for (let r = 0; r < 4; r++) {
-      for (let q = 0; q < 4; q++) {
-        h += `<i style="background:${(r + q) % 2 ? c.b : c.a}"></i>`;
-      }
-    }
-
-    return `<div class="tb">${h}</div>`;
-  }
-
-  const c = SKINS.pieces[id];
-
-  const bw = c.img ? `${c.img} center/70% no-repeat,${c.w}` : c.w;
-  const bk = c.img ? `${c.img} center/70% no-repeat,${c.k}` : c.k;
+  const c = SKINS.pieces[id] || SKINS.pieces.p0;
 
   return (
-    '<div class="tp">' +
-    `<b style="background:${bw}"${c.em ? ` data-em="${c.em[0]}"` : ''}></b>` +
-    `<b style="background:${bk}"${c.em ? ` data-em="${c.em[1]}"` : ''}></b>` +
+    `<div class="tp wood" style="${stoneVars(c)}">` +
+    '<b class="rp"></b><b class="rp k"></b>' +
     '</div>'
   );
 }
@@ -3254,7 +3206,7 @@ function renderShop() {
   const m = S.shop;
   if (!m) return;
 
-  const kind = S.shopTab;
+  const kind = 'pieces'; // тек тастар бөлімі қалды
 
   $('tabBoards').classList.toggle('on', kind === 'boards');
   $('tabPieces').classList.toggle('on', kind === 'pieces');
@@ -3284,7 +3236,7 @@ function renderShop() {
 
     const rar = fx
       ? `<div class="rar ${fx === 'cute' ? 'rg' : 'rb'}">${tr(fx === 'cute' ? 'rarGirl' : 'rarBoy')}</div>`
-      : `<div class="rar r${rarity(price)}">${tr('rar' + rarity(price))}</div>`;
+      : `<div class="rar r${star ? 3 : rarity(price)}">${tr('rar' + (star ? 3 : rarity(price)))}</div>`;
 
     html.push(
       `<div class="sitem${used ? ' sel' : ''}">` +
@@ -3476,6 +3428,13 @@ document.querySelectorAll('[data-back]').forEach((b) => {
 
 $('tabBoards').onclick = () => { S.shopTab = 'boards'; renderShop(); };
 $('tabPieces').onclick = () => { S.shopTab = 'pieces'; renderShop(); };
+
+// Тақталар бөлімі алынды: дүкенде тек тастар қалады, сондықтан қойындыларды жасырамыз
+(function hideShopTabs() {
+  const t = $('tabBoards');
+
+  if (t && t.parentNode) t.parentNode.style.display = 'none';
+})();
 
 $('shopGrid').addEventListener('click', (e) => {
   const b = e.target.closest('button[data-id]');
